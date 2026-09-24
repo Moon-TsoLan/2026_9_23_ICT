@@ -1,0 +1,56 @@
+{
+  "name": "benchmark10",
+  "purpose": "固定的 10 则公告。之后每次改进主路线，都用这一组对比状态、字段覆盖和失败码。",
+  "announcements": [
+    {
+      "announcement_id": "t20260202_26139731",
+      "role": "goods_multivalue_cell",
+      "why": "货物表单元格用分号并列多个标的，正文同时出现包 3、包 4。"
+    },
+    {
+      "announcement_id": "t20260905_27275031",
+      "role": "goods_detail_and_qualification",
+      "why": "包 1、3、4 不连续，HTML 有标的明细、综合得分和资格性审查。"
+    },
+    {
+      "announcement_id": "t20260202_26139917",
+      "role": "deal_service",
+      "why": "成交类保险服务，单包。"
+    },
+    {
+      "announcement_id": "t20260401_26346106",
+      "role": "letter_package",
+      "why": "包号写成 A，而不是数字。"
+    },
+    {
+      "announcement_id": "t20260203_26142958",
+      "role": "no_attachment",
+      "why": "服务公告，没有附件压缩包。"
+    },
+    {
+      "announcement_id": "t20260202_26140146",
+      "role": "points_to_attachment",
+      "why": "正文出现详见附件，成交包为 B 包。"
+    },
+    {
+      "announcement_id": "t20260202_26140259",
+      "role": "service_two_packages",
+      "why": "服务类，同一篇里有包 1 和包 2。"
+    },
+    {
+      "announcement_id": "t20260508_26523336",
+      "role": "engineering",
+      "why": "水库运行维护，正文带施工范围。"
+    },
+    {
+      "announcement_id": "t20260206_26154814",
+      "role": "skipped_package_numbers",
+      "why": "同一篇出现包 1、2、4、5，包号不连续。"
+    },
+    {
+      "announcement_id": "t20260202_26140620",
+      "role": "compact_goods",
+      "why": "货物字段较齐，附件 PDF 只有两份，适合看主路线在短公告上的表现。"
+    }
+  ]
+}
