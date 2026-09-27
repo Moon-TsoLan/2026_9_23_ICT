@@ -16,7 +16,9 @@ PACKAGE_LIST_RE = re.compile(
 )
 KV_LABEL_RE = re.compile(r"标\s*包|供应商|金额|名称|服务范围|服务标准|服务时间|服务要求|地址|品牌|规格|数量|单价|施工范围")
 PROJECT_NO_RE = re.compile(r"项目编号[:：]\s*([A-Za-z0-9\-]+)")
-AMOUNT_RE = re.compile(r"[￥¥]?\s*[\d,，]+(?:\.\d+)?\s*(?:万元|元)")
+AMOUNT_RE = re.compile(r"[￥¥]?\s*[\d,，]+(?:\.\d+)?\s*[（(]?\s*(?:万元|元)")
+NUMBERED_SPLIT = re.compile(r"(?=(?:^|\s)[一二三四五六七八九十百]+、)")
+COMPANY_RE = re.compile(r"[\u4e00-\u9fffA-Za-z0-9（）()]{2,40}?(?:有限公司|股份公司|公司)")
 
 
 def _text(node) -> str:
@@ -44,6 +46,7 @@ class ParsedNotice:
     sections: list[dict] = field(default_factory=list)
     source_project_no: str | None = None
     body_packages: list[str] = field(default_factory=list)
+    package_anchors: list[dict] = field(default_factory=list)
 
 
 def _summary(soup: BeautifulSoup) -> dict[str, str]:
@@ -82,6 +85,7 @@ def _headers_and_rows(table: Tag) -> tuple[list[str], list[list[str]]]:
     rows = [row for row in rows if any(row)]
     if not rows:
         return [], []
+    rows = [_split_embedded_label(row) for row in rows]
     if _looks_like_kv(rows):
         pairs = [(row + [""])[:2] for row in rows]
         return ["字段", "内容"], pairs
@@ -90,6 +94,18 @@ def _headers_and_rows(table: Tag) -> tuple[list[str], list[list[str]]]:
     if len(headers) < width:
         headers = headers + [""] * (width - len(headers))
     return headers, rows[1:]
+
+
+def _split_embedded_label(row: list[str]) -> list[str]:
+    """Turn '名称：某某' in the only cell, or beside an empty cell, into key and value."""
+    if not row or not row[0] or not re.search(r"[:：]", row[0]):
+        return row
+    if len(row) >= 2 and row[1]:
+        return row
+    key, value = re.split(r"[:：]", row[0], maxsplit=1)
+    if not key.strip() or not value.strip():
+        return row
+    return [key.strip(), value.strip(), *row[2:]]
 
 
 def _looks_like_kv(rows: list[list[str]]) -> bool:
@@ -146,25 +162,31 @@ def parse_notice(path: Path) -> ParsedNotice:
         text = _text(node)
         if not text:
             continue
-        if node.name.startswith("h") or node.name == "div":
-            if section and section_parts:
-                sections.append({"title": section, "text": " ".join(section_parts)[:1600]})
-            headings.append(text)
-            section = text
-            section_parts = []
-        else:
-            section_parts.append(text[:500])
+        pieces = [piece.strip() for piece in NUMBERED_SPLIT.split(text) if piece.strip()]
+        for piece in pieces:
+            numbered = re.match(r"[一二三四五六七八九十百]+、", piece)
+            if node.name.startswith("h") or node.name == "div" or numbered:
+                if section and section_parts:
+                    sections.append({"title": section, "text": " ".join(section_parts)[:4000]})
+                headings.append(piece[:80])
+                section = piece[:80]
+                section_parts = [] if numbered and len(piece) <= 80 else ([piece] if numbered else [])
+                if numbered and len(piece) > 80:
+                    section_parts = [piece]
+            else:
+                section_parts.append(piece[:2000])
         before = text
         location = "html_heading" if node.name != "p" else "html_text"
         _collect_package_hints(hints, text, location)
     if section and section_parts:
-        sections.append({"title": section, "text": " ".join(section_parts)[:1600]})
+        sections.append({"title": section, "text": " ".join(section_parts)[:4000]})
     body = _text(content)
     project_no = PROJECT_NO_RE.search(body)
     seen: list[str] = []
     for hint in hints:
         if hint["package_no"] not in seen:
             seen.append(hint["package_no"])
+    anchors = _package_anchors(sections)
     return ParsedNotice(
         announcement_id=announcement_id,
         title=title,
@@ -175,6 +197,7 @@ def parse_notice(path: Path) -> ParsedNotice:
         sections=sections,
         source_project_no=project_no.group(1) if project_no else None,
         body_packages=seen,
+        package_anchors=anchors,
     )
 
 
@@ -233,28 +256,88 @@ def step1_payload(notice: ParsedNotice) -> dict:
     }
 
 
+def _package_anchors(sections: list[dict]) -> list[dict]:
+    """Package, supplier, and amount blocks from numbered body text."""
+    anchors: list[dict] = []
+    for section in sections:
+        parts = re.split(r"(?=供应商名称\s*[:：])", section["text"])
+        for part in parts:
+            if "供应商名称" not in part and "金额" not in part:
+                continue
+            package = re.search(r"第\s*([0-9]+|[A-Za-z]+)\s*包", part)
+            amount = AMOUNT_RE.search(part)
+            if package is None and amount is None:
+                continue
+            companies = COMPANY_RE.findall(part)
+            supplier = companies[-1] if companies else None
+            yuan = None
+            raw = None
+            if amount:
+                raw = amount.group(0)
+                yuan, _ = parse_amount(raw)
+            if package is None and supplier is None:
+                continue
+            anchors.append(
+                {
+                    "package_no": None if package is None else package.group(1),
+                    "supplier_name": supplier,
+                    "amount_raw": raw,
+                    "amount_yuan": yuan,
+                    "text": part[:400],
+                }
+            )
+    return anchors
+
+
 def bidder_body_sections(notice: ParsedNotice) -> list[dict]:
-    """Bidder prose that never becomes a table, so step 2B would otherwise not see it."""
+    """Bidder prose selected by content, not by the heading the DOM happened to use."""
     found = []
+    seen: set[str] = set()
     for section in notice.sections:
-        title = section["title"]
-        text = section["text"]
-        score_list = (
-            "评审专家" in title
-            and re.search(r"[（(]\s*\d", text)
-            and re.search(r"公司|供应商", text)
-        )
-        lost_bid = "未中标" in title and re.search(r"公司|供应商", text)
-        if score_list or lost_bid:
-            found.append({"title": title, "text": text})
+        blob = f"{section['title']} {section['text']}"
+        company_score = ("公司" in blob or "供应商" in blob) and re.search(r"[（(]\s*\d", blob)
+        supplier_amount = "供应商名称" in blob and ("金额" in blob or "万元" in blob)
+        if not company_score and not supplier_amount:
+            continue
+        key = section["text"][:80]
+        if key in seen:
+            continue
+        seen.add(key)
+        found.append({"title": section["title"], "text": section["text"]})
     return found
 
 
-def step2a_payload(table: ParsedTable, package_candidates: list[str]) -> dict:
+def fill_package_amounts(understanding, notice: ParsedNotice) -> None:
+    from ict.schemas import Amount
+
+    found: dict[str, dict] = {}
+    for anchor in notice.package_anchors:
+        package_no = anchor.get("package_no")
+        if package_no and anchor.get("amount_yuan") is not None:
+            found.setdefault(package_no, anchor)
+    for package in understanding.packages:
+        current = package.package_amount
+        if current is not None and current.amount_yuan is not None:
+            continue
+        anchor = found.get(package.package_no)
+        if anchor is None:
+            continue
+        package.package_amount = Amount(
+            raw_text=anchor.get("amount_raw"),
+            amount_yuan=anchor.get("amount_yuan"),
+            scope="package",
+            confidence=0.8,
+        )
+
+
+def step2a_payload(table: ParsedTable, package_candidates: list[str], siblings: list[dict] | None = None) -> dict:
     return {
         "table_index": table.table_index,
         "before_text": table.before_text,
         "headers": table.headers,
         "first_rows": table.rows[:12],
+        "section": table.section,
+        "key_value": table.key_value,
         "package_candidates": package_candidates,
+        "other_tables": siblings or [],
     }

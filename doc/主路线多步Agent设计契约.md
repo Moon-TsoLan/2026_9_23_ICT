@@ -1,6 +1,6 @@
 # 主路线多步 Agent 设计契约
 
-版本：v0.5  
+版本：v0.6  
 日期：2026-09-27  
 适用范围：任务一主提取流程。本文记录当前主路线的数据契约、状态流转，以及已经落地的调用方式。
 
@@ -159,12 +159,14 @@ work/runs/<announcement_id>/
 | `watermark_interference` | 水印导致关键内容不可读 |
 | `document_parse_failed` | DOC/DOCX/XLSX 等文档解析失败 |
 | `package_structure_unclear` | 无法判断公告包结构 |
-| `llm_schema_invalid` | 返回不是 JSON 对象，或第 2A 步 `table_role` 不在枚举内。接口只有 `json_object`，没有 JSON Schema |
+| `llm_schema_invalid` | 返回不是 JSON 对象，或枚举不合法。先带错误重试 1 次，仍不合法才记录。接口只有 `json_object`，没有 JSON Schema |
 | `llm_call_failed` | LLM 调用失败 |
 | `no_text_extractable` | 没有可提取文本。PDF 没有 Markdown 且 Paddle 未接入时，说明为 `unknown:paddle_not_connected`；转换失败时为 `unknown:conversion_failed` |
 | `no_candidate_extracted` | 未抽到任何候选 |
 | `field_normalization_failed` | 字段规范化失败 |
 | `merge_conflict_unresolved` | 合并冲突无法解决 |
+| `page_context_truncated` | 同一包送入第 6 步的页面超过 12 页，超出部分未抽取 |
+| `consistency_check_failed` | 包金额、标的或中标人一致性检查未通过，运行待复核 |
 | `unexpected_error` | 未归类异常 |
 
 ### 4.4 `EntityType`
@@ -483,8 +485,28 @@ PDF 若在 `work/attachments-md/` 下有同相对路径的 `.md`，索引把该 
 1. 只实现单条公告的主处理流水线。
 2. COB 与 SUB 作为两类独立候选分别抽取、分别校验、分别合并；不要求同一次 LLM 调用同时输出两类实体。
 3. 文件级筛选与页面级筛选是主路线的必要环节，用于避免把无关长文本送入抽取步骤。
-4. 不处理 OCR、水印、图片识别、包结构二次推断、未归属候选提升和成本分析。
-5. `source_priority` 为暂定经验值，后续按实测结果反向调整。
+4. 不处理 OCR、水印和图片识别。包范围可以在逐表判断之后用规则补定；无法归属的 HTML 明细可以按补定后的包号进入合并。招标需求文件不能新增标的。
+5. `source_priority` 为暂定经验值。HTML「主要标的信息」明细为 100。附件按文件类型：成交明细 100、分项报价 90、招标需求 40。价格、数量、品牌在 HTML 明细已有值时不被附件覆盖。
+
+## 1.7 确定性包归属与标的清单
+
+第 2A 步每张表仍然单独判断。判断之后用规则补包号，顺序是：表前文字里的供应商对上中标供应商所在包；品目号第一段；同表头的一组表用已经确定的包做排除，剩下的包按顺序补上。仍然不确定时，再做一次整篇范围的模型调用，提示词 `resolve-packages-v1`。
+
+位于「主要标的信息」或键值里含名称、服务范围、标的的表，即使被判成 `other`，也按标的明细抽取。
+
+正文是否抽取供应商看内容：同时出现公司或供应商和括号分数，或出现「供应商名称」和金额。不要求标题写着评审专家。
+
+每个包的标的清单：HTML 成交明细是具体行、不是汇总、不指向附件时，清单封闭。附件只按名称补空字段，对不上名称的行丢弃并记原因。否则清单开放，`bid_quote` 或 `award_detail` 可以新增行并替换 HTML 汇总行。`tender_requirement` 永远不能新增标的。
+
+合并先按规范化名称聚类。数量和单价两边都有值且不同，才分成两行。空值不拆行。
+
+第 8 步之后做一致性检查：包内是否至少有一个标的和一个中标人；各行总价之和与包金额是否偏离超过 8%。不通过则记 `consistency_check_failed`，运行标为待复核，不自动再抽一轮。
+
+模型输出的枚举不合法时，带上错误信息重试 1 次。两次都不合法才记 `llm_schema_invalid`。
+
+服务和工程不因为品牌、规格覆盖率低而要求读附件。
+
+---
 
 ## 1.6 LLM 调用
 

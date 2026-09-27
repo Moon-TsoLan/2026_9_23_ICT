@@ -12,7 +12,8 @@ from ict.schemas import AttachmentIndex, IndexedFile
 from ict.state import write_json
 
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tif", ".tiff", ".webp"}
-SKIP_NAMES = {".extract_complete"}
+SKIP_NAMES = {".extract_complete", "index.json"}
+SKIP_SUFFIXES = {".zip", ".rar", ".7z"}
 
 
 def _sha256(path: Path) -> str:
@@ -74,6 +75,8 @@ def build_index(announcement_id: str, root: Path | None = None) -> AttachmentInd
         if digest in seen:
             continue
         suffix = path.suffix.lower()
+        if suffix in SKIP_SUFFIXES:
+            continue
         relative = path.relative_to(directory).as_posix()
         file_id = format_file_id(seq)
         seen[digest] = file_id

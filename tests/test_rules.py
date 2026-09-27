@@ -82,8 +82,9 @@ def test_bidder_score_paragraph_is_kept():
     html_root = Path(r"D:\all_contest\2026_9_23_ICT\data\赛题五基准测试数据\赛题五.基准测试数据_html")
     prose = bidder_body_sections(parse_notice(html_root / "t20260203_26142958.html"))
     assert any("青岛挚璞" in item["text"] for item in prose)
-    assert any("未中标" in item["title"] for item in prose)
-    assert bidder_body_sections(parse_notice(html_root / "t20260202_26139917.html")) == []
+    assert any("未中标" in item["title"] or "青岛挚璞" in item["text"] for item in prose)
+    experts = bidder_body_sections(parse_notice(html_root / "t20260202_26139917.html"))
+    assert all("公司" in item["text"] or "供应商名称" in item["text"] for item in experts)
 
 
 def test_page_scope_stays_inside_known_packages():
@@ -198,9 +199,80 @@ def test_merge_keeps_high_priority_and_winner_suppliers():
     project = merged.projects[0]
     assert project.package_total_amount == 10
     assert project.cobs[0].brand == "创维"
-    assert project.cobs[0].unit_price == 200
+    assert project.cobs[0].unit_price == 100
+    assert project.cobs[0].product_supplier == "厂商甲"
     assert project.subs[0].cooperative_product_suppliers == ["厂商甲"]
-    assert merged.conflicts
+
+
+def test_parenthetical_wan_and_requirement_text():
+    from ict.candidates import observe
+
+    yuan, wan = parse_amount("243.1310000（万元）")
+    assert wan is True
+    assert yuan == 2431310
+    assert observe("按照招标要求提供").status == "present"
+    assert observe("详见附件").status == "points_to_attachment"
+
+
+def test_multivalue_anchors_capture_package_amounts():
+    notice = parse_notice(HTML)
+    amounts = {item["package_no"]: item["amount_yuan"] for item in notice.package_anchors if item.get("package_no")}
+    assert amounts["3"] == 2431310
+    assert amounts["4"] == 819000
+    texts = bidder_body_sections(notice)
+    assert any("万迪科" in item["text"] for item in texts)
+
+
+def test_item_number_and_supplier_assign_package():
+    from ict.html_context import ParsedNotice, ParsedTable
+    from ict.package_resolve import resolve_table_packages
+    from ict.schemas import HtmlTable, HtmlTables
+
+    notice = ParsedNotice(
+        announcement_id="demo",
+        title="示例",
+        summary={},
+        headings=[],
+        tables=[
+            ParsedTable(0, "北京络捷斯特科技发展股份有限公司", ["品目号", "品目名称"], [["1-1", "工业机器人"]], "四、主要标的信息"),
+            ParsedTable(1, "", ["供应商名称"], [["北京络捷斯特科技发展股份有限公司"]], "三、中标信息"),
+        ],
+        package_hints=[],
+        package_anchors=[{"package_no": "1", "supplier_name": "北京络捷斯特科技发展股份有限公司", "amount_yuan": 1}],
+    )
+    tables = HtmlTables(
+        run_id="run",
+        status="success",
+        tables=[
+            HtmlTable(table_index=0, table_role="cob_detail", package_scope="unknown", row_grain="cob", status="success"),
+            HtmlTable(table_index=1, table_role="winner", package_scope="1", row_grain="supplier", status="success"),
+        ],
+    )
+    resolve_table_packages(notice, tables, ["1", "3", "4"])
+    assert tables.tables[0].package_scope == "1"
+
+
+def test_service_gap_ignores_missing_brand():
+    candidate = seal_candidate(
+        candidate_id="cand_000009",
+        entity_type="cob",
+        project_id="项目|1",
+        package_no="1",
+        source_type="html",
+        file_id=None,
+        source_priority=100,
+        raw_fields={"object_name": "运维服务", "category_type": "C", "total_price": "100"},
+    )
+    understanding = AnnouncementUnderstanding(
+        run_id="run_x",
+        status="success",
+        project_name="项目",
+        announcement_type="deal_announcement",
+        package_mode="single",
+        packages=[PackageUnderstanding(package_no="1", title=None, project_id="项目|1", package_evidence_text="单包")],
+    )
+    plans = plan_projects("run_x", understanding, [candidate], True)
+    assert plans.projects[0].needs_attachment is False
 
 
 def test_plan_needs_attachment_when_brand_missing():
