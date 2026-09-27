@@ -3,14 +3,96 @@ from pathlib import Path
 
 from ict.candidates import seal_candidate
 from ict.catalog import Catalog
-from ict.html_context import parse_notice
+from ict.html_context import bidder_body_sections, parse_notice
 from ict.money import parse_amount, parse_price_cell, parse_quantity
 from ict.schemas import AnnouncementUnderstanding, PackageUnderstanding
 from ict.steps.s03_plan import plan_projects
+from ict.steps.s04_attach import coerce_package_scope
 from ict.steps.s07_normalize import normalize_candidates
 from ict.steps.s08_merge import merge_projects
 
 HTML = Path(r"D:\all_contest\2026_9_23_ICT\data\赛题五基准测试数据\赛题五.基准测试数据_html\t20260202_26139731.html")
+
+
+def test_missing_markdown_is_paddle_not_connected(monkeypatch, tmp_path):
+    from ict import documents
+    from ict.documents import MarkdownUnavailable, ensure_markdown
+
+    pdf_root = tmp_path / "attachments" / "demo"
+    md_root = tmp_path / "attachments-md"
+    pdf_root.mkdir(parents=True)
+    pdf = pdf_root / "报价.pdf"
+    pdf.write_bytes(b"%PDF")
+    monkeypatch.setattr(documents, "ATTACHMENTS_ROOT", tmp_path / "attachments")
+    monkeypatch.setattr(documents, "ATTACHMENTS_MD_ROOT", md_root)
+    monkeypatch.delenv("ICT_PADDLE_COMMAND", raising=False)
+    try:
+        ensure_markdown(pdf)
+    except MarkdownUnavailable as exc:
+        assert exc.reason == "paddle_not_connected"
+    else:
+        raise AssertionError("expected MarkdownUnavailable")
+
+
+def test_alias_field_names_keep_object_name():
+    candidate = seal_candidate(
+        candidate_id="cand_000001",
+        entity_type="cob",
+        project_id="项目|B",
+        package_no="B",
+        source_type="pdf",
+        file_id="a003",
+        source_priority=90,
+        raw_fields={
+            "item_name": "HIS子系统升级",
+            "brand_model": "新蓝海",
+            "quantity": "1",
+            "unit_price": "400000.00",
+            "total_price": "400000.00",
+        },
+    )
+    assert candidate.fields["object_name"].raw_value == "HIS子系统升级"
+    assert candidate.fields["brand"].raw_value == "新蓝海"
+    assert candidate.fields["quantity"].status == "present"
+    named = seal_candidate(
+        candidate_id="cand_000002",
+        entity_type="cob",
+        project_id="项目|1",
+        package_no="1",
+        source_type="html",
+        file_id=None,
+        source_priority=70,
+        raw_fields={"品目编号及品目名称": "工业机器人", "报价明细内容": "潜伏式搬运机器人"},
+    )
+    assert named.fields["category_name"].raw_value == "工业机器人"
+    assert named.fields["object_name"].raw_value == "潜伏式搬运机器人"
+
+
+def test_bidder_score_paragraph_is_kept():
+    html = """<div class="vF_detail_content">
+    <h2>五、评审专家名单：</h2>
+    <p>标包：A 青岛示例科技有限公司（55.5、58、60） 杭州示例股份有限公司（93、92、96）</p>
+    </div>"""
+    path = Path("work/pytest-tmp/score-paragraph.html")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(html, encoding="utf-8")
+    texts = bidder_body_sections(parse_notice(path))
+    assert len(texts) == 1
+    assert "青岛示例科技有限公司" in texts[0]["text"]
+    html_root = Path(r"D:\all_contest\2026_9_23_ICT\data\赛题五基准测试数据\赛题五.基准测试数据_html")
+    prose = bidder_body_sections(parse_notice(html_root / "t20260203_26142958.html"))
+    assert any("青岛挚璞" in item["text"] for item in prose)
+    assert any("未中标" in item["title"] for item in prose)
+    assert bidder_body_sections(parse_notice(html_root / "t20260202_26139917.html")) == []
+
+
+def test_page_scope_stays_inside_known_packages():
+    assert coerce_package_scope("unknown", ["B"], ["A", "B", "C"], "报价.pdf") == "B"
+    assert coerce_package_scope("unknown", ["3", "4"], ["3", "4"], "招标文件.pdf") == "unknown"
+    assert coerce_package_scope("A", ["A"], ["1"], "磋商文件.pdf") == "1"
+    assert coerce_package_scope("3", ["1"], ["1"], "招标文件.pdf") == "1"
+    assert coerce_package_scope("2", ["1", "2", "3", "4"], ["1", "3", "4"], "招标文件.pdf") == "unknown"
+    assert coerce_package_scope("B", ["B"], ["A", "B"], "B包分项报价表.pdf") == "B"
 
 
 def test_amount_wan_and_quantity():

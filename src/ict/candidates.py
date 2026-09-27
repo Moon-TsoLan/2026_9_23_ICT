@@ -8,6 +8,65 @@ from ict.config import COB_FIELDS, SUB_FIELDS
 from ict.schemas import Candidate, FieldObservation, Source
 
 POINTING = ("详见附件", "详见招标文件", "详见磋商文件", "详见采购文件", "详见投标文件", "见附件")
+FIELD_ALIASES = {
+    "cob": {
+        "item_name": "object_name",
+        "product_name": "object_name",
+        "goods_name": "object_name",
+        "object": "object_name",
+        "name": "object_name",
+        "产品名称": "object_name",
+        "货物名称": "object_name",
+        "标的名称": "object_name",
+        "采购标的": "object_name",
+        "报价明细内容": "object_name",
+        "名称": "object_name",
+        "brand_name": "brand",
+        "品牌": "brand",
+        "model": "spec_model",
+        "specification": "spec_model",
+        "规格型号": "spec_model",
+        "型号": "spec_model",
+        "manufacturer": "product_supplier",
+        "制造商": "product_supplier",
+        "生产厂家": "product_supplier",
+        "数量": "quantity",
+        "单价": "unit_price",
+        "总价": "total_price",
+        "金额": "total_price",
+        "单位": "unit",
+        "品目名称": "category_name",
+        "品目编号及品目名称": "category_name",
+        "品目编号": "category_code",
+    },
+    "sub": {
+        "bidder_name": "supplier_name",
+        "supplier": "supplier_name",
+        "name": "supplier_name",
+        "供应商名称": "supplier_name",
+        "供应商": "supplier_name",
+        "综合得分": "score",
+        "评审总得分": "score",
+        "是否中标": "is_winner",
+    },
+}
+
+
+def align_fields(entity_type: str, raw_fields: dict[str, Any]) -> dict[str, Any]:
+    """Map common wrong field names onto the contract keys. Known keys win."""
+    aligned = dict(raw_fields)
+    aliases = FIELD_ALIASES.get(entity_type, {})
+    for source, target in aliases.items():
+        if source not in raw_fields or target in aligned and aligned[target] not in (None, ""):
+            continue
+        aligned[target] = raw_fields[source]
+    brand_model = raw_fields.get("brand_model") or raw_fields.get("品牌/型号")
+    if brand_model not in (None, ""):
+        if aligned.get("brand") in (None, ""):
+            aligned["brand"] = brand_model
+        if aligned.get("spec_model") in (None, "") and any(character.isdigit() for character in str(brand_model)):
+            aligned["spec_model"] = brand_model
+    return aligned
 
 
 def blank_fields(entity_type: str) -> dict[str, FieldObservation]:
@@ -45,6 +104,7 @@ def seal_candidate(
     confidence: float | None = 0.8,
 ) -> Candidate:
     fields = blank_fields(entity_type)
+    raw_fields = align_fields(entity_type, raw_fields)
     for key, raw in raw_fields.items():
         if key in fields:
             if isinstance(raw, dict) and "status" in raw:

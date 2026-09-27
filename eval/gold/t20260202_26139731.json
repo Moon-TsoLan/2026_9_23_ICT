@@ -1,0 +1,80 @@
+{
+  "announcement_id": "t20260202_26139731",
+  "projects": [
+    {
+      "project_id": "2023年工信部5G+8K项目-光华路办公区新建总控系统（四）制式转换设备等|3",
+      "source_project_no": "WKZB2531BJI3003278",
+      "project_name": "2023年工信部5G+8K项目-光华路办公区新建总控系统（四）制式转换设备等",
+      "package_no": "3",
+      "purchaser": "中央广播电视总台",
+      "package_total_amount": 2431310,
+      "cobs": [
+        {
+          "object_name": "光跳纤架",
+          "category_code": null,
+          "category_name": null,
+          "category_type": null,
+          "brand": "康普",
+          "product_supplier": null,
+          "spec_model": "NGFC FRAME",
+          "unit_price": 319300,
+          "quantity": 4,
+          "unit": "套",
+          "total_price": 1277200
+        },
+        {
+          "object_name": "光熔纤柜",
+          "category_code": null,
+          "category_name": null,
+          "category_type": null,
+          "brand": "康普",
+          "product_supplier": null,
+          "spec_model": "MX6",
+          "unit_price": 60480,
+          "quantity": 5,
+          "unit": "套",
+          "total_price": 302400
+        }
+      ],
+      "subs": [
+        {
+          "supplier_name": "北京万迪科信息技术有限公司",
+          "score": null,
+          "is_winner": true,
+          "cooperative_product_suppliers": []
+        }
+      ]
+    },
+    {
+      "project_id": "2023年工信部5G+8K项目-光华路办公区新建总控系统（四）制式转换设备等|4",
+      "source_project_no": "WKZB2531BJI3003278",
+      "project_name": "2023年工信部5G+8K项目-光华路办公区新建总控系统（四）制式转换设备等",
+      "package_no": "4",
+      "purchaser": "中央广播电视总台",
+      "package_total_amount": 819000,
+      "cobs": [
+        {
+          "object_name": "LCD显示大屏",
+          "category_code": null,
+          "category_name": null,
+          "category_type": null,
+          "brand": "创维",
+          "product_supplier": null,
+          "spec_model": "SKY55SXEPS",
+          "unit_price": 15750,
+          "quantity": 52,
+          "unit": "块",
+          "total_price": 819000
+        }
+      ],
+      "subs": [
+        {
+          "supplier_name": "北京智为视媒科技有限公司",
+          "score": null,
+          "is_winner": true,
+          "cooperative_product_suppliers": []
+        }
+      ]
+    }
+  ]
+}

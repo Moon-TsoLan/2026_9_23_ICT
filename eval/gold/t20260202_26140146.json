@@ -1,0 +1,126 @@
+{
+  "announcement_id": "t20260202_26140146",
+  "projects": [
+    {
+      "project_id": "济宁市第二人民医院信息化能力提升采购项目|B",
+      "source_project_no": "SDGP370811000202502000168",
+      "project_name": "济宁市第二人民医院信息化能力提升采购项目",
+      "package_no": "B",
+      "purchaser": "济宁市第二人民医院（济宁市骨科医院）",
+      "package_total_amount": 1486000,
+      "cobs": [
+        {
+          "object_name": "HIS子系统升级",
+          "category_code": null,
+          "category_name": null,
+          "category_type": null,
+          "brand": "新蓝海",
+          "product_supplier": "新蓝海",
+          "spec_model": "按照招标要求提供",
+          "unit_price": 400000,
+          "quantity": 1,
+          "unit": null,
+          "total_price": 400000
+        },
+        {
+          "object_name": "经济核算",
+          "category_code": null,
+          "category_name": null,
+          "category_type": null,
+          "brand": "新蓝海",
+          "product_supplier": "新蓝海",
+          "spec_model": "按照招标要求提供",
+          "unit_price": 200000,
+          "quantity": 1,
+          "unit": null,
+          "total_price": 200000
+        },
+        {
+          "object_name": "医技检查手术费用计费类系统",
+          "category_code": null,
+          "category_name": null,
+          "category_type": null,
+          "brand": "新蓝海",
+          "product_supplier": "新蓝海",
+          "spec_model": "按照招标要求提供",
+          "unit_price": 200000,
+          "quantity": 1,
+          "unit": null,
+          "total_price": 200000
+        },
+        {
+          "object_name": "国产数据库管理系统",
+          "category_code": null,
+          "category_name": null,
+          "category_type": null,
+          "brand": "达梦",
+          "product_supplier": "武汉",
+          "spec_model": "按照招标要求提供",
+          "unit_price": 100000,
+          "quantity": 2,
+          "unit": null,
+          "total_price": 200000
+        },
+        {
+          "object_name": "历史数据结构化改造服务",
+          "category_code": null,
+          "category_name": null,
+          "category_type": null,
+          "brand": "新蓝海",
+          "product_supplier": "新蓝海",
+          "spec_model": "按照招标要求提供",
+          "unit_price": 100000,
+          "quantity": 1,
+          "unit": null,
+          "total_price": 100000
+        },
+        {
+          "object_name": "系统对接费用",
+          "category_code": null,
+          "category_name": null,
+          "category_type": null,
+          "brand": "新蓝海",
+          "product_supplier": "新蓝海",
+          "spec_model": "按照招标要求提供",
+          "unit_price": 200000,
+          "quantity": 1,
+          "unit": null,
+          "total_price": 200000
+        },
+        {
+          "object_name": "系统实施费用",
+          "category_code": null,
+          "category_name": null,
+          "category_type": null,
+          "brand": "新蓝海",
+          "product_supplier": "新蓝海",
+          "spec_model": "按照招标要求提供",
+          "unit_price": 186000,
+          "quantity": 1,
+          "unit": null,
+          "total_price": 186000
+        }
+      ],
+      "subs": [
+        {
+          "supplier_name": "山东新蓝海科技股份有限公司",
+          "score": 89.74,
+          "is_winner": true,
+          "cooperative_product_suppliers": ["新蓝海", "武汉"]
+        },
+        {
+          "supplier_name": "山东龙聚信息技术服务有限公司",
+          "score": 78.2,
+          "is_winner": false,
+          "cooperative_product_suppliers": []
+        },
+        {
+          "supplier_name": "深圳易护怡康医疗智能科技有限公司",
+          "score": 74.6,
+          "is_winner": false,
+          "cooperative_product_suppliers": []
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,146 @@
+{
+  "announcement_id": "t20260203_26142958",
+  "projects": [
+    {
+      "project_id": "山东省2025年度自然资源调查监测相关系统及软件运维项目|A",
+      "source_project_no": "SDGP370000000202602000087",
+      "project_name": "山东省2025年度自然资源调查监测相关系统及软件运维项目",
+      "package_no": "A",
+      "purchaser": "山东省国土空间规划院（山东省自然资源和不动产登记中心）",
+      "package_total_amount": 998000,
+      "cobs": [
+        {
+          "object_name": "山东省自然资源统一调查举证管理系统运维",
+          "category_code": null,
+          "category_name": null,
+          "category_type": null,
+          "brand": null,
+          "product_supplier": null,
+          "spec_model": null,
+          "unit_price": null,
+          "quantity": null,
+          "unit": null,
+          "total_price": 998000
+        }
+      ],
+      "subs": [
+        {
+          "supplier_name": "杭州今奥信息科技股份有限公司",
+          "score": null,
+          "is_winner": true,
+          "cooperative_product_suppliers": []
+        },
+        {
+          "supplier_name": "北京数慧时空信息技术有限公司",
+          "score": null,
+          "is_winner": false,
+          "cooperative_product_suppliers": []
+        },
+        {
+          "supplier_name": "青岛挚璞信息科技有限公司",
+          "score": null,
+          "is_winner": false,
+          "cooperative_product_suppliers": []
+        },
+        {
+          "supplier_name": "山东鲁迪测绘有限公司",
+          "score": null,
+          "is_winner": false,
+          "cooperative_product_suppliers": []
+        }
+      ]
+    },
+    {
+      "project_id": "山东省2025年度自然资源调查监测相关系统及软件运维项目|B",
+      "source_project_no": "SDGP370000000202602000087",
+      "project_name": "山东省2025年度自然资源调查监测相关系统及软件运维项目",
+      "package_no": "B",
+      "purchaser": "山东省国土空间规划院（山东省自然资源和不动产登记中心）",
+      "package_total_amount": 498000,
+      "cobs": [
+        {
+          "object_name": "山东省2025年度国土变更调查内业核查软件运维",
+          "category_code": null,
+          "category_name": null,
+          "category_type": null,
+          "brand": null,
+          "product_supplier": null,
+          "spec_model": null,
+          "unit_price": null,
+          "quantity": null,
+          "unit": null,
+          "total_price": 498000
+        }
+      ],
+      "subs": [
+        {
+          "supplier_name": "北京数慧时空信息技术有限公司",
+          "score": null,
+          "is_winner": true,
+          "cooperative_product_suppliers": []
+        },
+        {
+          "supplier_name": "杭州今奥信息科技股份有限公司",
+          "score": null,
+          "is_winner": false,
+          "cooperative_product_suppliers": []
+        },
+        {
+          "supplier_name": "青岛挚璞信息科技有限公司",
+          "score": null,
+          "is_winner": false,
+          "cooperative_product_suppliers": []
+        },
+        {
+          "supplier_name": "山东鲁迪测绘有限公司",
+          "score": null,
+          "is_winner": false,
+          "cooperative_product_suppliers": []
+        }
+      ]
+    },
+    {
+      "project_id": "山东省2025年度自然资源调查监测相关系统及软件运维项目|C",
+      "source_project_no": "SDGP370000000202602000087",
+      "project_name": "山东省2025年度自然资源调查监测相关系统及软件运维项目",
+      "package_no": "C",
+      "purchaser": "山东省国土空间规划院（山东省自然资源和不动产登记中心）",
+      "package_total_amount": 448700,
+      "cobs": [
+        {
+          "object_name": "山东省林草湿荒综合调查监测系统和核查软件运维",
+          "category_code": null,
+          "category_name": null,
+          "category_type": null,
+          "brand": null,
+          "product_supplier": null,
+          "spec_model": null,
+          "unit_price": null,
+          "quantity": null,
+          "unit": null,
+          "total_price": 448700
+        }
+      ],
+      "subs": [
+        {
+          "supplier_name": "北京世纪国源科技股份有限公司",
+          "score": null,
+          "is_winner": true,
+          "cooperative_product_suppliers": []
+        },
+        {
+          "supplier_name": "北京数慧时空信息技术有限公司",
+          "score": null,
+          "is_winner": false,
+          "cooperative_product_suppliers": []
+        },
+        {
+          "supplier_name": "北京四维空间数码科技有限公司",
+          "score": null,
+          "is_winner": false,
+          "cooperative_product_suppliers": []
+        }
+      ]
+    }
+  ]
+}

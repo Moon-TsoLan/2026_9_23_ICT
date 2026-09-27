@@ -1,0 +1,54 @@
+{
+  "announcement_id": "t20260401_26346106",
+  "projects": [
+    {
+      "project_id": "微山县公务用车保障平台运营服务采购项目（二次）|A",
+      "source_project_no": "SDGP370826000202602000004",
+      "project_name": "微山县公务用车保障平台运营服务采购项目（二次）",
+      "package_no": "A",
+      "purchaser": "微山县机关事务服务中心（微山县接待事务中心）",
+      "package_total_amount": 1239629.63,
+      "cobs": [
+        {
+          "object_name": "微山县公务用车保障平台运营服务采购项目（二次）",
+          "category_code": null,
+          "category_name": null,
+          "category_type": null,
+          "brand": null,
+          "product_supplier": null,
+          "spec_model": null,
+          "unit_price": null,
+          "quantity": null,
+          "unit": null,
+          "total_price": 1239629.63
+        }
+      ],
+      "subs": [
+        {
+          "supplier_name": "微山县大运河汽车服务有限公司",
+          "score": 88.33,
+          "is_winner": true,
+          "cooperative_product_suppliers": []
+        },
+        {
+          "supplier_name": "微山县经开区顺达汽车租赁服务有限公司",
+          "score": 62.16,
+          "is_winner": false,
+          "cooperative_product_suppliers": []
+        },
+        {
+          "supplier_name": "微山县宝得宝汽车服务有限公司",
+          "score": 60.17,
+          "is_winner": false,
+          "cooperative_product_suppliers": []
+        },
+        {
+          "supplier_name": "微山县利微汽车维修服务有限公司",
+          "score": 58.66,
+          "is_winner": false,
+          "cooperative_product_suppliers": []
+        }
+      ]
+    }
+  ]
+}

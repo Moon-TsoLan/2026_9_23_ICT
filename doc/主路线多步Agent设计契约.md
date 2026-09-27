@@ -1,8 +1,8 @@
 # 主路线多步 Agent 设计契约
 
-版本：v0.4  
-日期：2026-09-24  
-适用范围：任务一主提取流程的设计确认与后续分支扩展。本文只定义主路线的数据契约、状态流转和分支记录点，不涉及具体代码实现。
+版本：v0.5  
+日期：2026-09-27  
+适用范围：任务一主提取流程。本文记录当前主路线的数据契约、状态流转，以及已经落地的调用方式。
 
 ---
 
@@ -40,7 +40,7 @@
 | 水印导致文本不可读 | 记录 `watermark_interference` |
 | 无法解析的 DOC/DOCX/XLSX | 记录 `document_parse_failed` |
 | 包结构无法判断 | 记录 `package_structure_unclear` |
-| LLM 输出无法通过结构校验 | 记录 `llm_schema_invalid` |
+| LLM 输出不是 JSON 对象，或表角色不在枚举内 | 记录 `llm_schema_invalid` |
 | 附件索引缺失 | 记录 `attachment_index_miss` |
 
 这些记录不是最终业务数据，而是后续分支建设的输入。
@@ -159,9 +159,9 @@ work/runs/<announcement_id>/
 | `watermark_interference` | 水印导致关键内容不可读 |
 | `document_parse_failed` | DOC/DOCX/XLSX 等文档解析失败 |
 | `package_structure_unclear` | 无法判断公告包结构 |
-| `llm_schema_invalid` | LLM 输出未通过结构校验 |
+| `llm_schema_invalid` | 返回不是 JSON 对象，或第 2A 步 `table_role` 不在枚举内。接口只有 `json_object`，没有 JSON Schema |
 | `llm_call_failed` | LLM 调用失败 |
-| `no_text_extractable` | 没有可提取文本 |
+| `no_text_extractable` | 没有可提取文本。PDF 没有 Markdown 且 Paddle 未接入时，说明为 `unknown:paddle_not_connected`；转换失败时为 `unknown:conversion_failed` |
 | `no_candidate_extracted` | 未抽到任何候选 |
 | `field_normalization_failed` | 字段规范化失败 |
 | `merge_conflict_unresolved` | 合并冲突无法解决 |
@@ -309,6 +309,8 @@ work/runs/<announcement_id>/
 | `parse_failed` | 文件解析失败 |
 | `unsupported` | 主路线不支持 |
 
+PDF 若在 `work/attachments-md/` 下有同相对路径的 `.md`，索引把该 PDF 记为 `text_extractable`，提示为 `markdown`，不再用 PDF 文本层判断稀密。没有 Markdown 时仍用 PDF 文本层探测。
+
 主路线对索引只做读取，不修改索引，也不承担解压职责。
 
 ---
@@ -326,28 +328,43 @@ work/runs/<announcement_id>/
     "采购项目名称": "xxx",
     "品目": "货物/设备",
     "采购单位": "xxx",
-    "总中标金额": "￥325.031000 万元"
+    "总中标金额": "￥325.031000 万元",
+    "总成交金额": "",
+    "评审专家名单": ""
   },
   "html_headings": ["一、中标信息", "二、主要中标标的"],
-  "table_headers": [
-    ["品目名称", "采购标的", "品牌", "规格型号"],
-    ["供应商", "资格性审查", "综合得分"]
+  "body_sections": [
+    {"title": "三、中标（成交）信息", "text": "正文摘录，最长 1600 字"}
+  ],
+  "tables": [
+    {
+      "table_index": 0,
+      "before_text": "表前文字",
+      "section": "四、主要标的信息",
+      "key_value": false,
+      "headers": ["品目名称", "采购标的", "品牌", "规格型号"],
+      "rows": [["其他商业保险服务", "团体重大疾病保险", "无", "无"]]
+    }
   ],
   "package_hints": [
     {
-      "text": "采购包1",
+      "text": "包1",
       "location": "html_heading",
       "package_evidence_text": "采购包1：xxx",
+      "package_no": "1",
       "package_amount": {
         "raw_text": "￥100万元",
         "amount_yuan": 1000000,
         "scope": "package",
-        "confidence": 0.95
+        "confidence": 0.7
       }
     }
-  ]
+  ],
+  "source_project_no_hint": "SDGP123"
 }
 ```
+
+概要只保留采购项目名称、品目、采购单位、总中标金额、总成交金额、评审专家名单。标题最多 40 条。正文段只收标题含「中标」「成交」「主要标的」「分包」的段，最多 8 段。表最多 12 张；普通表预览 8 行，键值表预览 20 行。包线索最多 40 条。
 
 ## 1.2 输出文件
 
@@ -378,8 +395,8 @@ work/runs/<announcement_id>/
   },
   "unclear_reason": null,
   "model_metadata": {
-    "model_name": "Qwen",
-    "model_version": "2.5-14B-Instruct",
+    "model_name": "deepseek-flash",
+    "model_version": "deepseek-flash",
     "prompt_version": "announcement-v1",
     "latency_ms": 1200
   },
@@ -422,7 +439,7 @@ work/runs/<announcement_id>/
 
 | 字段 | 类型 | 必填 | 说明 |
 |---|---|---:|---|
-| `package_no` | string | 是 | 包编号，保留原样 |
+| `package_no` | string | 是 | 包编号，只写编号本身。`"第3包"` 写成 `"3"`，`"标包A"` 写成 `"A"` |
 | `title` | string/null | 是 | 包标题 |
 | `project_id` | string | 是 | `<project_name>|<package_no>` |
 | `package_evidence_text` | string | 是 | 原文中证明该包存在的文本 |
@@ -457,6 +474,7 @@ work/runs/<announcement_id>/
 7. `package_amount.scope` 永远是 `package`，只能挂在对应包上。
 8. 单包公告中，若 `package_amount` 缺失，可用 `summary_amount` 作为 `package_total_amount`。
 9. 多包公告中，若 `package_amount` 缺失，`package_total_amount` 为 `null`，不得用公告总金额摊分。
+10. `package_no` 只含编号本身，不带「第」「包」「采购包」「标包」等前后缀。字母包保持字母，不改成数字。
 
 ---
 
@@ -467,6 +485,25 @@ work/runs/<announcement_id>/
 3. 文件级筛选与页面级筛选是主路线的必要环节，用于避免把无关长文本送入抽取步骤。
 4. 不处理 OCR、水印、图片识别、包结构二次推断、未归属候选提升和成本分析。
 5. `source_priority` 为暂定经验值，后续按实测结果反向调整。
+
+## 1.6 LLM 调用
+
+每步只接收当次拼好的 JSON，不保留对话。请求使用 `response_format: json_object`，温度为 0，关闭思考。没有把字段枚举做成 JSON Schema。
+
+返回不是 JSON 对象时记 `llm_schema_invalid`。第 2A 步的 `table_role` 不在枚举内时同样记 `llm_schema_invalid`。其余字段由代码收下：候选只保留契约字段；下表别名会改写成正式键，正式键已有值时不覆盖。
+
+| 模型键 | 正式键 |
+|---|---|
+| `item_name`、`product_name`、`产品名称`、`货物名称`、`采购标的`、`报价明细内容` | `object_name` |
+| `品牌`、`brand_model` 的非数字部分 | `brand` |
+| `规格型号`、`型号` | `spec_model` |
+| `制造商`、`生产厂家` | `product_supplier` |
+| `品目名称`、`品目编号及品目名称` | `category_name` |
+| `品目编号` | `category_code` |
+| `供应商名称`、`bidder_name` | `supplier_name` |
+| `综合得分`、`评审总得分` | `score` |
+
+提示词文件在 `src/ict/prompts/`。当前各步版本是 `announcement-v1`、`html-tables-v1`、`html-candidates-v1`、`triage-files-v1`、`locate-pages-v1`、`attachment-extract-v1`。
 
 ---
 
@@ -575,9 +612,35 @@ work/runs/<announcement_id>/
 | `column_mapping_uncertain` | 列映射不确定 |
 | `other` | 其它问题 |
 
+## 2A.4 列映射与调用
+
+每张 HTML 表调用一次。`column_mapping` 的键是业务字段名，值必须是该表表头原文；对不上表头的映射丢弃。
+
+品目按列的实际内容映射：
+
+| 表头或单元格 | 映射 |
+|---|---|
+| 只有品目名称，如「其他商业保险服务」 | `category_name` |
+| 只有品目编码，如「A02100499」 | `category_code` |
+| 品目编号与品目名称分列，或同一格同时有编码和名称 | 编码写入 `category_code`，名称写入 `category_name` |
+| 品目号，如 `1-1`、`3-1-1` | 行序号，写入 `unmapped_columns`，不映射到品目字段 |
+
+「品目编号及品目名称」这一列在只有名称时映射到 `category_name`。同时有「报价明细内容」和「采购标的」时，`object_name` 映射报价明细内容。
+
 ---
 
 # Step 2B：HTML 候选抽取
+
+角色不是 `other`、`agency_fee`，且该表理解成功的，每张表调用一次。`sub_score` 与 `winner` 的 `entity_type` 为 `sub`，其余为 `cob`。表的 `package_scope` 为 `announcement` 或 `unknown` 时，传给模型的 `package_no` 为 null。输入包含该表全部行、表头、列映射和表角色。
+
+表格以外的投标人正文再调用一次，提示词仍是 `html-candidates-v1`，`entity_type` 为 `sub`，来源优先级与 `sub_score` 相同。正文入选须满足一条：
+
+1. 标题含「评审专家」，正文里有公司或供应商，并且有括号数字。只有专家姓名的段落不入选。
+2. 标题含「未中标」，正文里有公司或供应商。
+
+没有这类正文时不增加调用。括号里并列的多个数字是评委分数，不是综合得分，`score` 不填。
+
+品目从该行单元格抄写，规则与第 2A 步相同。列映射没有品目时，仍抄表头里的品目名称或品目编码。没有编码或名称时不编造。
 
 ## 2B.1 输出文件
 
@@ -630,7 +693,7 @@ work/runs/<announcement_id>/
 | 值 | 来源 |
 |---|---|
 | `100` | 中标/成交明细表 |
-| `90` | 分项报价表、开标一览表 |
+| `90` | 分项报价表、开标一览表。第 6 步抽出的附件候选当前一律使用这个优先级，不按文件类型区分 |
 | `80` | HTML winner 表 |
 | `70` | HTML `cob_detail` 或 `sub_score` |
 | `60` | HTML `cob_summary` |
@@ -796,7 +859,7 @@ total_price
 
 ## 4.1 输入
 
-来自附件索引的文件清单与 Step 3 的项目缺口。对每个高潜力文件先生成文件探查摘要。`first_pages` 固定取文件前 3 页；`text_head` 为每页前 500 个字符。
+来自附件索引的文件清单与 Step 3 的项目缺口。对可读文件生成探查摘要。PDF 先读 `work/attachments-md/` 中同相对路径的 Markdown；没有 Markdown 时调用 `ICT_PADDLE_COMMAND`。命令为空则本次探查可读性为 `unknown`，原因为 `paddle_not_connected`，不使用 PDF 文本层代替。`first_pages` 取前 3 页，每页 `text_head` 为前 500 个字符，并带上该页表头。
 
 ```json
 {
@@ -808,7 +871,6 @@ total_price
   "first_pages": [
     {
       "page_no": 1,
-      "heading": "开标一览表",
       "text_head": "前500字摘要",
       "table_headers": [
         ["供应商", "投标报价", "工期"]
@@ -894,26 +956,33 @@ total_price
 
 ## 5.1 页面索引输入
 
-对被选文件建立页面索引：
+对被选文件建立页面索引。输入是 Markdown 页首和表头，不是 PDF 原件。字符少于 20 且没有表头的页不送入。每个文件最多送 80 页。一次调用覆盖本公告全部深读文件，并带上第 1 步确认的 `known_packages`。
 
 ```json
 {
-  "file_id": "a001",
-  "pages": [
+  "known_packages": ["1", "3"],
+  "search_queries": ["LCD显示大屏"],
+  "files": [
     {
-      "page_no": 12,
-      "heading": "第3包 分项报价表",
-      "text_head": "前300字摘要",
-      "table_headers": [
-        ["货物名称", "品牌", "型号", "数量", "单价"]
-      ],
-      "keyword_hits": ["第3包", "LCD显示大屏"],
-      "text_density": 0.65,
-      "readability": "text_extractable"
+      "file_id": "a001",
+      "display_name": "分项报价表.pdf",
+      "possible_packages": ["3"],
+      "pages": [
+        {
+          "page_no": 12,
+          "source": "markdown",
+          "text_head": "前300字摘要",
+          "table_headers": [
+            ["货物名称", "品牌", "型号", "数量", "单价"]
+          ]
+        }
+      ]
     }
   ]
 }
 ```
+
+没有 Markdown 且 Paddle 未接入或转换失败时，该文件记 `no_text_extractable`，不进入本步的页面列表。
 
 ## 5.2 输出文件
 
@@ -970,21 +1039,31 @@ total_price
 3. `readability=low_text` 的页面记录 `scanned_or_low_text_pdf`，不进入 Step 6。
 4. 图片页面记录 `unsupported_image`，不进入 Step 6。
 
+## 5.5 包范围收束
+
+`package_scope` 只能是 `known_packages` 中的编号、`announcement` 或 `unknown`。模型返回后按这个顺序改写，命中即停止：
+
+1. 返回值已经在 `known_packages` 里，或为 `announcement`，保持不变。
+2. 该文件的 `possible_packages` 里只有一个编号落在 `known_packages` 中，改成该编号。
+3. 文件名里恰好一个包号，且该包号在 `known_packages` 中，而 `possible_packages` 没有公告内包号，改成文件名包号。
+4. 返回值不在公告包列表里，且公告只有一个包，改成那个包。`unknown` 不触发这一条。
+5. 其余情况改为 `unknown`。
+
+因此页首没写包号、但文件只对应一个公告内的包时，不保留 `unknown`。公告只有一个包时，模型写出的其他编号会收成这个包。一个文件同时对应多个公告内的包、页面又没有写出其中某一个时，可以仍是 `unknown`。
+
 ---
 
 # Step 6：附件局部抽取
 
 ## 6.1 LLM 输入
 
-输入当前包上下文与被选中页面的局部内容：
+按页面决定上的 `package_scope` 分组。每一组调用一次，只传入该组页面。每组最多 12 页。页面文本最长 6000 字，每页最多 4 张表。`unknown` 与 `announcement` 各自成组，传给模型的 `package_no` 为 null。不传入 `known_cobs` 或 `known_subs`。
 
 ```json
 {
   "current_package": {
     "project_id": "xxx|3",
     "package_no": "3",
-    "known_cobs": ["LCD显示大屏"],
-    "known_subs": ["xxx"],
     "missing_fields": ["brand", "spec_model", "unit_price"]
   },
   "page_contexts": [
@@ -1007,7 +1086,9 @@ total_price
 }
 ```
 
-模型上下文足够大，允许一次传入多个候选页面；但输入仍必须限定为当前包和被选中页面，不得把全量附件目录或无关包一起传入。
+不得把全量附件目录或其它包的页面放进同一次调用。品目抄写规则与第 2B 步相同。
+
+模型没有给出 `package_no` 时，先用本组的包号；本组包号也为空时，文件名里恰好有一个包号则用文件名。附件候选的 `source_type` 当前一律记为 `pdf`，`source_priority` 一律为 90。
 
 ## 6.2 输出文件
 
@@ -1149,6 +1230,8 @@ total_price
 | 缺数量 | 不由总价倒推 |
 
 价格 `normalized_value` 单位固定为人民币元。
+
+名称能唯一对上采购目录时，补上缺失的 `category_code`、`category_name` 和 `category_type`。同一名称对应多条目录时不补。公告概要里的品目不往标的行上填。
 
 ### 品目
 
@@ -1293,8 +1376,8 @@ total_price
 
 ## 8.2 合并顺序
 
-1. 同一 `project_id` 内先按业务键去重；同来源、同业务键的候选视为重复。
-2. 同一 `project_id` 内合并。
+1. 同一 `project_id` 内按业务键合并，不区分候选来自 HTML 还是附件。
+2. `package_no` 为空，或包号不在第 1 步包列表中的候选，记入 `unassigned_candidates`，不参与合并，也不把字段补到同名的其它行上。
 3. COB 业务键：
 
 ```text

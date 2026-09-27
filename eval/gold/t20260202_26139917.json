@@ -1,0 +1,61 @@
+{
+  "announcement_id": "t20260202_26139917",
+  "projects": [
+    {
+      "project_id": "为市局民辅警及职工采购人身意外险及重大疾病等保险服务项目|1",
+      "source_project_no": "[231201]ALAZ[CS]20260001",
+      "project_name": "为市局民辅警及职工采购人身意外险及重大疾病等保险服务项目",
+      "package_no": "1",
+      "purchaser": "绥化市公安局",
+      "package_total_amount": 1222263,
+      "cobs": [
+        {
+          "object_name": "团体重大疾病保险",
+          "category_code": "C18040199",
+          "category_name": "其他商业保险服务",
+          "category_type": "C",
+          "brand": null,
+          "product_supplier": null,
+          "spec_model": null,
+          "unit_price": 194679,
+          "quantity": 1,
+          "unit": "项",
+          "total_price": 194679
+        },
+        {
+          "object_name": "团体意外伤害保险",
+          "category_code": "C18040199",
+          "category_name": "其他商业保险服务",
+          "category_type": "C",
+          "brand": null,
+          "product_supplier": null,
+          "spec_model": null,
+          "unit_price": 1027584,
+          "quantity": 1,
+          "unit": "项",
+          "total_price": 1027584
+        }
+      ],
+      "subs": [
+        {
+          "supplier_name": "中国太平洋人寿保险股份有限公司绥化中心支公司",
+          "score": 99.92,
+          "is_winner": true,
+          "cooperative_product_suppliers": []
+        },
+        {
+          "supplier_name": "中国人民人寿保险股份有限公司绥化市中心支公司",
+          "score": 98.0,
+          "is_winner": false,
+          "cooperative_product_suppliers": []
+        },
+        {
+          "supplier_name": "阳光财产保险股份有限公司绥化中心支公司",
+          "score": 75.74,
+          "is_winner": false,
+          "cooperative_product_suppliers": []
+        }
+      ]
+    }
+  ]
+}

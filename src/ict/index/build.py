@@ -24,6 +24,11 @@ def _sha256(path: Path) -> str:
 
 
 def _probe_pdf(path: Path) -> tuple[int | None, float | None, str, str | None]:
+    from ict.documents import markdown_path_for_pdf
+
+    markdown = markdown_path_for_pdf(path)
+    if markdown is not None and markdown.stat().st_size > 0:
+        return None, None, "text_extractable", "markdown"
     import pymupdf
 
     try:

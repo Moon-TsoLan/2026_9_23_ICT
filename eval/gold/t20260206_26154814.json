@@ -1,0 +1,195 @@
+{
+  "announcement_id": "t20260206_26154814",
+  "projects": [
+    {
+      "project_id": "口腔医学智能创新研究平台|1",
+      "source_project_no": "GZGK25D382A1284Z",
+      "project_name": "口腔医学智能创新研究平台",
+      "package_no": "1",
+      "purchaser": "佛山大学",
+      "package_total_amount": 2495000,
+      "cobs": [
+        {
+          "object_name": "口腔种植手术机器人(注册证产品名称：口腔种植手术导航定位设备）",
+          "category_code": "A02100499",
+          "category_name": "其他分析仪器",
+          "category_type": "A",
+          "brand": "雅客智慧",
+          "product_supplier": null,
+          "spec_model": "DRS0605-FT250",
+          "unit_price": 2495000,
+          "quantity": 1,
+          "unit": "台",
+          "total_price": 2495000
+        }
+      ],
+      "subs": [
+        {
+          "supplier_name": "深圳市东方嘉盛供应链股份有限公司",
+          "score": 80.24,
+          "is_winner": true,
+          "cooperative_product_suppliers": []
+        },
+        {
+          "supplier_name": "瑞诚医疗科技（深圳）有限公司",
+          "score": 55.14,
+          "is_winner": false,
+          "cooperative_product_suppliers": []
+        },
+        {
+          "supplier_name": "江苏联玥医疗技术有限公司",
+          "score": 49.56,
+          "is_winner": false,
+          "cooperative_product_suppliers": []
+        },
+        {
+          "supplier_name": "深圳市耀昌医疗器械有限公司",
+          "score": 41.72,
+          "is_winner": false,
+          "cooperative_product_suppliers": []
+        }
+      ]
+    },
+    {
+      "project_id": "口腔医学智能创新研究平台|2",
+      "source_project_no": "GZGK25D382A1284Z",
+      "project_name": "口腔医学智能创新研究平台",
+      "package_no": "2",
+      "purchaser": "佛山大学",
+      "package_total_amount": 2480000,
+      "cobs": [
+        {
+          "object_name": "X射线计算机体层摄影设备",
+          "category_code": "A02100499",
+          "category_name": "其他分析仪器",
+          "category_type": "A",
+          "brand": "西门子",
+          "product_supplier": null,
+          "spec_model": "SOMATOM go.Up",
+          "unit_price": 2480000,
+          "quantity": 1,
+          "unit": "台",
+          "total_price": 2480000
+        }
+      ],
+      "subs": [
+        {
+          "supplier_name": "广东云曌医疗科技有限公司",
+          "score": 89.21,
+          "is_winner": true,
+          "cooperative_product_suppliers": []
+        },
+        {
+          "supplier_name": "广州国雍医疗器械有限公司",
+          "score": 73.1,
+          "is_winner": false,
+          "cooperative_product_suppliers": []
+        },
+        {
+          "supplier_name": "珠海天健德康贸易有限公司",
+          "score": 65.88,
+          "is_winner": false,
+          "cooperative_product_suppliers": []
+        }
+      ]
+    },
+    {
+      "project_id": "口腔医学智能创新研究平台|4",
+      "source_project_no": "GZGK25D382A1284Z",
+      "project_name": "口腔医学智能创新研究平台",
+      "package_no": "4",
+      "purchaser": "佛山大学",
+      "package_total_amount": 650000,
+      "cobs": [
+        {
+          "object_name": "电子面弓（下颌运动分析系统）",
+          "category_code": "A02100499",
+          "category_name": "其他分析仪器",
+          "category_type": "A",
+          "brand": "zebris",
+          "product_supplier": null,
+          "spec_model": "zebris JMAOptic",
+          "unit_price": 650000,
+          "quantity": 1,
+          "unit": "台",
+          "total_price": 650000
+        }
+      ],
+      "subs": [
+        {
+          "supplier_name": "南京柯美齐科技有限公司",
+          "score": 75.6,
+          "is_winner": true,
+          "cooperative_product_suppliers": []
+        },
+        {
+          "supplier_name": "瑞诚医疗科技（深圳）有限公司",
+          "score": 56.87,
+          "is_winner": false,
+          "cooperative_product_suppliers": []
+        },
+        {
+          "supplier_name": "珠海市勇嘉医疗器械有限公司",
+          "score": 56.45,
+          "is_winner": false,
+          "cooperative_product_suppliers": []
+        },
+        {
+          "supplier_name": "深圳市康讯医疗科技有限公司",
+          "score": 49.47,
+          "is_winner": false,
+          "cooperative_product_suppliers": []
+        }
+      ]
+    },
+    {
+      "project_id": "口腔医学智能创新研究平台|5",
+      "source_project_no": "GZGK25D382A1284Z",
+      "project_name": "口腔医学智能创新研究平台",
+      "package_no": "5",
+      "purchaser": "佛山大学",
+      "package_total_amount": 1790000,
+      "cobs": [
+        {
+          "object_name": "3D面部扫描仪",
+          "category_code": "A02100499",
+          "category_name": "其他分析仪器",
+          "category_type": "A",
+          "brand": "3dMD",
+          "product_supplier": null,
+          "spec_model": "3dMD face system",
+          "unit_price": 1790000,
+          "quantity": 1,
+          "unit": "台",
+          "total_price": 1790000
+        }
+      ],
+      "subs": [
+        {
+          "supplier_name": "深圳市中皓医疗器械有限公司",
+          "score": 74.97,
+          "is_winner": true,
+          "cooperative_product_suppliers": []
+        },
+        {
+          "supplier_name": "深圳市康讯医疗科技有限公司",
+          "score": 65.6,
+          "is_winner": false,
+          "cooperative_product_suppliers": []
+        },
+        {
+          "supplier_name": "南京柯美齐科技有限公司",
+          "score": 51.64,
+          "is_winner": false,
+          "cooperative_product_suppliers": []
+        },
+        {
+          "supplier_name": "深圳市儒康星瑞医疗科技有限公司",
+          "score": 45.27,
+          "is_winner": false,
+          "cooperative_product_suppliers": []
+        }
+      ]
+    }
+  ]
+}

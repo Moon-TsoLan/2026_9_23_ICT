@@ -6,7 +6,7 @@ import json
 
 from ict.candidates import seal_candidate
 from ict.config import SOURCE_PRIORITY
-from ict.html_context import ParsedNotice, step2a_payload
+from ict.html_context import ParsedNotice, bidder_body_sections, step2a_payload
 from ict.ids import make_project_id
 from ict.llm import LLMClient, LLMError, parse_json_object
 from ict.schemas import Candidate, Failure, HtmlTable, HtmlTables
@@ -106,29 +106,62 @@ def extract_html_candidates(
             code = "llm_call_failed" if isinstance(exc, LLMError) else "llm_schema_invalid"
             failures.append(Failure(failure_code=code, failure_message=str(exc), location=str(understood.table_index)))
             continue
-        for item in parsed.get("candidates") or []:
-            item_type = item.get("entity_type") or entity
-            if item_type not in {"cob", "sub"}:
-                continue
-            item_package = item.get("package_no") or package_no
-            item_project = make_project_id(project_name, str(item_package)) if item_package and project_name else None
-            if item.get("project_id") is None and item.get("package_no") is None:
-                item_project = None
-                item_package = None
-            candidates.append(
-                seal_candidate(
-                    candidate_id=f"cand_{seq:06d}",
-                    entity_type=item_type,
-                    project_id=item_project,
-                    package_no=None if item_package is None else str(item_package),
-                    source_type="html",
-                    file_id=None,
-                    source_priority=priority,
-                    raw_fields=item.get("fields") or {},
-                    issues=item.get("issues") or [],
-                )
+        seq = _append_candidates(candidates, parsed.get("candidates") or [], entity, package_no, project_name, priority, seq)
+    body_sections = bidder_body_sections(notice)
+    if body_sections:
+        payload = {
+            "entity_type": "sub",
+            "package_no": None,
+            "table_role": "sub_score",
+            "column_mapping": {},
+            "headers": [],
+            "rows": [],
+            "body_sections": body_sections,
+        }
+        try:
+            result = llm.complete(
+                step="extract_html_candidates",
+                prompt_version="html-candidates-v1",
+                user=json.dumps(payload, ensure_ascii=False),
             )
-            seq += 1
+            parsed = parse_json_object(result.text)
+        except (LLMError, ValueError) as exc:
+            code = "llm_call_failed" if isinstance(exc, LLMError) else "llm_schema_invalid"
+            failures.append(Failure(failure_code=code, failure_message=str(exc), location="body_sections"))
+        else:
+            seq = _append_candidates(
+                candidates,
+                parsed.get("candidates") or [],
+                "sub",
+                None,
+                project_name,
+                SOURCE_PRIORITY["sub_score"],
+                seq,
+            )
     if not candidates:
         failures.append(Failure(failure_code="no_candidate_extracted", failure_message="HTML 未抽出候选"))
     return candidates, failures, seq
+
+
+def _append_candidates(candidates, items, entity, package_no, project_name, priority, seq) -> int:
+    for item in items:
+        item_type = item.get("entity_type") or entity
+        if item_type not in {"cob", "sub"}:
+            continue
+        item_package = item.get("package_no") or package_no
+        item_project = make_project_id(project_name, str(item_package)) if item_package and project_name else None
+        candidates.append(
+            seal_candidate(
+                candidate_id=f"cand_{seq:06d}",
+                entity_type=item_type,
+                project_id=item_project,
+                package_no=None if item_package is None else str(item_package),
+                source_type="html",
+                file_id=None,
+                source_priority=priority,
+                raw_fields=item.get("fields") or {},
+                issues=item.get("issues") or [],
+            )
+        )
+        seq += 1
+    return seq

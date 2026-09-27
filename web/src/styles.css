@@ -1,0 +1,280 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei UI", sans-serif;
+  --font-serif: "Noto Serif SC", "Songti SC", "SimSun", serif;
+  --color-ink: #09090b;
+  --color-muted: #52525b;
+  --color-paper: #fafafa;
+  --color-accent: #ec4899;
+  --color-line: #e4e4e7;
+}
+
+@layer base {
+  html,
+  body,
+  #app {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: #fafafa;
+    color: #09090b;
+    font-family: var(--font-sans);
+    font-variant-numeric: tabular-nums;
+  }
+
+  button,
+  input,
+  select {
+    font: inherit;
+    color: inherit;
+  }
+
+  button,
+  a {
+    cursor: pointer;
+  }
+
+  :focus-visible {
+    outline: 3px solid #18181b;
+    outline-offset: 3px;
+  }
+}
+
+.shell {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  background: #fafafa;
+}
+
+.topbar {
+  display: flex;
+  height: 64px;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 28px;
+  padding: 0 28px;
+  border-bottom: 1px solid #e4e4e7;
+  background: #fafafa;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #09090b;
+  font-family: var(--font-serif);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+.brand small {
+  display: block;
+  margin-top: 2px;
+  color: #52525b;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+}
+
+.nav {
+  display: flex;
+  gap: 4px;
+}
+
+.nav a {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-right: 18px;
+  border-bottom: 2px solid transparent;
+  padding: 8px 0;
+  color: #71717a;
+  font-size: 14px;
+  text-decoration: none;
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.nav a em {
+  color: #a1a1aa;
+  font-size: 10px;
+  font-style: normal;
+  letter-spacing: 0.08em;
+}
+
+.nav a:hover {
+  color: #09090b;
+}
+
+.nav a.on {
+  color: #09090b;
+  border-bottom-color: #09090b;
+}
+
+.nav a.on em {
+  color: #ec4899;
+}
+
+.search-btn {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  border: 1px solid #e4e4e7;
+  background: #fff;
+  padding: 0 12px;
+  color: #3f3f46;
+  font-size: 13px;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.search-btn:hover {
+  border-color: #18181b;
+  background: #fff;
+}
+
+.search-btn kbd {
+  border: 1px solid #e4e4e7;
+  padding: 1px 5px;
+  color: #71717a;
+  font-size: 10px;
+}
+
+.viewport {
+  position: relative;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+  background: #fafafa;
+}
+
+.page-root {
+  height: 100%;
+  background: #fafafa;
+}
+
+.sheet-enter-active,
+.sheet-leave-active {
+  position: absolute;
+  inset: 0;
+  transition: opacity 0.9s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sheet-enter-active {
+  z-index: 2;
+}
+
+.sheet-leave-active {
+  z-index: 1;
+}
+
+.sheet-enter-from,
+.sheet-leave-to {
+  opacity: 0;
+}
+
+.star-label,
+.star-edge {
+  pointer-events: none;
+  white-space: nowrap;
+  text-shadow: 0 0 14px rgba(8, 6, 4, 0.85);
+}
+
+.star-label {
+  margin-top: 12px;
+  font-family: "Noto Serif SC", "Songti SC", serif;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  color: rgba(255, 246, 236, 0.78);
+}
+
+.star-edge {
+  font-family: Inter, "Noto Sans SC", sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: rgba(255, 236, 214, 0.62);
+}
+
+.palette {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(9, 9, 11, 0.28);
+}
+
+.palette-card {
+  width: min(520px, calc(100% - 32px));
+  margin: 14vh auto 0;
+  overflow: hidden;
+  border: 1px solid #18181b;
+  background: #fff;
+  box-shadow: 8px 8px 0 #18181b;
+}
+
+.palette-card input {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid #e4e4e7;
+  background: transparent;
+  padding: 16px 18px;
+  outline: none;
+}
+
+.palette-card button {
+  display: flex;
+  width: 100%;
+  gap: 12px;
+  padding: 12px 18px;
+  text-align: left;
+  font-size: 14px;
+  transition: background 0.2s ease;
+}
+
+.palette-card button:hover {
+  background: #f4f4f5;
+}
+
+.edge-glow,
+.edge-flow {
+  stroke-linecap: round;
+  animation: travel 6.8s linear infinite;
+}
+
+.edge-glow {
+  stroke-dasharray: 28 72;
+}
+
+.edge-flow {
+  stroke-dasharray: 9 91;
+}
+
+@keyframes travel {
+  to {
+    stroke-dashoffset: -100;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet-enter-active,
+  .sheet-leave-active,
+  .edge-glow,
+  .edge-flow {
+    transition: none;
+    animation: none;
+  }
+
+  .sheet-enter-from,
+  .sheet-leave-to {
+    opacity: 1;
+  }
+
+  .edge-glow,
+  .edge-flow {
+    display: none;
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "announcement_id": "t20260508_26523336",
+  "projects": [
+    {
+      "project_id": "济南市莱芜区2026年度中型水库运行维护项目|1",
+      "source_project_no": "SDGP370116000202602000027",
+      "project_name": "济南市莱芜区2026年度中型水库运行维护项目",
+      "package_no": "1",
+      "purchaser": "济南市莱芜区城乡水务局",
+      "package_total_amount": 376600,
+      "cobs": [
+        {
+          "object_name": "水库运行维护",
+          "category_code": null,
+          "category_name": null,
+          "category_type": null,
+          "brand": null,
+          "product_supplier": null,
+          "spec_model": null,
+          "unit_price": null,
+          "quantity": null,
+          "unit": null,
+          "total_price": 376600
+        }
+      ],
+      "subs": [
+        {
+          "supplier_name": "山东龙园万家乐生活服务有限公司",
+          "score": null,
+          "is_winner": true,
+          "cooperative_product_suppliers": []
+        },
+        {
+          "supplier_name": "山东省鸿禹水利水电工程有限公司",
+          "score": null,
+          "is_winner": false,
+          "cooperative_product_suppliers": []
+        },
+        {
+          "supplier_name": "山东玥晨建设工程有限公司",
+          "score": null,
+          "is_winner": false,
+          "cooperative_product_suppliers": []
+        },
+        {
+          "supplier_name": "山东顺连建设有限公司",
+          "score": null,
+          "is_winner": false,
+          "cooperative_product_suppliers": []
+        }
+      ]
+    }
+  ]
+}

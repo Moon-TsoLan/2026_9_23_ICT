@@ -1,0 +1,80 @@
+{
+  "announcement_id": "t20260202_26140620",
+  "projects": [
+    {
+      "project_id": "河南省人民医院心电监护仪、输液采集系统及呼吸机项目|1",
+      "source_project_no": "豫财招标采购-2025-1596",
+      "project_name": "河南省人民医院心电监护仪、输液采集系统及呼吸机项目",
+      "package_no": "1",
+      "purchaser": "河南省人民医院",
+      "package_total_amount": 1208200,
+      "cobs": [
+        {
+          "object_name": "遥测心电监护系统(1拖40)",
+          "category_code": null,
+          "category_name": null,
+          "category_type": null,
+          "brand": "迈瑞",
+          "product_supplier": "深圳迈瑞生物医疗电子股份有限公司",
+          "spec_model": "BeneVision TMS30A",
+          "unit_price": 440000,
+          "quantity": 1,
+          "unit": null,
+          "total_price": 440000
+        },
+        {
+          "object_name": "普通监护仪",
+          "category_code": null,
+          "category_name": null,
+          "category_type": null,
+          "brand": "迈瑞",
+          "product_supplier": "深圳迈瑞生物医疗电子股份有限公司",
+          "spec_model": "ePM10MC",
+          "unit_price": 14700,
+          "quantity": 6,
+          "unit": null,
+          "total_price": 88200
+        },
+        {
+          "object_name": "高档监护仪",
+          "category_code": null,
+          "category_name": null,
+          "category_type": null,
+          "brand": "迈瑞",
+          "product_supplier": "深圳迈瑞生物医疗电子股份有限公司",
+          "spec_model": "BeneVision V700",
+          "unit_price": 170000,
+          "quantity": 4,
+          "unit": null,
+          "total_price": 680000
+        }
+      ],
+      "subs": [
+        {
+          "supplier_name": "河南邦祯商贸有限公司",
+          "score": 75.11,
+          "is_winner": true,
+          "cooperative_product_suppliers": ["深圳迈瑞生物医疗电子股份有限公司"]
+        },
+        {
+          "supplier_name": "河南绘景医疗器械有限公司",
+          "score": 56.29,
+          "is_winner": false,
+          "cooperative_product_suppliers": []
+        },
+        {
+          "supplier_name": "郑州天亦娇医院管理有限公司",
+          "score": 38.51,
+          "is_winner": false,
+          "cooperative_product_suppliers": []
+        },
+        {
+          "supplier_name": "河南晟禾医疗器械有限公司",
+          "score": 35.77,
+          "is_winner": false,
+          "cooperative_product_suppliers": []
+        }
+      ]
+    }
+  ]
+}

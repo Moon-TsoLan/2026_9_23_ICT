@@ -10,6 +10,7 @@ DATA_HTML = REPO_ROOT / "data" / "赛题五基准测试数据" / "赛题五.基�
 CATALOG_PATH = REPO_ROOT / "data" / "procurement_catalog_2022.json"
 WORK_ROOT = REPO_ROOT / "work"
 ATTACHMENTS_ROOT = WORK_ROOT / "attachments"
+ATTACHMENTS_MD_ROOT = WORK_ROOT / "attachments-md"
 RUNS_ROOT = WORK_ROOT / "runs"
 
 LOW_TEXT_CHARS_PER_PAGE = 80

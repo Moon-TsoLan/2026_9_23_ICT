@@ -1,0 +1,91 @@
+{
+  "announcement_id": "t20260202_26140259",
+  "projects": [
+    {
+      "project_id": "哈尔滨城市级数智化供热监管平台项目|1",
+      "source_project_no": "[230101]HC[GK]20260001",
+      "project_name": "哈尔滨城市级数智化供热监管平台项目",
+      "package_no": "1",
+      "purchaser": "哈尔滨市住房和城乡建设局",
+      "package_total_amount": 9281000,
+      "cobs": [
+        {
+          "object_name": "哈尔滨城市级数智化供热监管平台项目",
+          "category_code": "C16010100",
+          "category_name": "基础软件开发服务",
+          "category_type": "C",
+          "brand": null,
+          "product_supplier": null,
+          "spec_model": null,
+          "unit_price": 9281000,
+          "quantity": 1,
+          "unit": "个",
+          "total_price": 9281000
+        }
+      ],
+      "subs": [
+        {
+          "supplier_name": "哈工智慧城市研究院（哈尔滨）有限公司(联合体成员：哈尔滨工业大学人工智能研究院有限公司)",
+          "score": 98.7,
+          "is_winner": true,
+          "cooperative_product_suppliers": []
+        },
+        {
+          "supplier_name": "哈尔滨市新金电子有限公司",
+          "score": 71.09,
+          "is_winner": false,
+          "cooperative_product_suppliers": []
+        },
+        {
+          "supplier_name": "黑龙江省应用电子有限责任公司",
+          "score": 70.92,
+          "is_winner": false,
+          "cooperative_product_suppliers": []
+        }
+      ]
+    },
+    {
+      "project_id": "哈尔滨城市级数智化供热监管平台项目|2",
+      "source_project_no": "[230101]HC[GK]20260001",
+      "project_name": "哈尔滨城市级数智化供热监管平台项目",
+      "package_no": "2",
+      "purchaser": "哈尔滨市住房和城乡建设局",
+      "package_total_amount": 195000,
+      "cobs": [
+        {
+          "object_name": "哈尔滨城市级数智化供热监管平台项目",
+          "category_code": "C16050000",
+          "category_name": "信息化工程监理服务",
+          "category_type": "C",
+          "brand": null,
+          "product_supplier": null,
+          "spec_model": null,
+          "unit_price": 195000,
+          "quantity": 1,
+          "unit": "个",
+          "total_price": 195000
+        }
+      ],
+      "subs": [
+        {
+          "supplier_name": "黑龙江赛宝信息技术咨询有限公司",
+          "score": 95.2,
+          "is_winner": true,
+          "cooperative_product_suppliers": []
+        },
+        {
+          "supplier_name": "北方实验室（沈阳）股份有限公司",
+          "score": 85.78,
+          "is_winner": false,
+          "cooperative_product_suppliers": []
+        },
+        {
+          "supplier_name": "黑龙江省同风起工程管理服务有限公司",
+          "score": 81.4,
+          "is_winner": false,
+          "cooperative_product_suppliers": []
+        }
+      ]
+    }
+  ]
+}

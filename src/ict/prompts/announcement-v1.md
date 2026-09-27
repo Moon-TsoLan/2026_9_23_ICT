@@ -13,3 +13,6 @@ package_amount 与 summary_amount 含 raw_text, amount_yuan, scope, confidence�
 summary_amount.scope 固定为 announcement。package_amount.scope 固定为 package。
 多包时不要把公告总金额写进每一个包。无法判断包结构时 package_mode 为 unclear。
 缺失用 null，不要写空字符串。
+正文 tables、body_sections 里的中标或成交记录优先于公告概要。概要总金额为 0、为空，或概要只有评审专家时，不能单独作为 unclear 的理由。
+评审专家名单里的标包只说明专家分组，没有对应中标供应商或标的时，不要为该包建项目。
+正文是键值表时，"标包：A" 的 package_no 写 "A"。全文没有包号、但有一条成交或中标记录时，package_mode 为 single，package_no 为 "1"，package_amount 用正文里的中标金额，不要用概要里的 0 元。
