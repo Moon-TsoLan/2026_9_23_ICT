@@ -1,0 +1,16 @@
+@import "tailwindcss";
+@import "./tokens.css";
+@import "./base.css";
+
+/* Tailwind 4 主题：颜色别名映射到域变量，工具类随域自动换肤 */
+@theme inline {
+  --font-sans: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei UI", sans-serif;
+  --font-serif: "Noto Serif SC", "Songti SC", "SimSun", serif;
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+}
