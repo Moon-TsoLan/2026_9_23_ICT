@@ -20,6 +20,7 @@ STEP_FILES = {
     "extract_attachment_candidates": "07_attachment_extraction.json",
     "normalize_candidates": "08_normalized_candidates.json",
     "merge_candidates": "09_merged_projects.json",
+    "repair_packages": "09_merged_projects.json",
     "persist_and_report": "10_run_report.json",
 }
 

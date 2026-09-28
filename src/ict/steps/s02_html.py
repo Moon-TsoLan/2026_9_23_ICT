@@ -3,18 +3,35 @@
 from __future__ import annotations
 
 import json
+import re
 from collections import Counter
 
 from ict.candidates import seal_candidate
 from ict.config import SOURCE_PRIORITY
-from ict.html_context import ParsedNotice, bidder_body_sections, step2a_payload
+from ict.html_context import ParsedNotice, ParsedTable, bidder_body_sections, step2a_payload
 from ict.ids import make_project_id
 from ict.llm import LLMClient, LLMError, complete_json
 from ict.package_resolve import promote_object_tables, resolve_table_packages
-from ict.schemas import Candidate, Failure, HtmlTable, HtmlTables
+from ict.schemas import Candidate, Failure, FieldObservation, HtmlTable, HtmlTables
 
 TABLE_ROLES = {"cob_detail", "cob_summary", "sub_score", "winner", "agency_fee", "other"}
 ROW_GRAINS = {"cob", "supplier", "project", "other"}
+LINE_KEYS = ("brand", "spec_model", "quantity", "unit_price", "total_price")
+POINTER_RE = re.compile(r"详见|见附件")
+LINE_POINTER_RE = re.compile(r"(?:品牌|规格|型号|数量|单价|总价|报价)\s*[:：]?\s*(?:详见|见)\S{0,8}?(?:附件|文件|明细)")
+
+
+def _compact(value) -> str:
+    return re.sub(r"\s+", "", str(value or ""))
+
+
+def _bidder_cells(table: ParsedTable, mapping: dict) -> list[str]:
+    """Bidder column cells of an object table that has no manufacturer column."""
+    header = mapping.get("supplier_name")
+    if not header or "product_supplier" in mapping or header not in table.headers:
+        return []
+    column = table.headers.index(header)
+    return [_compact(row[column]) for row in table.rows if column < len(row) and row[column]]
 
 
 def _validate_table(parsed: dict, package_nos: list[str]) -> str:
@@ -149,6 +166,7 @@ def extract_html_candidates(
             code = "llm_call_failed" if isinstance(exc, LLMError) else "llm_schema_invalid"
             failures.append(Failure(failure_code=code, failure_message=str(exc), location=str(understood.table_index)))
             continue
+        start = len(candidates)
         seq = _append_candidates(
             candidates,
             parsed.get("candidates") or [],
@@ -159,6 +177,19 @@ def extract_html_candidates(
             seq,
             known_packages,
         )
+        pointer = entity == "cob" and _line_fields_point(table, understood.column_mapping)
+        cells = {_compact(cell) for row in table.rows for cell in row} if understood.table_role == "winner" else set()
+        bidders = _bidder_cells(table, understood.column_mapping) if entity == "cob" else []
+        for candidate in candidates[start:]:
+            name = candidate.fields.get("supplier_name")
+            if candidate.entity_type == "sub" and name and _compact(name.raw_value) in cells:
+                candidate.fields["is_winner"] = FieldObservation(raw_value=True, status="present")
+            product = candidate.fields.get("product_supplier")
+            if product and product.raw_value and any(_compact(product.raw_value) in cell for cell in bidders):
+                candidate.fields["product_supplier"] = FieldObservation(raw_value=None, status="missing")
+                candidate.issues.append("product_supplier_from_bidder_column")
+            if pointer and candidate.entity_type == "cob" and "line_fields_point_to_attachment" not in candidate.issues:
+                candidate.issues.append("line_fields_point_to_attachment")
     body_sections = bidder_body_sections(notice)
     if body_sections:
         payload = {
@@ -198,10 +229,28 @@ def extract_html_candidates(
     return candidates, failures, seq
 
 
+def _pointer_cell(text: str) -> bool:
+    return bool(POINTER_RE.search(text or "")) and len(text) <= 20
+
+
+def _line_fields_point(table: ParsedTable, mapping: dict[str, str]) -> bool:
+    """Brand, spec, quantity or price cells that only say 'see attachment'."""
+    for key in LINE_KEYS:
+        header = mapping.get(key)
+        if header not in table.headers:
+            continue
+        column = table.headers.index(header)
+        if any(column < len(row) and _pointer_cell(row[column]) for row in table.rows):
+            return True
+    return any(LINE_POINTER_RE.search(cell or "") for row in table.rows for cell in row)
+
+
 def _append_candidates(candidates, items, entity, package_no, project_name, priority, seq, known_packages=None) -> int:
     for item in items:
         item_type = item.get("entity_type") or entity
         if item_type not in {"cob", "sub"}:
+            continue
+        if not any(value not in (None, "") for value in (item.get("fields") or {}).values()):
             continue
         item_package = item.get("package_no") or package_no
         if item_package in (None, "", "null") and known_packages and len(known_packages) == 1:

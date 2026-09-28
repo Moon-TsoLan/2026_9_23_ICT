@@ -8,7 +8,7 @@ from pathlib import Path
 
 from ict.catalog import Catalog
 from ict.config import ATTACHMENTS_ROOT, DATA_HTML
-from ict.html_context import parse_notice
+from ict.html_context import parse_notice, winner_hints
 from ict.index.build import load_index
 from ict.llm import LLMClient, build_client
 from ict.schemas import CandidateFile, Failure, RunReport
@@ -18,7 +18,8 @@ from ict.steps.s02_html import extract_html_candidates, understand_tables
 from ict.steps.s03_plan import plan_projects
 from ict.steps.s04_attach import extract_attachment_candidates, locate_pages, triage_files
 from ict.steps.s07_normalize import normalize_candidates
-from ict.steps.s08_merge import consistency_checks, merge_projects
+from ict.steps.s08_merge import merge_projects
+from ict.steps.s08b_repair import repair_packages
 
 
 def _status_from_failures(base: str, failures: list[Failure]) -> str:
@@ -139,11 +140,15 @@ def run_announcement(announcement_id: str, llm: LLMClient | None = None, html_di
 
     store.begin("merge_candidates")
     merged = merge_projects(store.run_id, understanding, normalized.candidates)
-    check_failures = consistency_checks(merged)
-    all_failures.extend(check_failures)
-    merged.failures.extend(check_failures)
     store.write_output("merge_candidates", merged)
     store.finish("merge_candidates", merged.status)
+
+    store.begin("repair_packages")
+    check_failures = repair_packages(merged, winner_hints(notice, package_nos), client, calls)
+    all_failures.extend(check_failures)
+    merged.failures.extend(check_failures)
+    store.write_output("repair_packages", merged)
+    store.finish("repair_packages", "partial" if check_failures else "success")
     store.state.counts["final_cobs"] = sum(len(project.cobs) for project in merged.projects)
     store.state.counts["final_subs"] = sum(len(project.subs) for project in merged.projects)
     public = [project.model_dump(exclude={"provenance"}) for project in merged.projects]
@@ -152,7 +157,7 @@ def run_announcement(announcement_id: str, llm: LLMClient | None = None, html_di
     final = "success"
     if understanding.status == "failed" or not merged.projects:
         final = "failed"
-    elif all_failures or merged.conflicts or merged.status == "partial":
+    elif all_failures or merged.status == "partial":
         final = "partial"
     store.state.status = final
     store.state.review_required = final != "success"

@@ -32,6 +32,12 @@ from ict.schemas import (
 )
 
 FILE_PACKAGE_RE = re.compile(r"(?:标\s*包|采购包|合同包|第)?\s*([0-9]+|[A-Za-z])\s*包|(?:标\s*包|采购包|合同包)\s*[:：]?\s*([0-9]+|[A-Za-z])")
+PAGE_PACKAGE_RE = re.compile(r"第\s*([0-9]+)\s*包|(?:标\s*包|采购包|合同包|包号|包)\s*[:：]?\s*([0-9]+|[A-Za-z])(?![0-9A-Za-z])")
+
+
+def page_packages(text: str, known: list[str]) -> set[str]:
+    known_set = set(known)
+    return {next(group for group in match.groups() if group) for match in PAGE_PACKAGE_RE.finditer(text or "")} & known_set
 
 
 def coerce_package_scope(scope: str, possible: list[str], known: list[str], file_name: str) -> str:
@@ -247,6 +253,8 @@ def locate_pages(run_id: str, plans: ProjectPlans, files: FileDecisions, index: 
         )
     page_inputs = []
     failures: list[Failure] = []
+    known_packages = [project.package_no for project in plans.projects]
+    mentioned: dict[tuple[str, int], set[str]] = {}
     for decision in chosen:
         path = _file_path(index, decision.file_id)
         if path is None:
@@ -269,6 +277,7 @@ def locate_pages(run_id: str, plans: ProjectPlans, files: FileDecisions, index: 
             continue
         slim = []
         for page in pages:
+            mentioned[(decision.file_id, page["page_no"])] = page_packages(page["text"], known_packages)
             headers = [table["headers"] for table in page["tables"]]
             if page["chars"] < 20 and not headers:
                 continue
@@ -289,7 +298,6 @@ def locate_pages(run_id: str, plans: ProjectPlans, files: FileDecisions, index: 
             }
         )
     queries = [query for project in plans.projects for query in project.search_queries]
-    known_packages = [project.package_no for project in plans.projects]
     file_meta = {item["file_id"]: item for item in page_inputs}
     try:
         parsed = complete_json(
@@ -317,18 +325,22 @@ def locate_pages(run_id: str, plans: ProjectPlans, files: FileDecisions, index: 
         if mode not in {"text", "table", "text_and_table", "unsupported"}:
             mode = "text"
         meta = file_meta.get(file_id) or {}
+        page_no = int(item.get("page_no") or 0)
+        scope = coerce_package_scope(
+            str(item.get("package_scope") or "unknown"),
+            list(meta.get("possible_packages") or []),
+            known_packages,
+            str(meta.get("display_name") or ""),
+        )
+        if len(mentioned.get((file_id, page_no), set())) >= 2:
+            scope = "announcement"
         decisions.append(
             PageDecision(
                 file_id=file_id,
-                page_no=int(item.get("page_no") or 0),
+                page_no=page_no,
                 relevance=float(item.get("relevance") or 0),
                 expected_fields=item.get("expected_fields") or [],
-                package_scope=coerce_package_scope(
-                    str(item.get("package_scope") or "unknown"),
-                    list(meta.get("possible_packages") or []),
-                    known_packages,
-                    str(meta.get("display_name") or ""),
-                ),
+                package_scope=scope,
                 extraction_mode=mode,
                 reason=item.get("reason") or "",
             )

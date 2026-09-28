@@ -283,10 +283,27 @@ def _package_anchors(sections: list[dict]) -> list[dict]:
                     "supplier_name": supplier,
                     "amount_raw": raw,
                     "amount_yuan": yuan,
+                    "section_title": section["title"],
                     "text": part[:400],
                 }
             )
     return anchors
+
+
+def winner_hints(notice: ParsedNotice, package_nos: list[str]) -> dict[str, list[str]]:
+    """Suppliers named in the award prose, by package. Losing-bid prose is excluded."""
+    hints: dict[str, list[str]] = {}
+    for anchor in notice.package_anchors:
+        title = anchor.get("section_title") or ""
+        if re.search(r"未中标|未成交", title) or not re.search(r"中标|成交", title):
+            continue
+        name = anchor.get("supplier_name")
+        package_no = anchor.get("package_no")
+        if package_no is None and len(package_nos) == 1:
+            package_no = package_nos[0]
+        if name and package_no in package_nos and name not in hints.get(package_no, []):
+            hints.setdefault(package_no, []).append(name)
+    return hints
 
 
 def bidder_body_sections(notice: ParsedNotice) -> list[dict]:

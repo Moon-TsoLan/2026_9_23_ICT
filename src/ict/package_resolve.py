@@ -11,24 +11,48 @@ from ict.llm import LLMClient, complete_json
 from ict.schemas import HtmlTable, HtmlTables
 
 ITEM_NO_RE = re.compile(r"^\s*([0-9]+|[A-Za-z]+)\s*[-－]")
-OBJECT_KEYS = ("名称", "服务范围", "施工范围", "标的", "货物名称", "采购标的")
+OBJECT_KEYS = {"名称", "标的名称", "服务名称", "工程名称", "货物名称", "采购标的", "服务范围", "施工范围"}
+OBJECT_SECTION_RE = re.compile(r"主要标的|标的信息|采购内容")
+NON_OBJECT_SECTION_RE = re.compile(r"评审|专家|未中标|未成交|其他补充|代理服务费|资格|业绩|联系")
+NON_OBJECT_HEADER_RE = re.compile(r"甲方|竣工|业绩|未中标|未成交|评审结果|得分|资格性审查|符合性审查|文件名称|文件类型|可下载")
+
+
+def _labels(parsed) -> list[str]:
+    labels = list(parsed.headers)
+    if parsed.key_value:
+        labels.extend(row[0] for row in parsed.rows if row)
+    return [re.sub(r"[\s:：]", "", label) for label in labels]
+
+
+def _object_evidence(parsed) -> str | None:
+    if OBJECT_SECTION_RE.search(parsed.section or ""):
+        return "section"
+    if any(label in OBJECT_KEYS for label in _labels(parsed)):
+        return "kv_key" if parsed.key_value else "header"
+    return None
 
 
 def promote_object_tables(notice: ParsedNotice, tables: HtmlTables) -> None:
-    """A table in the object section is still extracted when the model says other."""
+    """Promote an other table only on structural evidence; demote tables that never list objects."""
     by_index = {table.table_index: table for table in notice.tables}
     for understood in tables.tables:
-        if understood.table_role != "other":
-            continue
         parsed = by_index.get(understood.table_index)
         if parsed is None:
             continue
-        blob = " ".join([parsed.section, parsed.before_text, *parsed.headers, *(cell for row in parsed.rows[:6] for cell in row)])
-        if "主要标的" in parsed.section or any(key in blob for key in OBJECT_KEYS):
-            understood.table_role = "cob_detail"
-            understood.row_grain = "cob"
-            if "promoted_from_other" not in understood.issues:
-                understood.issues.append("promoted_from_other")
+        header_veto = bool(NON_OBJECT_HEADER_RE.search(" ".join(_labels(parsed))))
+        if understood.table_role in {"cob_detail", "cob_summary"} and header_veto:
+            understood.table_role = "other"
+            understood.row_grain = "other"
+            understood.issues.append("demoted_non_object")
+            continue
+        if understood.table_role != "other" or header_veto or NON_OBJECT_SECTION_RE.search(parsed.section or ""):
+            continue
+        evidence = _object_evidence(parsed)
+        if evidence is None:
+            continue
+        understood.table_role = "cob_detail"
+        understood.row_grain = "cob"
+        understood.issues.extend(["promoted_from_other", f"promoted_by:{evidence}"])
 
 
 def resolve_table_packages(
