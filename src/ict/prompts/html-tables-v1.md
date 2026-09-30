@@ -1,12 +1,25 @@
-你判断一张政府采购 HTML 表的角色。只输出 JSON。
+你判断一张政府采购 HTML 表的角色，并给出列映射。只输出 JSON。
 
-table_role 只能是 cob_detail、cob_summary、sub_score、winner、agency_fee、other。
-row_grain 只能是 cob、supplier、project、other。
-package_scope 只能是编号本身、announcement 或 unknown。"第3包""采购包3""包3"写成 "3"；"标包A""包A"写成 "A"。不要把"第3包"或 multiple_packages_in_one_table 写进 package_scope。一张表覆盖多个包时，package_scope 写 announcement，并在 issues 里写 multiple_packages_in_one_table。用户给出的 package_candidates 里已有编号时，优先用其中同一个编号。
-column_mapping 的值必须是用户给出的表头原文，键使用 object_name、category_name、category_code、brand、spec_model、quantity、unit、unit_price、total_price、supplier_name、score、is_winner 这些字段名。
-品目名称、品目编号及品目名称映射到 category_name。单元格里是政府采购目录编码时映射到 category_code。品目号（如 1-1、3-1-1）的第一段是包号：1-1 属于包 "1"，2-1 属于包 "2"。它不是品目编码，不要映射到 category_code 或 category_name，写入 unmapped_columns。section 含「主要标的」且表里有名称、服务范围或采购标的时，table_role 用 cob_detail，不要用 other。
-仅有品目名称：表头「品目号、品目名称、采购标的」，一行「1-1、其他商业保险服务、团体重大疾病保险」。column_mapping 为 {"category_name":"品目名称","object_name":"采购标的"}，品目号写入 unmapped_columns。
-仅有品目编码：表头「品目编号、货物名称、品牌」，一行「A02100499、口腔种植手术机器人、雅客智慧」。column_mapping 为 {"category_code":"品目编号","object_name":"货物名称","brand":"品牌"}。不要因为没有名称列就空着 category_code。
-品目名称和品目编码都有：表头「品目编号、品目名称、采购标的」，一行「A02050906、工业机器人、潜伏式搬运机器人」。column_mapping 为 {"category_code":"品目编号","category_name":"品目名称","object_name":"采购标的"}。一列叫「品目编号及品目名称」、单元格同时有编码和名称时，category_code 和 category_name 都映射到这一列。
-同时有「报价明细内容」和「采购标的」时，object_name 映射报价明细内容。
-issues 从这些值里选择：object_name_grain_suspect、summary_row、points_to_attachment、multiple_packages_in_one_table、multi_value_cell、header_merge_needed、package_scope_unknown、column_mapping_uncertain、other。
+输入：一张表（table_index、before_text、headers、rows 或表头预览）、本公告的包号候选 package_candidates、以及同篇其它表的标题列表。
+
+字段：
+- table_role：cob_detail、cob_summary、sub_score、winner、agency_fee、other 之一。
+- row_grain：cob、supplier、project、other 之一。
+- package_scope：某个包号、announcement 或 unknown；编号只写本身，例如 3、A，不要写成"第3包""包3"这类形式。
+- column_mapping：键用正式字段名（object_name、category_name、category_code、brand、spec_model、quantity、unit、unit_price、total_price、supplier_name、score、is_winner），值必须是该表表头的原文。
+- unmapped_columns：对不上正式字段的表头。
+- issues：从 object_name_grain_suspect、summary_row、points_to_attachment、multiple_packages_in_one_table、multi_value_cell、header_merge_needed、package_scope_unknown、column_mapping_uncertain、other 中取。
+- confidence：0 到 1 的数。
+
+判断准则：
+1. table_role 描述这张表的主体内容：展示标的明细行（每行一个标的、含名称，通常还有品牌、规格、数量、单价、总价）时用 cob_detail；展示供应商得分或审查结果时用 sub_score；展示中标供应商时用 winner；只做汇总时用 cob_summary；代理服务费表用 agency_fee；以上都不是时用 other。
+2. 只有表里存在能映射到 object_name 的列时，才可能判为 cob_detail，否则用 other。节名或表头出现"主要标的""标的信息""采购内容"只是线索，不能替代列内容。
+3. 品目名称、品目编号及品目名称映射到 category_name；单元格是政府采购目录编码时映射到 category_code。
+4. 品目号（如 1-1、3-1-1）是行序号，写入 unmapped_columns，不映射到品目字段。
+5. 一张表覆盖多个包时，package_scope 写 announcement，并在 issues 记 multiple_packages_in_one_table。
+6. column_mapping 的值必须是表头原文；对不上正式字段的表头放进 unmapped_columns。
+
+输出：
+{"table_index": <int>, "table_role": "<枚举>", "package_scope": "<包号|announcement|unknown>", "row_grain": "<枚举>", "column_mapping": {"<正式字段名>": "<表头原文>"}, "unmapped_columns": ["<表头>"], "issues": ["<枚举>"], "confidence": "<number|null>"}
+
+无法确定角色时 table_role 写 other；无法确定包号时 package_scope 写 unknown。
