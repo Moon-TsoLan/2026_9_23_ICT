@@ -7,7 +7,7 @@ import EmptyState from '@/components/EmptyState.vue'
 import MetricCard from '@/components/MetricCard.vue'
 import PartyPicker from '@/components/PartyPicker.vue'
 import type { PartyProfile } from '@/types/explore'
-import { NODE_KIND_LABEL } from '@/types/graph'
+import { DISPLAY_KIND, DISPLAY_KIND_LABEL } from '@/types/graph'
 
 const route = useRoute()
 const router = useRouter()
@@ -75,7 +75,7 @@ function goSearch() {
     <EmptyState v-else-if="state === 'error'" :title="errorMsg" hint="换 ⌘K 或上方搜索框找其他主体" />
 
     <div v-else-if="profile" class="body">
-      <p class="kicker">主体档案 · {{ NODE_KIND_LABEL[profile.kind] }}</p>
+      <p class="kicker">主体档案 · {{ DISPLAY_KIND_LABEL[DISPLAY_KIND[profile.kind]] }}</p>
       <h1 class="h-serif">{{ profile.name }}</h1>
 
       <div class="stats">

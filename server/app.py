@@ -306,9 +306,10 @@ def party_profile(party_id: str) -> dict:
     kind, _, name = party_id.partition(":")
     if kind == "buyer":
         return _buyer_profile(party_id, name)
-    if kind == "sup":
+    if kind in ("sup", "vendor"):
+        # 星图里的"产品供应商"节点是 vendor:<名称>，实体仍是 supplier
         return _supplier_profile(party_id, name)
-    raise HTTPException(422, "id 需形如 sup:<名称> 或 buyer:<名称>")
+    raise HTTPException(422, "id 需形如 sup:/vendor:/buyer:<名称>")
 
 
 def _buyer_profile(pid: str, name: str) -> dict:

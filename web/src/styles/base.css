@@ -185,21 +185,42 @@
   }
 }
 
-/* ---- 星图标签（three.js CSS2D 渲染用，全局类名不可 scoped） ---- */
+/* ---- 星图标签（three.js CSS2D 渲染用）：锚位由 StarMap 决定，这里只管排版 ---- */
 .star-label,
-.star-edge,
-.star-rank {
+.star-edge {
   pointer-events: none;
   white-space: nowrap;
-  text-shadow: 0 0 14px rgba(8, 6, 4, 0.85);
+  text-shadow: 0 0 14px rgba(8, 6, 4, 0.9);
 }
 
 .star-label {
-  margin-top: 12px;
+  /* 半透明底板：让文字在雾上仍可读，同时不遮掉星空本身 */
+  border-radius: 2px;
+  background: rgba(10, 9, 8, 0.42);
+  padding: 1px 4px;
   font-family: "Noto Serif SC", "Songti SC", serif;
   font-size: 13px;
-  letter-spacing: 0.06em;
-  color: rgba(255, 246, 236, 0.78);
+  line-height: 15px;
+  letter-spacing: 0.04em;
+  color: rgba(255, 246, 236, 0.86);
+}
+
+/* 两行断行：宽度减半，是"不把名字横向排开"的关键 */
+.star-label i {
+  display: block;
+  font-style: normal;
+}
+
+.star-label[data-dir='1'] i,
+.star-label[data-dir='3'] i,
+.star-label[data-dir='4'] i {
+  text-align: left;
+}
+
+.star-label[data-dir='2'] i,
+.star-label[data-dir='3'] i,
+.star-label[data-dir='5'] i {
+  text-align: right;
 }
 
 .star-edge {
@@ -209,19 +230,6 @@
   color: rgba(255, 236, 214, 0.62);
 }
 
-.star-rank {
-  display: grid;
-  width: 20px;
-  height: 20px;
-  place-items: center;
-  border: 1px solid rgba(255, 206, 148, 0.85);
-  border-radius: 99px;
-  background: rgba(12, 11, 10, 0.72);
-  color: #ffce94;
-  font-family: Inter, sans-serif;
-  font-size: 11px;
-  font-weight: 600;
-}
 
 /* ---- 滚动条（双域低调处理） ---- */
 * {

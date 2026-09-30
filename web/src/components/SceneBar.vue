@@ -25,6 +25,7 @@ const props = defineProps<{ loading?: boolean }>()
 const emit = defineEmits<{
   (e: 'query', scene: SceneId, subjects: string[]): void
   (e: 'reset'): void
+  (e: 'reframe'): void
 }>()
 
 const scene = ref<SceneId>('S1')
@@ -34,6 +35,9 @@ const multiInput = ref('')
 
 const meta = computed(() => SCENES[scene.value])
 const sceneIds = Object.keys(SCENES) as SceneId[]
+
+/** 接力只带过来一家时，明确说还差几家，而不是点了没反应 */
+const notice = ref('')
 
 const canQuery = computed(() =>
   meta.value.multi ? multiList.value.length >= 2 : single.value.trim().length > 0,
@@ -57,6 +61,26 @@ function run() {
   if (!canQuery.value || props.loading) return
   emit('query', scene.value, meta.value.multi ? [...multiList.value] : [single.value.trim()])
 }
+
+/** 供星图"接力查询"调用：切场景 + 填主体 + 立刻查 */
+function apply(next: SceneId, names: string[]) {
+  scene.value = next
+  notice.value = ''
+  if (SCENES[next].multi) {
+    multiList.value = [...new Set(names)]
+    multiInput.value = ''
+    if (multiList.value.length < 2) {
+      const have = multiList.value[0] ?? ''
+      notice.value = have + ' 已填入，' + next + ' 需要至少 2 家中标供应商，再加一家后点查询'
+      return
+    }
+  } else {
+    single.value = names[0] ?? ''
+  }
+  if (canQuery.value) emit('query', next, SCENES[next].multi ? [...multiList.value] : [single.value])
+}
+
+defineExpose({ apply })
 </script>
 
 <template>
@@ -77,11 +101,14 @@ function run() {
       </button>
     </div>
     <div class="controls">
-      <p class="desc">{{ meta.desc }}<span class="hint">{{ meta.hint }}</span></p>
+      <p class="desc">
+        {{ meta.desc }}<span class="hint">{{ meta.hint }}</span>
+        <span v-if="notice" class="warn">{{ notice }}</span>
+      </p>
       <div v-if="!meta.multi" class="row">
         <PartyPicker
           v-model="single"
-          :kind="meta.subjectKind"
+          :kind="meta.subjectKind === 'supplier' ? 'winner' : 'buyer'"
           :placeholder="meta.subjectKind === 'buyer' ? '输入采购单位名称' : '输入中标供应商名称'"
           @select="run"
           @update:model-value="() => {}"
@@ -94,8 +121,8 @@ function run() {
         </span>
         <PartyPicker
           v-model="multiInput"
-          kind="supplier"
-          :placeholder="multiList.length ? '继续添加供应商' : '输入中标供应商名称'"
+          kind="winner"
+          :placeholder="multiList.length ? '继续添加中标供应商' : '输入中标供应商名称'"
           @select="(hit) => addMulti(hit.name)"
         />
       </div>
@@ -104,7 +131,8 @@ function run() {
         <Play v-else :size="14" />
         查询
       </button>
-      <button class="btn-ghost" @click="emit('reset')">重置视野</button>
+      <button class="btn-ghost" :disabled="!loading && false" @click="emit('reframe')">重新取景</button>
+      <button class="btn-ghost" @click="emit('reset')">回到全景</button>
     </div>
   </div>
 </template>
@@ -177,6 +205,12 @@ function run() {
 .hint {
   margin-left: 8px;
   color: var(--faint);
+}
+
+.warn {
+  margin-left: 10px;
+  color: var(--warm, #ffce94);
+  font-size: 11px;
 }
 
 .row {

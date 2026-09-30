@@ -49,7 +49,10 @@ function scatter(ids: string[], spacing: number, face: (x: number, y: number, d:
   return homes
 }
 
-export function layoutGraph(nodes: GraphNode[], edges: GraphEdge[]): Placed[] {
+/** 排布模式：disc = 原来的圆盘座位 + 深度抖动；sphere = 簇心铺满球面、簇内球壳 */
+export type LayoutMode = 'disc' | 'sphere'
+
+export function layoutGraph(nodes: GraphNode[], edges: GraphEdge[], mode: LayoutMode = 'disc'): Placed[] {
   const n = nodes.length
   if (!n) return []
 
@@ -95,6 +98,43 @@ export function layoutGraph(nodes: GraphNode[], edges: GraphEdge[]): Placed[] {
   const up = norm(cross(right, eye))
   const face = (x: number, y: number, depth: number) => add(add(mul(right, x), mul(up, y)), mul(eye, depth))
 
+  /** Fibonacci 球：把 count 个点均匀铺在球面上，深度由结构本身产生 */
+  const fibSphere = (count: number, radius: number, flatten = 0.86): V3[] => {
+    const pts: V3[] = []
+    const golden = Math.PI * (3 - Math.sqrt(5))
+    for (let i = 0; i < count; i++) {
+      const y = count === 1 ? 0 : 1 - (i / (count - 1)) * 2
+      const ring = Math.sqrt(Math.max(0, 1 - y * y))
+      const th = golden * i
+      pts.push({ x: Math.cos(th) * ring * radius, y: y * radius * flatten, z: Math.sin(th) * ring * radius })
+    }
+    return pts
+  }
+  /** 每个星团一个随机朝向，避免所有盘面共面（那正是"扁平"的来源） */
+  const rotOf = (seed: string) => {
+    const a = hash(seed + 'a') * Math.PI * 2
+    const bb = hash(seed + 'b') * Math.PI * 2
+    const ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(bb), sb = Math.sin(bb)
+    return (p2: V3): V3 => {
+      const y = p2.y * ca - p2.z * sa
+      const z = p2.y * sa + p2.z * ca
+      return { x: p2.x * cb - y * sb, y: p2.x * sb + y * cb, z }
+    }
+  }
+  const shellHomes = (ids: string[], radius: number, seed: string) => {
+    const rot = rotOf(seed)
+    const pts = fibSphere(ids.length, radius)
+    const m = new Map<string, V3>()
+    ids.forEach((id, i) => m.set(id, rot(pts[i] ?? { x: 0, y: 0, z: 0 })))
+    return m
+  }
+  const randDir = (seed: string, radius: number): V3 => {
+    const u = hash(seed) * 2 - 1
+    const th = hash(seed + 't') * Math.PI * 2
+    const ring = Math.sqrt(Math.max(0, 1 - u * u))
+    return { x: Math.cos(th) * ring * radius, y: u * radius * 0.86, z: Math.sin(th) * ring * radius }
+  }
+
   const home = new Map<string, V3>()
   const pos = new Map<string, V3>()
   const vel = new Map<string, V3>()
@@ -108,8 +148,13 @@ export function layoutGraph(nodes: GraphNode[], edges: GraphEdge[]): Placed[] {
   const buyers = nodes.filter((b) => b.kind === 'buyer').map((b) => b.id)
   const orgs = nodes.filter((b) => b.kind !== 'buyer' && b.kind !== 'project')
   const centers = buyers.length ? buyers : orgs.map((b) => b.id)
-  const centerHomes = scatter(centers, 30, face)
-  for (const id of centers) setHome(id, centerHomes.get(id)!)
+  if (mode === 'sphere') {
+    const pts = fibSphere(centers.length, 30 * Math.sqrt(Math.max(centers.length, 1)) * 0.62)
+    centers.forEach((id, i) => setHome(id, pts[i] ?? v()))
+  } else {
+    const centerHomes = scatter(centers, 30, face)
+    for (const id of centers) setHome(id, centerHomes.get(id)!)
+  }
 
   // ② 项目层：有 buyer 的绕 buyer 转；没有的绕相连中心点的质心
   const projects = nodes.filter((b) => b.kind === 'project')
@@ -125,13 +170,21 @@ export function layoutGraph(nodes: GraphNode[], edges: GraphEdge[]): Placed[] {
   }
   for (const [buyer, list] of byBuyer) {
     const c = home.get(buyer)!
-    const rad = list.length > 1 ? 16 : 8
-    list.forEach((pid, i) => {
-      const even = (i / Math.max(list.length, 1)) * Math.PI * 2 + 0.4
-      const local = face(Math.cos(even) * rad, Math.sin(even) * rad * 0.78, (hash(pid) - 0.5) * 10)
-      setHome(pid, add(c, local))
-      ringOf.set(pid, rad)
-    })
+    const rad = list.length > 1 ? (mode === 'sphere' ? 16 * Math.sqrt(list.length / 4) + 6 : 16) : 9
+    if (mode === 'sphere') {
+      const shell = shellHomes(list, rad, buyer)
+      for (const pid of list) {
+        setHome(pid, add(c, shell.get(pid)!))
+        ringOf.set(pid, rad)
+      }
+    } else {
+      list.forEach((pid, i) => {
+        const even = (i / Math.max(list.length, 1)) * Math.PI * 2 + 0.4
+        const local = face(Math.cos(even) * rad, Math.sin(even) * rad * 0.78, (hash(pid) - 0.5) * 10)
+        setHome(pid, add(c, local))
+        ringOf.set(pid, rad)
+      })
+    }
   }
   for (const p of projects) {
     if (home.has(p.id)) continue
@@ -139,8 +192,8 @@ export function layoutGraph(nodes: GraphNode[], edges: GraphEdge[]): Placed[] {
     const c = linked.length
       ? mul(linked.reduce((a, x) => add(a, x), v()), 1 / linked.length)
       : v()
-    const ang = hash(p.id) * Math.PI * 2
-    const local = face(Math.cos(ang) * 12, Math.sin(ang) * 9.4, (hash(p.id + 'z') - 0.5) * 8)
+    const local =
+      mode === 'sphere' ? randDir(p.id, 12) : face(Math.cos(hash(p.id) * Math.PI * 2) * 12, Math.sin(hash(p.id) * Math.PI * 2) * 9.4, (hash(p.id + 'z') - 0.5) * 8)
     setHome(p.id, add(c, local))
   }
 
@@ -151,13 +204,16 @@ export function layoutGraph(nodes: GraphNode[], edges: GraphEdge[]): Placed[] {
     let p: V3
     if (centers2.length <= 1) {
       const c = centers2[0] ?? v()
-      const ang = hash(org.id) * Math.PI * 2
       const rad = 9 + hash(org.id + 'r') * 2
-      const local = face(Math.cos(ang) * rad, Math.sin(ang) * rad * 0.8, (hash(org.id + 'z') - 0.5) * 8)
-      p = add(c, local)
+      p = add(
+        c,
+        mode === 'sphere'
+          ? randDir(org.id, rad)
+          : face(Math.cos(hash(org.id) * Math.PI * 2) * rad, Math.sin(hash(org.id) * Math.PI * 2) * rad * 0.8, (hash(org.id + 'z') - 0.5) * 8),
+      )
     } else {
       p = mul(centers2.reduce((a, x) => add(a, x), v()), 1 / centers2.length)
-      p = add(p, mul(up, (hash(org.id) - 0.5) * 6))
+      p = add(p, mode === 'sphere' ? randDir(org.id + 'm', 5) : mul(up, (hash(org.id) - 0.5) * 6))
     }
     setHome(org.id, p)
   }
