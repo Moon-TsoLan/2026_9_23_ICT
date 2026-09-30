@@ -26,6 +26,8 @@ const props = withDefaults(
     edges: GraphEdge[]
     focusId?: string | null
     highlightIds?: string[]
+    /** 场景答案涉及的节点：只提亮，不替换底图 */
+    sceneIds?: string[]
     ranks?: Record<string, number>
     dimOthers?: boolean
     /** 图例过滤：被关掉的类别不画也不标注 */
@@ -33,11 +35,13 @@ const props = withDefaults(
     /** 排布模式：disc = 原来的扁平圆盘，sphere = 球面星团（画面效果由使用者确认） */
     layoutMode?: LayoutMode
   }>(),
-  { focusId: null, highlightIds: () => [], ranks: () => ({}), dimOthers: true, hiddenKinds: () => [], layoutMode: 'disc' },
+  { focusId: null, highlightIds: () => [], sceneIds: () => [], ranks: () => ({}), dimOthers: true, hiddenKinds: () => [], layoutMode: 'disc' },
 )
 
 const emit = defineEmits<{
   (e: 'select', id: string | null): void
+  /** Shift+点：把这个节点交给"对比篮"（S4/S5 需要多主体） */
+  (e: 'basket', id: string): void
   (e: 'hover', id: string | null, pt: { x: number; y: number } | null): void
   (e: 'ready', ms: number): void
   (e: 'labels', shown: number, candidates: number): void
@@ -129,6 +133,7 @@ let cleanup = () => {}
 
 /** 取景/定位的真实实现在 onMounted 里（需要 camera 与节点表），这里做转接 */
 let frameFn: (animated?: boolean) => void = () => {}
+let frameToFn: (ids: string[]) => void = () => {}
 let flyToFn: (id: string) => void = () => {}
 let hasNodeFn: (id: string) => boolean = () => false
 
@@ -136,6 +141,8 @@ defineExpose({
   frame: (animated?: boolean) => frameFn(animated),
   flyTo: (id: string) => flyToFn(id),
   hasNode: (id: string) => hasNodeFn(id),
+  /** 框住一组节点（场景答案集） */
+  frameTo: (ids: string[]) => frameToFn(ids),
 })
 
 onMounted(() => {
@@ -351,7 +358,7 @@ onMounted(() => {
 
   function frame(animated = true) {
     const { target, pos } = homePose()
-    controls.minDistance = graphRadius * 0.55
+    controls.minDistance = graphRadius * 0.55 // 恢复全图下限（frameToIds 会临时调小）
     controls.maxDistance = graphRadius * 4.2
     camera.far = Math.max(2000, graphRadius * 8)
     camera.updateProjectionMatrix()
@@ -363,6 +370,33 @@ onMounted(() => {
       return
     }
     camTween = { fromP: camera.position.clone(), toP: pos, fromT: controls.target.clone(), toT: target, t: 0 }
+  }
+
+  /** 把镜头交给一组节点（场景答案集）：只框住它们，背景仍在画面里，但不抢注意力 */
+  function frameToIds(ids: string[]) {
+    const picked = ids.map((i) => nodeById.get(i)).filter(Boolean) as NodeLive[]
+    if (!picked.length) return frame(true)
+    const c = new THREE.Vector3()
+    for (const p of picked) c.add(p.base)
+    c.multiplyScalar(1 / picked.length)
+    let r = 8
+    for (const p of picked) r = Math.max(r, p.base.distanceTo(c) + p.scale * sizeMul[p.dk])
+    // 上下限都夹一下：太近会只剩答案看不见宇宙，太远又回到原来那种"一小坨"
+    const dist = THREE.MathUtils.clamp(r * 2.1, graphRadius * 0.2, graphRadius * 1.05)
+    controls.minDistance = Math.max(6, r * 0.5)
+    controls.maxDistance = Math.max(dist * 2.4, graphRadius * 4.2)
+    camera.far = Math.max(2000, graphRadius * 8)
+    camera.updateProjectionMatrix()
+    const dir = camera.position.clone().sub(controls.target).normalize()
+    const pos = c.clone().add(dir.multiplyScalar(dist))
+    if (reduce) {
+      controls.target.copy(c)
+      camera.position.copy(pos)
+      camTween = null
+      labelDirty = true
+      return
+    }
+    camTween = { fromP: camera.position.clone(), toP: pos, fromT: controls.target.clone(), toT: c, t: 0 }
   }
 
   /** 定位到某个节点：相机推到它跟前，并把视点交给它（搜索即定位） */
@@ -386,6 +420,7 @@ onMounted(() => {
   frameFn = frame
   flyToFn = flyTo
   hasNodeFn = (id: string) => nodeById.has(id)
+  frameToFn = frameToIds
 
   /* ---- 重建（数据变更） ---- */
   let rebuildSeq = 0
@@ -635,6 +670,7 @@ onMounted(() => {
   function applyEmphasis() {
     const focus = props.focusId && nodeById.has(props.focusId) ? props.focusId : null
     const highlights = new Set(props.highlightIds.filter((id) => nodeById.has(id)))
+    const inScene = new Set(props.sceneIds.filter((id) => nodeById.has(id)))
     const hidden = new Set<DisplayKind>(props.hiddenKinds)
 
     // 相关集合：聚焦点 + 一跳 + 项目一跳的各方（原版 focusOf 的 1.5 跳语义）
@@ -662,8 +698,9 @@ onMounted(() => {
       }
     }
     for (const id of highlights) relatedIds.add(id)
+    for (const id of inScene) relatedIds.add(id)
 
-    const dimming = props.dimOthers && (focus !== null || highlights.size > 0)
+    const dimming = props.dimOthers && (focus !== null || highlights.size > 0 || inScene.size > 0)
     for (const n of nodes) {
       n.target = hidden.has(n.dk) ? 0 : !dimming || relatedIds.has(n.id) ? 1 : 0.18
     }
@@ -974,7 +1011,12 @@ onMounted(() => {
   function onUp(e: PointerEvent) {
     if (Math.hypot(e.clientX - downX, e.clientY - downY) > 6) return
     const hit = cast(e)
-    emit('select', hit ? (hit.object.userData.id as string) : null)
+    const id = hit ? (hit.object.userData.id as string) : null
+    if (id && e.shiftKey) {
+      emit('basket', id)
+      return
+    }
+    emit('select', id)
   }
   function onMove(e: PointerEvent) {
     if (e.buttons) return
@@ -1218,7 +1260,7 @@ onMounted(() => {
   /* ---- 数据与强调态监听 ---- */
   watch(() => [props.nodes, props.edges, props.layoutMode], () => void rebuild(), { deep: false })
   watch(
-    () => [props.focusId, props.highlightIds, props.ranks, props.dimOthers, props.hiddenKinds],
+    () => [props.focusId, props.highlightIds, props.sceneIds, props.ranks, props.dimOthers, props.hiddenKinds],
     () => applyEmphasis(),
     { deep: false },
   )

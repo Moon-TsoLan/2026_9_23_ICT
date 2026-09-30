@@ -26,6 +26,7 @@ const emit = defineEmits<{
   (e: 'query', scene: SceneId, subjects: string[]): void
   (e: 'reset'): void
   (e: 'reframe'): void
+  (e: 'scene-change', scene: SceneId): void
 }>()
 
 const scene = ref<SceneId>('S1')
@@ -45,6 +46,9 @@ const canQuery = computed(() =>
 
 function pickScene(id: SceneId) {
   scene.value = id
+  
+  // 切场景不是"换页"，而是对当前对象换个问法：交给上层决定要不要立刻查
+  emit('scene-change', id)
 }
 
 function addMulti(name: string) {
@@ -80,7 +84,19 @@ function apply(next: SceneId, names: string[]) {
   if (canQuery.value) emit('query', next, SCENES[next].multi ? [...multiList.value] : [single.value])
 }
 
-defineExpose({ apply })
+/** 对比篮：星图 Shift+点往这里加主体 */
+function addSubject(name: string): boolean {
+  if (multiList.value.includes(name)) return false
+  multiList.value.push(name)
+  notice.value = ''
+  return true
+}
+
+function subjects(): string[] {
+  return [...multiList.value]
+}
+
+defineExpose({ apply, addSubject, subjects })
 </script>
 
 <template>
