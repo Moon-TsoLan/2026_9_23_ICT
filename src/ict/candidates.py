@@ -7,7 +7,7 @@ from typing import Any
 from ict.config import COB_FIELDS, SUB_FIELDS
 from ict.schemas import Candidate, FieldObservation, Source
 
-POINTING = ("详见附件", "详见招标文件", "详见磋商文件", "详见采购文件", "详见投标文件", "见附件")
+POINTING = ("详见附件", "见附件")
 FIELD_ALIASES = {
     "cob": {
         "item_name": "object_name",
@@ -102,6 +102,7 @@ def seal_candidate(
     raw_fields: dict[str, Any],
     issues: list[str] | None = None,
     confidence: float | None = 0.8,
+    source_class: str | None = None,
 ) -> Candidate:
     fields = blank_fields(entity_type)
     raw_fields = align_fields(entity_type, raw_fields)
@@ -120,4 +121,5 @@ def seal_candidate(
         source_priority=source_priority,
         fields=fields,
         issues=issues or [],
+        source_class=source_class,
     )

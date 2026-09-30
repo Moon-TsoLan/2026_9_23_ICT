@@ -1,0 +1,59 @@
+/* 设计令牌 —— 唯一色彩/节奏来源。
+   双域主题：记录域（浅 · 档案）与宇宙域（深 · 星空）。
+   通过 .shell[data-domain] 切换变量，组件只引用变量、不写死颜色。 */
+
+:root {
+  /* 记录域（默认） */
+  --paper: #fafafa;
+  --surface: #ffffff;
+  --ink: #09090b;
+  --muted: #52525b;
+  --faint: #a1a1aa;
+  --line: #e4e4e7;
+  --accent: #ec4899;
+
+  /* 语义色（星图节点，双域共用） */
+  --c-buyer: #f4e7d6;
+  --c-project: #f0d0b0;
+  --c-winner: #fff6ec;
+  --c-bidder: #efe4d6;
+  --c-vendor: #f0d8bc;
+  --warm: #ffce94; /* 合作 */
+  --cool: #c4d0e0; /* 竞争 */
+
+  /* 状态色 */
+  --ok: #0f6e56;
+  --warn: #854f0b;
+  --bad: #a32d2d;
+  --info: #185fa5;
+
+  /* 节奏 */
+  --r-sm: 2px;
+  --r-md: 4px;
+  --r-lg: 8px;
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --dur-fast: 160ms;
+  --dur-base: 240ms;
+  --dur-slow: 420ms;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.shell[data-domain="void"] {
+  --paper: #0c0b0a;
+  --surface: #141110;
+  --ink: #f6efe6;
+  --muted: rgba(246, 239, 230, 0.55);
+  --faint: rgba(246, 239, 230, 0.32);
+  --line: rgba(246, 239, 230, 0.1);
+  --accent: #ffce94;
+
+  --ok: #4ade80;
+  --warn: #fbbf24;
+  --bad: #f87171;
+  --info: #93c5fd;
+}

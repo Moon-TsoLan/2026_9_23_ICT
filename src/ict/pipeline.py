@@ -8,7 +8,7 @@ from pathlib import Path
 
 from ict.catalog import Catalog
 from ict.config import ATTACHMENTS_ROOT, DATA_HTML
-from ict.html_context import parse_notice
+from ict.html_context import parse_notice, winner_hints
 from ict.index.build import load_index
 from ict.llm import LLMClient, build_client
 from ict.schemas import CandidateFile, Failure, RunReport
@@ -19,6 +19,7 @@ from ict.steps.s03_plan import plan_projects
 from ict.steps.s04_attach import extract_attachment_candidates, locate_pages, triage_files
 from ict.steps.s07_normalize import normalize_candidates
 from ict.steps.s08_merge import merge_projects
+from ict.steps.s08b_repair import repair_packages
 
 
 def _status_from_failures(base: str, failures: list[Failure]) -> str:
@@ -40,9 +41,7 @@ def run_announcement(announcement_id: str, llm: LLMClient | None = None, html_di
     all_failures: list[Failure] = []
 
     store.begin("understand_announcement")
-    understanding = understand(store.run_id, notice, client)
-    if client is not None:
-        calls["understand_announcement"] += 1
+    understanding = understand(store.run_id, notice, client, calls)
     store.write_output("understand_announcement", understanding)
     store.finish("understand_announcement", understanding.status, _first_code(understanding.failures), _first_message(understanding.failures))
     all_failures.extend(understanding.failures)
@@ -52,17 +51,15 @@ def run_announcement(announcement_id: str, llm: LLMClient | None = None, html_di
 
     package_nos = [package.package_no for package in understanding.packages]
     store.begin("understand_html_tables")
-    tables = understand_tables(store.run_id, notice, package_nos, client)
-    calls["understand_html_tables"] += len(notice.tables) if client is not None else 0
+    tables = understand_tables(store.run_id, notice, package_nos, client, calls)
     store.write_output("understand_html_tables", tables)
     store.finish("understand_html_tables", tables.status)
     all_failures.extend(tables.failures)
 
     store.begin("extract_html_candidates")
     html_candidates, html_failures, seq = extract_html_candidates(
-        store.run_id, notice, tables, understanding.project_name or "", client
+        store.run_id, notice, tables, understanding.project_name or "", client, counter=calls, known_packages=package_nos
     )
-    calls["extract_html_candidates"] += sum(1 for table in tables.tables if table.table_role not in {"other", "agency_fee"}) if client else 0
     html_file = CandidateFile(
         run_id=store.run_id,
         status="failed" if not html_candidates else ("partial" if html_failures else "success"),
@@ -96,20 +93,14 @@ def run_announcement(announcement_id: str, llm: LLMClient | None = None, html_di
     else:
         store.state.counts["files"] = len(index.files)
         store.begin("triage_files")
-        file_decisions = triage_files(store.run_id, plans, index, client)
-        if client is not None and file_decisions.status != "skipped":
-            calls["triage_files"] += 1
+        file_decisions = triage_files(store.run_id, plans, index, client, calls)
         store.write_output("triage_files", file_decisions)
         store.finish("triage_files", file_decisions.status)
         store.state.counts["selected_files"] = sum(1 for item in file_decisions.file_decisions if item.read_strategy == "target_pages")
         all_failures.extend(file_decisions.failures)
 
         store.begin("locate_pages")
-        page_decisions = locate_pages(store.run_id, plans, file_decisions, index, client)
-        if client is not None and page_decisions.status not in {"skipped", "failed"}:
-            calls["locate_pages"] += 1
-        elif client is not None and page_decisions.status == "failed":
-            calls["locate_pages"] += 1
+        page_decisions = locate_pages(store.run_id, plans, file_decisions, index, client, calls)
         store.write_output("locate_pages", page_decisions)
         store.finish("locate_pages", page_decisions.status)
         store.state.counts["selected_pages"] = len(page_decisions.page_decisions)
@@ -124,9 +115,9 @@ def run_announcement(announcement_id: str, llm: LLMClient | None = None, html_di
             index,
             client,
             seq,
+            counter=calls,
+            file_classes={item.file_id: item.file_class for item in file_decisions.file_decisions},
         )
-        if client is not None and page_decisions.page_decisions:
-            calls["extract_attachment_candidates"] += 1
         attach_file = CandidateFile(
             run_id=store.run_id,
             status="skipped" if not page_decisions.page_decisions else ("partial" if attach_failures else "success"),
@@ -151,6 +142,13 @@ def run_announcement(announcement_id: str, llm: LLMClient | None = None, html_di
     merged = merge_projects(store.run_id, understanding, normalized.candidates)
     store.write_output("merge_candidates", merged)
     store.finish("merge_candidates", merged.status)
+
+    store.begin("repair_packages")
+    check_failures = repair_packages(merged, winner_hints(notice, package_nos), client, calls)
+    all_failures.extend(check_failures)
+    merged.failures.extend(check_failures)
+    store.write_output("repair_packages", merged)
+    store.finish("repair_packages", "partial" if check_failures else "success")
     store.state.counts["final_cobs"] = sum(len(project.cobs) for project in merged.projects)
     store.state.counts["final_subs"] = sum(len(project.subs) for project in merged.projects)
     public = [project.model_dump(exclude={"provenance"}) for project in merged.projects]
@@ -159,7 +157,7 @@ def run_announcement(announcement_id: str, llm: LLMClient | None = None, html_di
     final = "success"
     if understanding.status == "failed" or not merged.projects:
         final = "failed"
-    elif all_failures or merged.conflicts or merged.status == "partial":
+    elif all_failures or merged.status == "partial":
         final = "partial"
     store.state.status = final
     store.state.review_required = final != "success"

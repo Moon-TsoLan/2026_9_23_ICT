@@ -43,12 +43,31 @@ def plan_projects(
         cobs = [item for item in candidates if item.entity_type == "cob" and item.project_id == package.project_id]
         subs = [item for item in candidates if item.entity_type == "sub" and item.project_id == package.project_id]
         stats = _stats(cobs)
+        category_types = set()
+        for item in cobs:
+            raw_type = item.fields["category_type"].normalized_value or item.fields["category_type"].raw_value
+            raw_code = item.fields["category_code"].normalized_value or item.fields["category_code"].raw_value
+            if raw_type:
+                category_types.add(str(raw_type)[:1])
+            if raw_code:
+                category_types.add(str(raw_code)[:1])
+        service_or_work = bool(category_types & {"B", "C"}) and not (category_types & {"A"})
+        optional = {
+            "brand",
+            "spec_model",
+            "product_supplier",
+            "category_name",
+            "category_code",
+            "category_type",
+            "unit_price",
+            "quantity",
+            "unit",
+        } if service_or_work else set()
         missing = [
             key
             for key, stat in stats.items()
-            if stat.points_to_attachment or (key in OFFICIAL_SEVEN and stat.coverage < 1 and key == "object_name")
-            or (key in OFFICIAL_SEVEN and stat.coverage < 0.3)
-            or stat.points_to_attachment
+            if key not in optional
+            and (stat.points_to_attachment or (key in OFFICIAL_SEVEN and stat.coverage < 0.3) or (key == "object_name" and stat.coverage < 1))
         ]
         missing = list(dict.fromkeys(missing))
         suspects: list[str] = []
@@ -66,7 +85,13 @@ def plan_projects(
             suspects.append("field_points_to_attachment")
         if not cobs:
             suspects.append("no_cob_candidate")
-        needs = has_attachment and bool(suspects or any(key in OFFICIAL_SEVEN and stats[key].coverage < 0.3 for key in OFFICIAL_SEVEN) or stats["object_name"].coverage < 1)
+        needs = has_attachment and (
+            "no_cob_candidate" in suspects
+            or "field_points_to_attachment" in suspects
+            or "html_table_is_summary" in suspects
+            or stats["object_name"].coverage < 1
+            or any(key in OFFICIAL_SEVEN and key not in optional and stats[key].coverage < 0.3 for key in OFFICIAL_SEVEN)
+        )
         names = [
             str(item.fields["object_name"].raw_value)
             for item in cobs

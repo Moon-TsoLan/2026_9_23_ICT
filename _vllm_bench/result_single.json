@@ -1,0 +1,62 @@
+{
+  "dpi": 200,
+  "page_size": [
+    2339,
+    1654
+  ],
+  "png_mb": 0.5365495681762695,
+  "prompt": "OCR:",
+  "max_tokens": 4096,
+  "metrics_before": {
+    "running": 0.0,
+    "waiting": 0.0,
+    "kv_cache_perc": 0.0
+  },
+  "rtt": {
+    "samples": [
+      0.2471876999916276,
+      0.23600480001186952,
+      0.2370048000011593,
+      0.25550149999617133,
+      0.24933010000677314
+    ],
+    "median_s": 0.2471876999916276
+  },
+  "single": [
+    {
+      "latency_s": 2.2252117000025464,
+      "prompt_tokens": 1273,
+      "completion_tokens": 351,
+      "chars": 464,
+      "finish_reason": "stop"
+    },
+    {
+      "latency_s": 1.8928505000076257,
+      "prompt_tokens": 1273,
+      "completion_tokens": 351,
+      "chars": 464,
+      "finish_reason": "stop"
+    },
+    {
+      "latency_s": 1.7786479000060353,
+      "prompt_tokens": 1273,
+      "completion_tokens": 351,
+      "chars": 464,
+      "finish_reason": "stop"
+    }
+  ],
+  "stream": {
+    "ttft_s": 1.1220704000006663,
+    "total_s": 1.8379926000052365,
+    "completion_tokens": 351,
+    "prompt_tokens": 1273,
+    "chunks": 350,
+    "chars": 464,
+    "tpot_s": 0.0020454920000130576
+  },
+  "metrics_after": {
+    "running": 0.0,
+    "waiting": 0.0,
+    "kv_cache_perc": 0.0
+  }
+}

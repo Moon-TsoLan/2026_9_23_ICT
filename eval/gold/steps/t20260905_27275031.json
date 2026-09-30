@@ -1,0 +1,8 @@
+{
+  "announcement_id": "t20260905_27275031",
+  "tables": [
+    {"table_index": 3, "table_role": "cob_detail", "package_scope": "1"},
+    {"table_index": 4, "table_role": "cob_detail", "package_scope": "3"},
+    {"table_index": 5, "table_role": "cob_detail", "package_scope": "4"}
+  ]
+}

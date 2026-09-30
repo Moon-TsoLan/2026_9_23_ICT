@@ -19,7 +19,7 @@ from ict.config import (
 )
 from ict.documents import MarkdownUnavailable, read_document
 from ict.ids import make_project_id
-from ict.llm import LLMClient, LLMError, parse_json_object
+from ict.llm import LLMClient, LLMError, complete_json
 from ict.schemas import (
     AttachmentIndex,
     Candidate,
@@ -32,6 +32,12 @@ from ict.schemas import (
 )
 
 FILE_PACKAGE_RE = re.compile(r"(?:标\s*包|采购包|合同包|第)?\s*([0-9]+|[A-Za-z])\s*包|(?:标\s*包|采购包|合同包)\s*[:：]?\s*([0-9]+|[A-Za-z])")
+PAGE_PACKAGE_RE = re.compile(r"第\s*([0-9]+)\s*包|(?:标\s*包|采购包|合同包|包号|包)\s*[:：]?\s*([0-9]+|[A-Za-z])(?![0-9A-Za-z])")
+
+
+def page_packages(text: str, known: list[str]) -> set[str]:
+    known_set = set(known)
+    return {next(group for group in match.groups() if group) for match in PAGE_PACKAGE_RE.finditer(text or "")} & known_set
 
 
 def coerce_package_scope(scope: str, possible: list[str], known: list[str], file_name: str) -> str:
@@ -61,6 +67,51 @@ def _package_from_filename(file_name: str) -> str | None:
     if len(found) == 1:
         return found[0]
     return None
+
+
+FILE_CLASSES = {
+    "award_detail",
+    "bid_quote",
+    "winner_detail",
+    "tender_requirement",
+    "qualification",
+    "contract",
+    "evaluation",
+    "unrelated",
+    "unknown",
+}
+READ_STRATEGIES = {"skip", "target_pages", "unsupported"}
+CLASS_PRIORITY = {
+    "award_detail": 100,
+    "bid_quote": 90,
+    "winner_detail": 80,
+    "evaluation": 70,
+    "tender_requirement": 40,
+    "qualification": 30,
+    "contract": 30,
+    "unrelated": 30,
+    "unknown": 30,
+}
+
+
+def _validate_files(parsed: dict) -> str:
+    if not isinstance(parsed.get("file_decisions"), list):
+        return "需要 file_decisions 数组"
+    for item in parsed["file_decisions"]:
+        if item.get("file_class") not in FILE_CLASSES:
+            return "file_class 不在允许值内"
+        if item.get("read_strategy") not in READ_STRATEGIES:
+            return "read_strategy 不在允许值内"
+    return ""
+
+
+def _validate_pages(parsed: dict) -> str:
+    if not isinstance(parsed.get("page_decisions"), list):
+        return "需要 page_decisions 数组"
+    for item in parsed["page_decisions"]:
+        if item.get("extraction_mode") not in {None, "", "text", "table", "text_and_table", "unsupported"}:
+            return "extraction_mode 不在允许值内"
+    return ""
 
 
 READ_FAILURE = {
@@ -115,7 +166,7 @@ def _probe(index: AttachmentIndex, file_id: str) -> dict:
     }
 
 
-def triage_files(run_id: str, plans: ProjectPlans, index: AttachmentIndex | None, llm: LLMClient | None) -> FileDecisions:
+def triage_files(run_id: str, plans: ProjectPlans, index: AttachmentIndex | None, llm: LLMClient | None, counter=None) -> FileDecisions:
     failures: list[Failure] = []
     if index is None or index.attachment_directory is None:
         failures.append(Failure(failure_code="attachment_index_miss", failure_message="附件索引不存在"))
@@ -147,15 +198,17 @@ def triage_files(run_id: str, plans: ProjectPlans, index: AttachmentIndex | None
         return FileDecisions(run_id=run_id, status="failed", file_decisions=decisions, failures=failures)
     probes = [_probe(index, item.file_id) for item in readable]
     try:
-        result = llm.complete(
+        parsed = complete_json(
+            llm,
             step="triage_files",
             prompt_version="triage-files-v1",
             user=json.dumps(
                 {"plans": [project.model_dump() for project in plans.projects], "files": probes},
                 ensure_ascii=False,
             ),
+            validate=_validate_files,
+            counter=counter,
         )
-        parsed = parse_json_object(result.text)
     except (LLMError, ValueError) as exc:
         code = "llm_call_failed" if isinstance(exc, LLMError) else "llm_schema_invalid"
         failures.append(Failure(failure_code=code, failure_message=str(exc)))
@@ -188,7 +241,7 @@ def triage_files(run_id: str, plans: ProjectPlans, index: AttachmentIndex | None
     return FileDecisions(run_id=run_id, status=status, file_decisions=decisions, failures=failures)
 
 
-def locate_pages(run_id: str, plans: ProjectPlans, files: FileDecisions, index: AttachmentIndex, llm: LLMClient | None) -> PageDecisions:
+def locate_pages(run_id: str, plans: ProjectPlans, files: FileDecisions, index: AttachmentIndex, llm: LLMClient | None, counter=None) -> PageDecisions:
     chosen = [item for item in files.file_decisions if item.read_strategy == "target_pages"]
     if not chosen:
         return PageDecisions(run_id=run_id, status="skipped", failures=list(files.failures))
@@ -200,6 +253,8 @@ def locate_pages(run_id: str, plans: ProjectPlans, files: FileDecisions, index: 
         )
     page_inputs = []
     failures: list[Failure] = []
+    known_packages = [project.package_no for project in plans.projects]
+    mentioned: dict[tuple[str, int], set[str]] = {}
     for decision in chosen:
         path = _file_path(index, decision.file_id)
         if path is None:
@@ -222,6 +277,7 @@ def locate_pages(run_id: str, plans: ProjectPlans, files: FileDecisions, index: 
             continue
         slim = []
         for page in pages:
+            mentioned[(decision.file_id, page["page_no"])] = page_packages(page["text"], known_packages)
             headers = [table["headers"] for table in page["tables"]]
             if page["chars"] < 20 and not headers:
                 continue
@@ -242,18 +298,19 @@ def locate_pages(run_id: str, plans: ProjectPlans, files: FileDecisions, index: 
             }
         )
     queries = [query for project in plans.projects for query in project.search_queries]
-    known_packages = [project.package_no for project in plans.projects]
     file_meta = {item["file_id"]: item for item in page_inputs}
     try:
-        result = llm.complete(
+        parsed = complete_json(
+            llm,
             step="locate_pages",
             prompt_version="locate-pages-v1",
             user=json.dumps(
                 {"known_packages": known_packages, "search_queries": queries, "files": page_inputs},
                 ensure_ascii=False,
             ),
+            validate=_validate_pages,
+            counter=counter,
         )
-        parsed = parse_json_object(result.text)
     except (LLMError, ValueError) as exc:
         code = "llm_call_failed" if isinstance(exc, LLMError) else "llm_schema_invalid"
         return PageDecisions(run_id=run_id, status="failed", failures=[*failures, Failure(failure_code=code, failure_message=str(exc))])
@@ -268,18 +325,22 @@ def locate_pages(run_id: str, plans: ProjectPlans, files: FileDecisions, index: 
         if mode not in {"text", "table", "text_and_table", "unsupported"}:
             mode = "text"
         meta = file_meta.get(file_id) or {}
+        page_no = int(item.get("page_no") or 0)
+        scope = coerce_package_scope(
+            str(item.get("package_scope") or "unknown"),
+            list(meta.get("possible_packages") or []),
+            known_packages,
+            str(meta.get("display_name") or ""),
+        )
+        if len(mentioned.get((file_id, page_no), set())) >= 2:
+            scope = "announcement"
         decisions.append(
             PageDecision(
                 file_id=file_id,
-                page_no=int(item.get("page_no") or 0),
+                page_no=page_no,
                 relevance=float(item.get("relevance") or 0),
                 expected_fields=item.get("expected_fields") or [],
-                package_scope=coerce_package_scope(
-                    str(item.get("package_scope") or "unknown"),
-                    list(meta.get("possible_packages") or []),
-                    known_packages,
-                    str(meta.get("display_name") or ""),
-                ),
+                package_scope=scope,
                 extraction_mode=mode,
                 reason=item.get("reason") or "",
             )
@@ -296,6 +357,8 @@ def extract_attachment_candidates(
     index: AttachmentIndex,
     llm: LLMClient | None,
     seq_start: int,
+    counter=None,
+    file_classes: dict[str, str] | None = None,
 ) -> tuple[list[Candidate], list[Failure], list[dict], int]:
     failures: list[Failure] = []
     candidates: list[Candidate] = []
@@ -346,6 +409,14 @@ def extract_attachment_candidates(
     plans_by_no = {project.package_no: project for project in plans.projects}
     for package_no, contexts in by_package.items():
         plan = plans_by_no.get(package_no)
+        if len(contexts) > 12:
+            failures.append(
+                Failure(
+                    failure_code="page_context_truncated",
+                    failure_message=f"包 {package_no} 超出 12 页，未送入 {len(contexts) - 12} 页",
+                    location=str(package_no),
+                )
+            )
         payload = {
             "current_package": {
                 "project_id": None if plan is None else plan.project_id,
@@ -355,12 +426,14 @@ def extract_attachment_candidates(
             "page_contexts": contexts[:12],
         }
         try:
-            result = llm.complete(
+            parsed = complete_json(
+                llm,
                 step="extract_attachment_candidates",
                 prompt_version="attachment-extract-v1",
                 user=json.dumps(payload, ensure_ascii=False),
+                validate=lambda item: "" if isinstance(item.get("candidates"), list) else "需要 candidates 数组",
+                counter=counter,
             )
-            parsed = parse_json_object(result.text)
         except (LLMError, ValueError) as exc:
             code = "llm_call_failed" if isinstance(exc, LLMError) else "llm_schema_invalid"
             failures.append(Failure(failure_code=code, failure_message=str(exc), location=package_no))
@@ -374,6 +447,7 @@ def extract_attachment_candidates(
             project_id = make_project_id(project_name, str(item_package)) if item_package and project_name else None
             source_type = "pdf"
             file_id = item.get("file_id") or (contexts[0]["file_id"] if contexts else None)
+            file_class = (file_classes or {}).get(file_id or "", "bid_quote")
             candidates.append(
                 seal_candidate(
                     candidate_id=f"cand_{seq:06d}",
@@ -382,9 +456,10 @@ def extract_attachment_candidates(
                     package_no=None if item_package is None else str(item_package),
                     source_type=source_type,
                     file_id=file_id,
-                    source_priority=SOURCE_PRIORITY.get("bid_quote", 90),
+                    source_priority=CLASS_PRIORITY.get(file_class, 90),
                     raw_fields=item.get("fields") or {},
                     issues=item.get("issues") or [],
+                    source_class=file_class,
                 )
             )
             seq += 1

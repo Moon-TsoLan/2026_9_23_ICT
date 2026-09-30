@@ -1,0 +1,165 @@
+{
+  "dpi": 200,
+  "page_size": [
+    2339,
+    1654
+  ],
+  "png_mb": 0.5365495681762695,
+  "prompt": "OCR:",
+  "max_tokens": 4096,
+  "metrics_before": {
+    "running": 0.0,
+    "waiting": 0.0,
+    "kv_cache_perc": 0.0
+  },
+  "rtt": {
+    "samples": [
+      0.25067459999991115,
+      0.25036700000055134,
+      0.25841350000700913,
+      0.3069951000070432,
+      0.25687810000090394
+    ],
+    "median_s": 0.25687810000090394
+  },
+  "stream": {
+    "ttft_s": 3.12278079999669,
+    "total_s": 3.924097299997811,
+    "completion_tokens": 351,
+    "prompt_tokens": 1273,
+    "chunks": 350,
+    "chars": 464,
+    "tpot_s": 0.002289475714288918
+  },
+  "concurrency": [
+    {
+      "concurrency": 32,
+      "requests": 48,
+      "ok": 48,
+      "failed": 0,
+      "wall_s": 13.414944200005266,
+      "throughput_req_s": 3.5780991172502348,
+      "out_tokens_per_s": 1253.676478206551,
+      "latency_avg_s": 7.142948808334343,
+      "latency_median_s": 8.4598790500022,
+      "latency_p95_s": 8.68789580000157,
+      "latency_min_s": 4.139856900001178,
+      "latency_max_s": 8.725239000006695,
+      "completion_tokens_total": 16818,
+      "prompt_tokens_total": 61104,
+      "errors": []
+    },
+    {
+      "concurrency": 64,
+      "requests": 48,
+      "ok": 48,
+      "failed": 0,
+      "wall_s": 12.088786899999832,
+      "throughput_req_s": 3.970621733765583,
+      "out_tokens_per_s": 1391.6201963987166,
+      "latency_avg_s": 10.888040262499999,
+      "latency_median_s": 11.436545299999125,
+      "latency_p95_s": 11.60690070000419,
+      "latency_min_s": 2.9283699999941746,
+      "latency_max_s": 11.69231809998746,
+      "completion_tokens_total": 16823,
+      "prompt_tokens_total": 61104,
+      "errors": []
+    }
+  ],
+  "metrics_during": [
+    {
+      "concurrency": 32,
+      "samples": [
+        {
+          "t": 1790674991.821932,
+          "running": 0.0,
+          "waiting": 0.0,
+          "kv_cache_perc": 0.0
+        },
+        {
+          "t": 1790674993.682688,
+          "running": 1.0,
+          "waiting": 0.0,
+          "kv_cache_perc": 0.003358099315787233
+        },
+        {
+          "t": 1790674996.1416452,
+          "running": 13.0,
+          "waiting": 0.0,
+          "kv_cache_perc": 0.0437812198295765
+        },
+        {
+          "t": 1790674998.0802848,
+          "running": 20.0,
+          "waiting": 0.0,
+          "kv_cache_perc": 0.06732989128153466
+        },
+        {
+          "t": 1790675000.0125172,
+          "running": 32.0,
+          "waiting": 0.0,
+          "kv_cache_perc": 0.12660034420517985
+        },
+        {
+          "t": 1790675001.9437742,
+          "running": 4.0,
+          "waiting": 0.0,
+          "kv_cache_perc": 0.014565755782227296
+        },
+        {
+          "t": 1790675003.9851968,
+          "running": 14.0,
+          "waiting": 0.0,
+          "kv_cache_perc": 0.04856651135457335
+        }
+      ]
+    },
+    {
+      "concurrency": 64,
+      "samples": [
+        {
+          "t": 1790675005.9884582,
+          "running": 0.0,
+          "waiting": 0.0,
+          "kv_cache_perc": 0.0
+        },
+        {
+          "t": 1790675007.8922136,
+          "running": 4.0,
+          "waiting": 0.0,
+          "kv_cache_perc": 0.01452377954077988
+        },
+        {
+          "t": 1790675010.4783607,
+          "running": 11.0,
+          "waiting": 0.0,
+          "kv_cache_perc": 0.0387860470973429
+        },
+        {
+          "t": 1790675012.552026,
+          "running": 21.0,
+          "waiting": 0.0,
+          "kv_cache_perc": 0.07266087394534693
+        },
+        {
+          "t": 1790675014.4506516,
+          "running": 29.0,
+          "waiting": 0.0,
+          "kv_cache_perc": 0.09776266633085673
+        },
+        {
+          "t": 1790675016.357994,
+          "running": 44.0,
+          "waiting": 0.0,
+          "kv_cache_perc": 0.14158586240188054
+        }
+      ]
+    }
+  ],
+  "metrics_after": {
+    "running": 0.0,
+    "waiting": 0.0,
+    "kv_cache_perc": 0.0
+  }
+}

@@ -1,0 +1,238 @@
+/* 重置 + 排版基线 + 通用组件类（随域变量自动换肤） */
+
+@layer base {
+  html,
+  body,
+  #app {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  button,
+  input,
+  select {
+    font: inherit;
+    color: inherit;
+  }
+
+  button,
+  a {
+    cursor: pointer;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
+  }
+}
+
+/* ---- 数字：等宽 + 右对齐场景专用 ---- */
+.num {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* ---- 排版基线 ---- */
+.kicker {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: var(--muted);
+}
+
+.h-serif {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+/* ---- 通用组件 ---- */
+.card {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: var(--r-md);
+}
+
+.input {
+  height: 36px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: var(--r-sm);
+  padding: 0 10px;
+  font-size: 13px;
+  color: var(--ink);
+  outline: none;
+  transition: border-color var(--dur-fast) var(--ease);
+}
+
+.input::placeholder {
+  color: var(--faint);
+}
+
+.input:focus {
+  border-color: var(--accent);
+}
+
+.btn {
+  display: inline-flex;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  border-radius: var(--r-sm);
+  padding: 0 14px;
+  color: var(--paper);
+  font-size: 13px;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
+.btn:hover {
+  opacity: 0.82;
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-ghost {
+  display: inline-flex;
+  height: 32px;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  background: transparent;
+  border-radius: var(--r-sm);
+  padding: 0 12px;
+  color: var(--muted);
+  font-size: 12px;
+  transition:
+    color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
+}
+
+.btn-ghost:hover {
+  color: var(--ink);
+  border-color: var(--ink);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  background: var(--surface);
+  padding: 3px 10px;
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.tag {
+  display: inline-block;
+  border-radius: var(--r-sm);
+  padding: 1px 6px;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+/* ---- 骨架屏 ---- */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--ink) 6%, transparent),
+    transparent
+  );
+  animation: skeleton-sweep 1.4s ease infinite;
+}
+
+@keyframes skeleton-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after {
+    animation: none;
+  }
+}
+
+/* ---- 星图标签（three.js CSS2D 渲染用）：锚位由 StarMap 决定，这里只管排版 ---- */
+.star-label,
+.star-edge {
+  pointer-events: none;
+  white-space: nowrap;
+  text-shadow: 0 0 14px rgba(8, 6, 4, 0.9);
+}
+
+.star-label {
+  /* 半透明底板：让文字在雾上仍可读，同时不遮掉星空本身 */
+  border-radius: 2px;
+  background: rgba(10, 9, 8, 0.42);
+  padding: 1px 4px;
+  font-family: "Noto Serif SC", "Songti SC", serif;
+  font-size: 13px;
+  line-height: 15px;
+  letter-spacing: 0.04em;
+  color: rgba(255, 246, 236, 0.86);
+}
+
+/* 两行断行：宽度减半，是"不把名字横向排开"的关键 */
+.star-label i {
+  display: block;
+  font-style: normal;
+}
+
+.star-label[data-dir='1'] i,
+.star-label[data-dir='3'] i,
+.star-label[data-dir='4'] i {
+  text-align: left;
+}
+
+.star-label[data-dir='2'] i,
+.star-label[data-dir='3'] i,
+.star-label[data-dir='5'] i {
+  text-align: right;
+}
+
+.star-edge {
+  font-family: Inter, "Noto Sans SC", sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: rgba(255, 236, 214, 0.62);
+}
+
+
+/* ---- 滚动条（双域低调处理） ---- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ink) 18%, transparent) transparent;
+}

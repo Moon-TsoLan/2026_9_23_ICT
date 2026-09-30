@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import time
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -101,3 +102,34 @@ def parse_json_object(text: str) -> dict:
     if start < 0 or end < start:
         raise ValueError("model output has no JSON object")
     return json.loads(cleaned[start : end + 1])
+
+
+def complete_json(
+    llm: LLMClient,
+    *,
+    step: str,
+    prompt_version: str,
+    user: str,
+    validate,
+    counter: Counter | None = None,
+) -> dict:
+    """Call the model and, if the JSON or enum check fails, retry once with the error."""
+    payload = user
+    last_error = "model output has no JSON object"
+    parsed: dict | None = None
+    for attempt in range(2):
+        result = llm.complete(step=step, prompt_version=prompt_version, user=payload)
+        if counter is not None:
+            counter[step] += 1
+        try:
+            parsed = parse_json_object(result.text)
+        except (ValueError, json.JSONDecodeError) as exc:
+            last_error = str(exc)
+            parsed = None
+        else:
+            last_error = validate(parsed) or ""
+            if not last_error:
+                return parsed
+        if attempt == 0:
+            payload = f"{user}\n\n上一次输出不合法：{last_error}。请只输出符合枚举的 JSON。"
+    raise ValueError(last_error)

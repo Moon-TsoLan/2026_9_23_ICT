@@ -23,6 +23,8 @@ FailureCode = Literal[
     "no_candidate_extracted",
     "field_normalization_failed",
     "merge_conflict_unresolved",
+    "page_context_truncated",
+    "consistency_check_failed",
     "unexpected_error",
 ]
 EntityType = Literal["cob", "sub"]
@@ -143,6 +145,7 @@ class Candidate(Model):
     issues: list[str] = Field(default_factory=list)
     validation_errors: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+    source_class: str | None = None
 
 
 class CandidateFile(Model):
@@ -267,7 +270,7 @@ class Project(Model):
     package_total_amount: float | None = None
     cobs: list[Cob] = Field(default_factory=list)
     subs: list[Sub] = Field(default_factory=list)
-    provenance: dict[str, list[str]] | None = None
+    provenance: dict[str, list[str | None]] | None = None
 
 
 class MergedProjects(Model):
@@ -277,6 +280,10 @@ class MergedProjects(Model):
     conflicts: list[dict[str, Any]] = Field(default_factory=list)
     unmatched_summary_rows: list[dict[str, str]] = Field(default_factory=list)
     unassigned_candidates: list[dict[str, str]] = Field(default_factory=list)
+    list_sources: dict[str, str] = Field(default_factory=dict)
+    alternatives: dict[str, list[dict[str, Any]]] = Field(default_factory=dict)
+    repairs: list[dict[str, Any]] = Field(default_factory=list)
+    checks: list[dict[str, Any]] = Field(default_factory=list)
     failures: list[Failure] = Field(default_factory=list)
 
 

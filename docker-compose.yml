@@ -1,0 +1,31 @@
+# PostgreSQL（开发/演示库）。生产库用同一份配置换 POSTGRES_DB 即可。
+# 启动：docker compose up -d
+# 停止：docker compose down          （保留数据）
+# 清库重建：docker compose down -v   （会删掉数据卷，谨慎）
+services:
+  db:
+    image: postgres:16
+    container_name: ict-pg
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ict
+      POSTGRES_PASSWORD: ict_dev_pw
+      POSTGRES_DB: ict_demo
+      # 编码与排序规则跨环境锁定：开发机 == 服务器，避免中文排序不一致
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+      TZ: Asia/Shanghai
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # 仅在数据卷为空时执行一次（首次启动初始化 schema）
+      - ./db/001_schema.sql:/docker-entrypoint-initdb.d/001_schema.sql:ro
+    command: ["postgres", "-c", "shared_buffers=512MB", "-c", "work_mem=16MB"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ict -d ict_demo"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
