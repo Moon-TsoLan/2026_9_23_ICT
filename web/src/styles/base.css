@@ -206,6 +206,24 @@
 }
 
 /* 两行断行：宽度减半，是"不把名字横向排开"的关键 */
+/* 对比主体：标签挂一个与"边 / 环 / 矩阵列头"同色的点，四处的对应关系一眼成立 */
+.star-label[data-slot] {
+  padding-left: 12px;
+}
+
+.star-label[data-slot]::before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  margin-top: -3px;
+  border-radius: 99px;
+  background: var(--slot, #fff);
+  box-shadow: 0 0 6px var(--slot, #fff);
+}
+
 .star-label i {
   display: block;
   font-style: normal;

@@ -307,8 +307,17 @@ def party_profile(party_id: str) -> dict:
     if kind == "buyer":
         return _buyer_profile(party_id, name)
     if kind in ("sup", "vendor"):
-        # 星图里的"产品供应商"节点是 vendor:<名称>，实体仍是 supplier
-        return _supplier_profile(party_id, name)
+        # 星图里的"产品供应商"节点写作 vendor:<名称>，实体可能仍在 supplier 表里。
+        # 若按名称取不到（有些产品供应商从未作为投标主体入库），
+        # 就退回"按名称找供应商档案"，而不是直接 404 —— 前端因此不再报错。
+        try:
+            return _supplier_profile(party_id, name)
+        except HTTPException:
+            if kind == "vendor":
+                row = q1("SELECT name FROM supplier WHERE name = %s LIMIT 1", (name,))
+                if row:
+                    return _supplier_profile("sup:" + name, row["name"])
+            raise
     raise HTTPException(422, "id 需形如 sup:/vendor:/buyer:<名称>")
 
 
@@ -352,6 +361,44 @@ def _buyer_profile(pid: str, name: str) -> dict:
     }
 
 
+def _vendor_profile(pid: str, name: str) -> dict | None:
+    """产品供应商的降级档案：只依据 cob.product_supplier 聚合。
+    这些主体在星图上是合法节点（标的物里的厂商/经销商），但从未投标，因此没有 supplier 行。"""
+    base = q1(
+        """
+        SELECT count(*) AS cobs,
+               count(DISTINCT c.project_id) AS projects,
+               sum(c.total_price) AS amount
+        FROM cob c WHERE c.product_supplier = %s
+        """,
+        (name,),
+    )
+    if not base or not base["cobs"]:
+        return None
+    buyers = q(
+        """
+        SELECT p.purchaser, count(*) AS times
+        FROM cob c JOIN project p ON p.project_id = c.project_id
+        WHERE c.product_supplier = %s AND p.purchaser IS NOT NULL
+        GROUP BY p.purchaser ORDER BY times DESC LIMIT 3
+        """,
+        (name,),
+    )
+    facts = [f"作为产品供应商出现在 {b['purchaser']} 的 {b['times']} 个标的物中" for b in buyers]
+    return {
+        "id": pid,
+        "name": name,
+        "kind": "vendor",
+        "stats": [
+            {"k": "供货标的物", "v": str(base["cobs"])},
+            {"k": "涉及项目", "v": str(base["projects"])},
+            {"k": "标的物金额", "v": yuan(base["amount"])},
+            {"k": "采购单位", "v": str(len(buyers))},
+        ],
+        "facts": facts,
+    }
+
+
 def _supplier_profile(pid: str, name: str) -> dict:
     base = q1(
         """
@@ -365,6 +412,11 @@ def _supplier_profile(pid: str, name: str) -> dict:
         (name,),
     )
     if not base or not base["bids"]:
+        # 该名称可能只是"产品供应商"（出现在 cob.product_supplier），从未作为投标主体入库。
+        # 它在星图上是合法节点，因此给一个基于标的物的降级档案，而不是 404。
+        fallback = _vendor_profile(pid, name)
+        if fallback:
+            return fallback
         raise HTTPException(404, "主体不存在")
     co = q(
         """

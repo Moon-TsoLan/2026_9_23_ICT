@@ -94,6 +94,20 @@ function onBlur() {
   // 延迟收起，让点击候选先生效
   window.setTimeout(() => (openList.value = false), 160)
 }
+
+/** 回车等价于"选中当前候选"：有候选就取第一个，否则按名称精确匹配，都没有则显式展开提示。
+ *  此前只绑定了 Escape，导致多选场景（S4/S5）里打完字按回车毫无反应。 */
+function onEnter() {
+  const s = text.value.trim()
+  if (!s) return
+  const target = hits.value.find((h) => h.name === s) ?? hits.value[0]
+  if (target) {
+    pick(target)
+    return
+  }
+  // 没有候选也没有精确匹配：展开"没有匹配的主体"提示，避免静默
+  openList.value = true
+}
 </script>
 
 <template>
@@ -104,6 +118,7 @@ function onBlur() {
       :placeholder="placeholder"
       @focus="hits.length && (openList = true)"
       @blur="onBlur"
+      @keydown.enter.prevent="onEnter"
       @keydown.escape="openList = false"
     />
     <button v-if="text" class="clear" aria-label="清除" @mousedown.prevent="clear">

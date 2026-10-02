@@ -15,7 +15,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import * as THREE from 'three'
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import type { LayoutMode } from '@/composables/useGraphLayout'
-import { hash, homeEye, layoutGraph, visualScale } from '@/composables/useGraphLayout'
+import { SLOT_CSS, SLOT_HEX } from '@/constants/slots'
+import { hash, homeEye, placeStars, visualScale } from '@/composables/useGraphLayout'
 import type { DisplayKind, GraphEdge, GraphNode, NodeKind } from '@/types/graph'
 import { DISPLAY_KIND, EDGE_ROLE_LABEL } from '@/types/graph'
 import { disambiguate, rankMark, wrapTwo } from '@/utils/label'
@@ -32,16 +33,45 @@ const props = withDefaults(
     dimOthers?: boolean
     /** 图例过滤：被关掉的类别不画也不标注 */
     hiddenKinds?: DisplayKind[]
+    /** 当前场景的答案边：独立成层并按 role 上色，让"切场景"在视觉上真的换了问题。
+     *  这些边不再混进底图雾层，否则五个场景看上去一模一样。 */
+    sceneEdges?: GraphEdge[]
     /** 排布模式：disc = 原来的扁平圆盘，sphere = 球面星团（画面效果由使用者确认） */
     layoutMode?: LayoutMode
+    /**
+     * 显示模式（由状态机决定，不再从"有没有 focus"去猜）：
+     *  overview 总览：全亮
+     *  picked   S0 选中：只亮选中点本身，邻居也暗 —— S0 不回答关系问题
+     *  scene    场景态：主体 + 答案集亮，其余暗
+     *  pool     多选态：供应商池亮（可选对象），其余暗
+     */
+    displayMode?: 'overview' | 'picked' | 'scene' | 'pool' | 's6'
+    /** 场景态锁定：非答案节点不可点，悬停仍可看全名 */
+    locked?: boolean
+    /** 对比主体（S4/S5）的节点 id，顺序即配色顺序 */
+    subjectIds?: string[]
   }>(),
-  { focusId: null, highlightIds: () => [], sceneIds: () => [], ranks: () => ({}), dimOthers: true, hiddenKinds: () => [], layoutMode: 'disc' },
+  {
+    focusId: null,
+    highlightIds: () => [],
+    sceneIds: () => [],
+    ranks: () => ({}),
+    dimOthers: true,
+    hiddenKinds: () => [],
+    sceneEdges: () => [],
+    layoutMode: 'sphere',
+    displayMode: 'overview',
+    locked: false,
+    subjectIds: () => [],
+  },
 )
 
 const emit = defineEmits<{
   (e: 'select', id: string | null): void
   /** Shift+点：把这个节点交给"对比篮"（S4/S5 需要多主体） */
   (e: 'basket', id: string): void
+  /** 场景态锁定下试图点别的节点 */
+  (e: 'blocked', id: string): void
   (e: 'hover', id: string | null, pt: { x: number; y: number } | null): void
   (e: 'ready', ms: number): void
   (e: 'labels', shown: number, candidates: number): void
@@ -65,6 +95,18 @@ const hazeMul: Record<DisplayKind, number> = { buyer: 2.3, project: 2.0, supplie
 const sizeMul: Record<DisplayKind, number> = { buyer: 2.3, project: 1.35, supplier: 0.95 }
 /** 核心纹理：采购与供应用紧核（小也看得见），项目用盘状（大面积暖金） */
 const coreOf: Record<DisplayKind, 'core' | 'disc'> = { buyer: 'core', project: 'disc', supplier: 'core' }
+
+/** 中标供应商的描边色：多选态的"可选池"里不点也能看出谁能进对比篮 */
+const WIN_GOLD = 0xffc861
+
+/**
+ * 流光带开关。
+ * 关掉的原因不是它不好看，而是它与曲线层**各用一套配色**（曲线在对比态按来源主体上色，
+ * 带子永远按关系类型上色），同一批边叠两层，谁盖过谁取决于镜头远近——
+ * 边越少框得越近，带子就越粗，于是出现"色点是主体色、线却是金光"。
+ * 先摘掉它把语义收敛成一套；等系统完整后再作为"流量层"加回来，届时必须与曲线共用配色。
+ */
+const SHOW_FLOW_BANDS = false
 
 /* ---- 标签系统参数 ---- */
 const CELL = 8 // 屏幕占位网格边长（px）
@@ -102,7 +144,7 @@ type NodeLive = {
   text: string
   prio: number
   mustShow: boolean
-  /** 滞回计数：+2 才允许出现，-2 才消失，避免旋转时文字闪跳 */
+  /** 滞回计数：连续两次放得下才允许出现（0 或 1 表示还没站稳），失败立即归零 */
   pass: number
   shown: boolean
   dir: number
@@ -114,13 +156,6 @@ type NodeLive = {
 
 type Pulse = { sprite: THREE.Sprite; t: number; size: number }
 
-type FocusLine = {
-  a: string
-  b: string
-  role: GraphEdge['role']
-  line: THREE.Line
-  tagObj: CSS2DObject
-}
 
 type MistGroup = {
   points: THREE.Points
@@ -283,9 +318,68 @@ onMounted(() => {
   const picks: THREE.Object3D[] = []
   let mistGroups: MistGroup[] = []
   let backbone: { points: THREE.Points; mat: THREE.PointsMaterial } | null = null
-  let focusLines: FocusLine[] = []
-  let winRing: THREE.Sprite | null = null
-  let winRingId = ''
+  /** 场景答案边层：按 role（对比态按来源主体）上色的唯一一条边层，带角色标签。
+   *  由 applyEmphasis 驱动（轻量，只重建这几十条线），**不放进 rebuild** ——
+   *  否则每次切场景都会走一遍全量力导重排，用户看到"图重新渲染"。 */
+  let sceneLines: Array<{ line: THREE.Line; tagObj: CSS2DObject; a: string; b: string; role: string }> = []
+  /** 聚焦用的角色配色，场景边层复用同一套语义色 */
+  const ROLE_COLOR: Record<string, { c: number; o: number }> = {
+    win: { c: 0xffc861, o: 0.72 }, // 中标：金
+    buy: { c: 0x79d0ff, o: 0.5 }, // 采购：冰蓝
+    supply: { c: 0xc98a4b, o: 0.46 }, // 供货：铜
+    bid: { c: 0x8ea6c4, o: 0.3 }, // 投标：冷灰
+  }
+
+  function clearSceneLines() {
+    for (const it of sceneLines) {
+      world.remove(it.line, it.tagObj)
+      it.line.geometry.dispose()
+      ;(it.line.material as THREE.Material).dispose()
+    }
+    sceneLines = []
+  }
+  /** 复用式环池：进出多选态不反复创建销毁对象 */
+  const emblems: Array<{ sprite: THREE.Sprite; id: string; base: number }> = []
+  const slotIndex = new Map<string, number>()
+
+  /** 这条边属于第几个对比主体（-1 = 不属于任何主体，按角色上色） */
+  function slotOf(a: string, b: string) {
+    return slotIndex.get(a) ?? slotIndex.get(b) ?? -1
+  }
+
+  function setEmblems(list: Array<{ id: string; color: number; radius: number }>) {
+    for (let i = 0; i < list.length; i++) {
+      const spec = list[i]!
+      let e = emblems[i]
+      if (!e) {
+        const sprite = new THREE.Sprite(
+          new THREE.SpriteMaterial({
+            map: ringTex,
+            transparent: true,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+            opacity: 0.55, // 环是标记不是主角：太亮会在密集区连成"锁子甲"
+          }),
+        )
+        sprite.renderOrder = 5
+        world.add(sprite)
+        e = { sprite, id: '', base: 1 }
+        emblems[i] = e
+      }
+      e.id = spec.id
+      e.base = spec.radius
+      const m = e.sprite.material as THREE.SpriteMaterial
+      m.color.setHex(spec.color)
+      m.opacity = spec.soft ? 0.4 : 0.62
+      e.sprite.visible = true
+      const n = nodeById.get(spec.id)
+      if (n) {
+        e.sprite.position.copy(n.sprite.position)
+        e.sprite.scale.setScalar(spec.radius)
+      }
+    }
+    for (let i = list.length; i < emblems.length; i++) emblems[i]!.sprite.visible = false
+  }
   const pulses: Pulse[] = []
   const disposables: Array<{ dispose(): void }> = []
 
@@ -344,6 +438,8 @@ onMounted(() => {
 
   /* ---- 取景：seed 只在拿到数据后发生，切换做补间 ---- */
   let graphRadius = 8
+  /** 布局 scale 基准（底图节点数）。见 rebuild() 中的说明：不能跟随场景节点数变化。 */
+  let graphScaleBase: number | null = null
   let camSeeded = false
   let camTween: { fromP: THREE.Vector3; toP: THREE.Vector3; fromT: THREE.Vector3; toT: THREE.Vector3; t: number } | null = null
   let lastInteract = 0
@@ -447,7 +543,8 @@ onMounted(() => {
       backbone.mat.dispose()
       backbone = null
     }
-    clearFocusLines()
+    clearEmblems()
+    clearSceneLines()
     for (const p of pulses) {
       world.remove(p.sprite)
       ;(p.sprite.material as THREE.Material).dispose()
@@ -457,19 +554,13 @@ onMounted(() => {
     disposables.length = 0
   }
 
-  function clearFocusLines() {
-    for (const fl of focusLines) {
-      world.remove(fl.line, fl.tagObj)
-      fl.line.geometry.dispose()
-      ;(fl.line.material as THREE.Material).dispose()
+  /** 环池整体销毁（只在重建节点表时调用；平时靠 setEmblems 复用） */
+  function clearEmblems() {
+    for (const e of emblems) {
+      world.remove(e.sprite)
+      ;(e.sprite.material as THREE.Material).dispose()
     }
-    focusLines = []
-    winRingId = ''
-    if (winRing) {
-      world.remove(winRing)
-      ;(winRing.material as THREE.Material).dispose()
-      winRing = null
-    }
+    emblems.length = 0
   }
 
   /** 雾分组按"天区"而不是随机哈希：一次呼吸扫过一片，而不是全屏碎片闪烁 */
@@ -489,7 +580,14 @@ onMounted(() => {
     await new Promise((r) => setTimeout(r, 0))
     if (my !== rebuildSeq) return
 
-    const placed = layoutGraph(props.nodes, props.edges, props.layoutMode)
+    // scale 基准固定为"底图规模"，不随场景层增删变化。
+    // 场景层只是在底图上**追加**节点，若基准跟着总数走，多几个节点就会让整张图
+    // 重新缩放（数据层一个点没动、渲染层整体位移，即用户看到的"图抖了一下"）。
+    // 判定底图换了的依据：本次节点数不比基准多 —— 说明场景层被清掉或底图重采样了。
+    if (graphScaleBase === null || props.nodes.length < graphScaleBase) {
+      graphScaleBase = props.nodes.length
+    }
+    const placed = placeStars(props.nodes, props.edges, props.layoutMode, graphScaleBase)
     shortById.clear()
     for (const [id, t] of disambiguate(props.nodes)) shortById.set(id, t)
     const placeMap = new Map(placed.map((p) => [p.id, p]))
@@ -590,7 +688,10 @@ onMounted(() => {
     }
 
     /* 静态边 → 粒子雾：亮度包络（中段亮两端暗）烧进顶点色，帧循环只动各组透明度。
-       与旧版的差别只有两点：分组按天区（见 sectorOf）、外加一层不参与呼吸的常驻骨架。 */
+       与旧版的差别只有两点：分组按天区（见 sectorOf）、外加一层不参与呼吸的常驻骨架。
+       注意：场景答案边**不参与**这一层，它们由下面独立的 sceneLines 层按 role 绘制。 */
+    const edgeKey = (e: GraphEdge) => e.a + '|' + e.b + '|' + e.role
+    const sceneEdgeKeys = new Set(props.sceneEdges.map(edgeKey))
     if (props.edges.length > 0) {
       const samples = Math.max(6, Math.min(36, Math.round(60000 / props.edges.length)))
       const buckets: Array<{ pos: number[]; col: number[] }> = Array.from({ length: MIST_GROUPS }, () => ({
@@ -605,6 +706,7 @@ onMounted(() => {
       const sorted = [...props.edges].sort((x, y) => y.weight - x.weight)
       const backboneSet = new Set(sorted.slice(0, Math.min(260, Math.round(props.edges.length * 0.06))))
       for (const e of props.edges) {
+        if (sceneEdgeKeys.has(edgeKey(e))) continue // 场景边走独立层，避免重复绘制
         const pa = placeMap.get(e.a)
         const pb = placeMap.get(e.b)
         if (!pa || !pb) continue
@@ -665,51 +767,73 @@ onMounted(() => {
 
   /* ---- 强调态（聚焦/高亮/排名/图例过滤，无需重建） ---- */
   let relatedIds = new Set<string>()
+  let litIds = new Set<string>()
   let focusEdgeList: GraphEdge[] = []
+  /** 流光带只跟着"连着主体的边"，否则整张答案图的粒子会爆带容量 */
+  let bandEdgeList: GraphEdge[] = []
 
   function applyEmphasis() {
     const focus = props.focusId && nodeById.has(props.focusId) ? props.focusId : null
+    const showRelations = props.displayMode === 'scene' || props.displayMode === 'compared' || props.displayMode === 's6'
     const highlights = new Set(props.highlightIds.filter((id) => nodeById.has(id)))
     const inScene = new Set(props.sceneIds.filter((id) => nodeById.has(id)))
     const hidden = new Set<DisplayKind>(props.hiddenKinds)
 
-    // 相关集合：聚焦点 + 一跳 + 项目一跳的各方（原版 focusOf 的 1.5 跳语义）
     relatedIds = new Set<string>()
     focusEdgeList = []
-    if (focus) {
-      relatedIds.add(focus)
-      const projHop = new Set<string>()
-      for (const e of props.edges) {
-        if (e.a === focus || e.b === focus) {
-          const other = e.a === focus ? e.b : e.a
-          relatedIds.add(other)
+    bandEdgeList = []
+    // 只有"已经提问"的状态才产生关系数据（scene / compared / s6）。
+    // picked、pool、overview 一律不算底图 1.5 跳 —— 上一版在这里算了却只挡住曲线层，
+    // 于是流光带和金环从侧门漏出去，表现为"选中节点周围自己亮了"、"进多选态线不熄"。
+    // 场景态也绝不回退底图 1.5 跳：一家供应商在底图里能牵出几百条线（实测 S3 360 条）。
+    if (showRelations) {
+      // 哪怕一条边都没有（交集为空），也绝不退回"底图 1.5 跳"——
+      // 那会把第一家自己的历史关系错画成答案，看起来像"亮了别的节点"。
+      for (const id of props.sceneIds) if (nodeById.has(id)) relatedIds.add(id)
+      // 每个对比主体都算"焦点"，否则第二家起的边没有标签
+      const anchors = new Set<string>(props.subjectIds.length ? props.subjectIds : focus ? [focus] : [])
+      for (const e of props.sceneEdges) {
+        if (!nodeById.has(e.a) || !nodeById.has(e.b)) continue
+        relatedIds.add(e.a)
+        relatedIds.add(e.b)
+        // 整张答案图由 sceneLines 层按颜色画；这里只留"连着主体的那一跳"带曲线+角色标签。
+        // 同一条边被两层各画一遍（一层加色一层不加）就是"线条样式不一致"的来源。
+        if (!anchors.size || anchors.has(e.a) || anchors.has(e.b)) {
           focusEdgeList.push(e)
-          if (nodeById.get(other)?.kind === 'project') projHop.add(other)
-        }
-      }
-      if (projHop.size) {
-        for (const e of props.edges) {
-          if (projHop.has(e.a) || projHop.has(e.b)) {
-            focusEdgeList.push(e)
-            relatedIds.add(e.a)
-            relatedIds.add(e.b)
-          }
+          bandEdgeList.push(e)
         }
       }
     }
     for (const id of highlights) relatedIds.add(id)
     for (const id of inScene) relatedIds.add(id)
 
-    const dimming = props.dimOthers && (focus !== null || highlights.size > 0 || inScene.size > 0)
+    // 亮度完全由 displayMode 决定
+    const mode = props.displayMode
     for (const n of nodes) {
-      n.target = hidden.has(n.dk) ? 0 : !dimming || relatedIds.has(n.id) ? 1 : 0.18
+      if (hidden.has(n.dk)) {
+        n.target = 0
+        continue
+      }
+      if (mode === 'overview') n.target = 1
+      else if (mode === 'picked') n.target = n.id === focus ? 1 : 0.14
+      else if (mode === 'pool') n.target = n.dk === 'supplier' ? 1 : 0.16
+      // s6 / scene / compared：主体与答案亮，其余暗
+      else n.target = relatedIds.has(n.id) ? 1 : 0.18
     }
+    litIds =
+      mode === 'overview'
+        ? new Set(nodes.map((n) => n.id))
+        : mode === 'picked'
+          ? new Set(focus ? [focus] : [])
+          : mode === 'pool'
+            ? new Set(nodes.filter((n) => n.dk === 'supplier').map((n) => n.id))
+            : relatedIds
 
     // 标签文字与优先级：答案集(榜单) > 聚焦邻域 > 高亮 > 采购方 > 中标 > 供应商 > 投标 > 项目
     const KIND_PRIO: Record<DisplayKind, number> = { buyer: 20, supplier: 24, project: 40 }
     const weightOf = new Map(props.nodes.map((n) => [n.id, n.weight]))
     const kindOf = new Map(props.nodes.map((n) => [n.id, n.kind]))
-    const overviewMode = nodes.length > OVERVIEW_MIN_KIND
+    const ambientMode = props.displayMode === 'overview' && nodes.length > OVERVIEW_MIN_KIND
     for (const n of nodes) {
       const kind = kindOf.get(n.id) ?? n.kind
       const raw = shortById.get(n.id) ?? ''
@@ -721,64 +845,83 @@ onMounted(() => {
       else if (focus && n.id === focus) prio = 5
       else if (focus && relatedIds.has(n.id)) prio = 8
       else if (highlights.has(n.id)) prio = 10
-      else if (overviewMode && DISPLAY_KIND[kind] !== 'buyer') prio = 999 // 总览=氛围层：只给采购单位的星团命名，其余靠悬停
+      else if (ambientMode && DISPLAY_KIND[kind] !== 'buyer') prio = 999 // 总览=氛围层：只给采购单位的星团命名，其余靠悬停
       n.prio = prio
       n.mustShow = !!rank || (!!focus && n.id === focus)
       if (!n.text || hidden.has(DISPLAY_KIND[kind]) || (n.target < 0.5 && !n.mustShow)) n.prio = 999
     }
 
-    // 聚焦邻域边：独立曲线 + 角色标签（仅这些边有 DOM）
-    clearFocusLines()
-    if (focus) {
-      for (const e of focusEdgeList) {
+
+
+    // 场景答案边 → 独立曲线层：按 role 上色，让五个场景在视觉上真的不同。
+    // 后端为每个场景产出的边角色本就不同（S1 采购/中标/供货、S3 中标/投标、
+    // S4 供应商→采购单位、S5 采购/中标），此前它们被无差别倒进雾层，
+    // 所以"切场景看起来没换问题"。这里逐条重建（数量仅几十条，代价可忽略）。
+    /**
+     * 只有"多家对比"才按来源主体着色。单主体场景（S1/S2/S3）里"这条线是谁的"
+     * 由聚光灯本身已经回答，颜色必须继续表示关系类型，否则会出现同一条边
+     * 线是主体橙、标签却写蓝色"采购"的自相矛盾。
+     * 必须在画边之前填好——上一版填在画边之后，等于永远用的是上一次的表。
+     */
+    slotIndex.clear()
+    if (props.displayMode === 'compared') props.subjectIds.forEach((id, i) => slotIndex.set(id, i))
+
+    clearSceneLines()
+    if (props.sceneEdges.length) {
+      for (const e of props.sceneEdges) {
+        const na = nodeById.get(e.a)
+        const nb = nodeById.get(e.b)
+        if (!na || !nb) continue
+        const slot = slotOf(e.a, e.b)
+        const look = slot >= 0 ? { c: SLOT_HEX[slot % SLOT_HEX.length], o: 0.8 } : ROLE_COLOR[e.role] ?? ROLE_COLOR.bid!
         const geo = new THREE.BufferGeometry()
-        geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array((SEG + 1) * 3), 3))
-        const ROLE_LOOK: Record<string, { c: number; o: number }> = {
-          win: { c: 0xffc861, o: 0.62 }, // 中标：金，最亮
-          buy: { c: 0x79d0ff, o: 0.34 }, // 采购：冰蓝
-          supply: { c: 0xc98a4b, o: 0.3 }, // 供货：铜
-          bid: { c: 0x8ea6c4, o: 0.14 }, // 投标：冷灰，退到背景
+        const arr = new Float32Array((SEG + 1) * 3)
+        for (let i = 0; i <= SEG; i++) {
+          pointOn(na.base, nb.base, i / SEG, e.a, e.b, scratch)
+          arr[i * 3] = scratch.x
+          arr[i * 3 + 1] = scratch.y
+          arr[i * 3 + 2] = scratch.z
         }
-        const look = ROLE_LOOK[e.role] ?? ROLE_LOOK.bid!
+        geo.setAttribute('position', new THREE.BufferAttribute(arr, 3))
         const line = new THREE.Line(
           geo,
-          new THREE.LineBasicMaterial({ color: look.c, transparent: true, opacity: look.o, depthWrite: false }),
+          new THREE.LineBasicMaterial({
+            color: look.c,
+            transparent: true,
+            opacity: look.o,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+          }),
         )
         line.frustumCulled = false
-        line.renderOrder = 1
+        line.renderOrder = 2
         world.add(line)
         const tag = document.createElement('div')
         tag.className = 'star-edge'
         tag.textContent = EDGE_ROLE_LABEL[e.role] ?? ''
         const tagObj = new CSS2DObject(tag)
+        tagObj.position.copy(na.base)
         world.add(tagObj)
-        focusLines.push({ a: e.a, b: e.b, role: e.role, line, tagObj })
+        sceneLines.push({ line, tagObj, a: e.a, b: e.b, role: e.role })
       }
     }
 
-    // 选中的是项目：给它"本项目中标者"一枚常驻金环（身份来自边，不来自节点类别）
-    if (focus && nodeById.get(focus)?.kind === 'project') {
-      const winEdge = focusEdgeList.find((e) => e.role === 'win')
-      const other = winEdge ? (winEdge.a === focus ? winEdge.b : winEdge.a) : null
-      const w = other ? nodeById.get(other) : null
-      if (w) {
-        winRingId = w.id
-        winRing = new THREE.Sprite(
-          new THREE.SpriteMaterial({
-            map: ringTex,
-            color: 0xffc861,
-            transparent: true,
-            depthWrite: false,
-            blending: THREE.AdditiveBlending,
-            opacity: 0.85,
-          }),
-        )
-        winRing.position.copy(w.base)
-        winRing.scale.setScalar(Math.max(3, w.scale * sizeMul[w.dk] * 2.5))
-        winRing.renderOrder = 5
-        world.add(winRing)
+    // 环：多选态 = 中标供应商金环（不点也能看出谁能进对比篮）；
+    //     对比态 = 各主体的 slot 色环，与它的边、矩阵列头同色。
+    const emblemSpecs: Array<{ id: string; color: number; radius: number; soft?: boolean }> = []
+    if (props.displayMode === 'pool') {
+      for (const n of nodes) {
+        if (n.kind !== 'winner') continue
+        emblemSpecs.push({ id: n.id, color: WIN_GOLD, radius: Math.max(2.6, n.scale * sizeMul[n.dk] * 1.55), soft: true })
+      }
+    } else if (props.displayMode === 'compared') {
+      for (const id of props.subjectIds) {
+        const n = nodeById.get(id)
+        if (!n) continue
+        emblemSpecs.push({ id, color: SLOT_HEX[slotIndex.get(id) ?? 0], radius: Math.max(3.4, n.scale * sizeMul[n.dk] * 2.1) })
       }
     }
+    setEmblems(emblemSpecs)
 
     // 一次性脉冲环（高亮节点；reduced-motion 时跳过）
     for (const p of pulses) {
@@ -840,8 +983,8 @@ onMounted(() => {
       return true
     }
 
-    // 左下角的操作提示与图例先占位：文字不许压在 UI 上
-    for (const sel of ['.hint', '.legend']) {
+    // 左下角的操作提示、图例、以及顶部提示条先占位：文字不许压在 UI 上
+    for (const sel of ['.hint', '.legend', '.notice', '.lockbar']) {
       const u = el.parentElement?.querySelector<HTMLElement>(sel)
       if (!u) continue
       const b = u.getBoundingClientRect()
@@ -853,7 +996,7 @@ onMounted(() => {
     const cands: Cand[] = []
     for (const n of nodes) {
       if (n.prio >= 999) {
-        n.pass = Math.max(-2, n.pass - 1)
+        n.pass = 0
         continue
       }
       ndc.copy(n.sprite.position).project(camera)
@@ -910,10 +1053,40 @@ onMounted(() => {
       }
       return false
     }
+
+    /**
+     * 角色标签（中标/采购/供应/投标）按角色分批占位。
+     * 它们只有两个字，却是"场景到底在说什么"的载体，所以插在
+     * "答案的名字"与"其余名字"之间，而不是排到最后被挤光（实测会被挤到 0 条）。
+     */
+    const ROLE_ORDER: Record<string, number> = { win: 0, buy: 1, supply: 2, bid: 3 }
+    function placeTags(roles: string[]) {
+      const list = sceneLines
+        .filter((fl) => roles.includes(fl.role))
+        .map((fl) => {
+          const na = nodeById.get(fl.a)
+          const nb = nodeById.get(fl.b)
+          pointOn(na?.sprite.position ?? new THREE.Vector3(), nb?.sprite.position ?? new THREE.Vector3(), 0.5, fl.a, fl.b, scratch)
+          ndc.copy(scratch).project(camera)
+          return { fl, x: (ndc.x * 0.5 + 0.5) * W, y: (-ndc.y * 0.5 + 0.5) * H }
+        })
+        .filter((t) => t.x >= 0 && t.x <= W && t.y >= 0 && t.y <= H)
+        .sort((a, b) => (ROLE_ORDER[a.fl.role] ?? 9) - (ROLE_ORDER[b.fl.role] ?? 9))
+      for (const t of list) {
+        const w = (t.fl.tagObj.element.textContent ?? '').length * 11 + 8
+        t.fl.tagObj.visible = free(gLab, t.x - w / 2, t.y - 8, w, 16)
+        if (t.fl.tagObj.visible) mark(gLab, t.x - w / 2, t.y - 8, w, 16)
+      }
+    }
+
     // 第一轮严格避开光球；第二轮允许文字压在光晕上（有底板仍可读），
     // 否则聚焦态中心那团强光会把所有名字挤掉（实测只剩 3 条）。
     const left: Cand[] = []
-    for (const c of cands) if (!tryPlace(c, false)) left.push(c)
+    // 顺序：答案与主体的名字 → 中标/采购标签 → 其余名字 → 供应/投标标签
+    for (const c of cands) if (c.n.mustShow && !tryPlace(c, false)) left.push(c)
+    placeTags(['win', 'buy'])
+    for (const c of cands) if (!c.n.mustShow && !tryPlace(c, false)) left.push(c)
+    placeTags(['supply', 'bid'])
     for (const c of left) void tryPlace(c, true)
     // 第三轮：答案集（榜单前 5）无条件落位——宁可压字，也不能让"查到的那几家"没名字
     for (const c of left) {
@@ -928,26 +1101,9 @@ onMounted(() => {
       c.n.pass = 2
       ok.add(c.n)
     }
-    for (const c of left) if (!ok.has(c.n)) c.n.pass = Math.max(-2, c.n.pass - 1)
-    for (const c of cands) if (!ok.has(c.n)) c.n.pass = Math.max(-2, c.n.pass - 1)
+    for (const c of left) if (!ok.has(c.n)) c.n.pass = 0
+    for (const c of cands) if (!ok.has(c.n)) c.n.pass = 0
 
-    // 聚焦邻域的角色标签最后占位：场景视图里"答案的名字"优先于边上的角色小字
-    const ROLE_PRIO: Record<string, number> = { win: 0, buy: 1, supply: 2, bid: 3 }
-    const tagCands = focusLines
-      .map((fl) => {
-        const na = nodeById.get(fl.a)
-        const nb = nodeById.get(fl.b)
-        pointOn(na?.sprite.position ?? new THREE.Vector3(), nb?.sprite.position ?? new THREE.Vector3(), 0.5, fl.a, fl.b, scratch)
-        ndc.copy(scratch).project(camera)
-        return { fl, x: (ndc.x * 0.5 + 0.5) * W, y: (-ndc.y * 0.5 + 0.5) * H, p: ROLE_PRIO[fl.role] ?? 9 }
-      })
-      .filter((t) => t.x >= 0 && t.x <= W && t.y >= 0 && t.y <= H)
-      .sort((a, b) => a.p - b.p)
-    for (const t of tagCands) {
-      const w = (t.fl.tagObj.element.textContent ?? '').length * 11 + 8
-      t.fl.tagObj.visible = free(gLab, t.x - w / 2, t.y - 8, w, 16)
-      if (t.fl.tagObj.visible) mark(gLab, t.x - w / 2, t.y - 8, w, 16)
-    }
 
     // 写 DOM：两行内容、锚位（center+margin 必须与碰撞框一致）、随距离的字号
     for (const n of nodes) {
@@ -978,7 +1134,16 @@ onMounted(() => {
       n.labelEl.style.marginLeft = (a.sx > 0 ? n.gapPx : a.sx < 0 ? -n.gapPx : 0) + 'px'
       n.labelEl.style.marginTop = (a.sy > 0 ? n.gapPx : a.sy < 0 ? -n.gapPx : 0) + 'px'
       n.labelEl.dataset.dir = String(n.dir)
+      // 对比主体：标签前挂一个与边、环、矩阵列头同色的点
+      const slot = slotIndex.get(n.id)
+      if (slot === undefined) {
+        if (n.labelEl.dataset.slot !== undefined) delete n.labelEl.dataset.slot
+      } else {
+        n.labelEl.dataset.slot = String(slot)
+        n.labelEl.style.setProperty('--slot', SLOT_CSS[slot % SLOT_CSS.length]!)
+      }
     }
+    const f = nodeById.get(props.focusId ?? '')
     emit('labels', ok.size, cands.length)
     // 有节点卡在 pass===1（曾被隐藏、正在等滞回）→ 下一拍继续收敛，否则永远出不来
     for (const n of nodes) if (n.pass === 1) {
@@ -995,12 +1160,52 @@ onMounted(() => {
   let lastCast = 0
   let dragging = false
 
+  /** 屏幕空间近邻的兜底容差（px）。
+   *  为什么需要：拾取球只有视觉光球的约 0.62 倍，而光球纹理是长尾衰减——
+   *  用户按"看起来的大小"去点，落点经常在"有颜色但没有拾取体"的光晕区，
+   *  加上星体每帧漂移（±0.1~0.2 世界单位），悬停看到的点与点击时的点可能已不在同一处。
+   *  实测同一组 10 个固定格点 Shift+点多选只成功 1 次。 */
+  const PICK_TOLERANCE_PX = 14
+
+  const _pv = new THREE.Vector3()
+
+  /** 射线未命中时：在指针周围找屏幕投影最近的节点，避免"差几像素就点不中" */
+  function nearestByScreen(e: PointerEvent, rect: DOMRect, factor: number) {
+    const H = rect.height
+    const localX = e.clientX - rect.left
+    const localY = e.clientY - rect.top
+    const tol = PICK_TOLERANCE_PX * factor
+    const camDist = camera.position.distanceTo(controls.target)
+    let best: { id: string; d2: number } | null = null
+    for (const n of nodes) {
+      if (n.opacity <= 0.32) continue // 与 pick.visible 的阈值保持一致
+      _pv.copy(n.sprite.position).project(camera)
+      if (_pv.z > 1) continue
+      const sx = (_pv.x * 0.5 + 0.5) * rect.width
+      const sy = (-_pv.y * 0.5 + 0.5) * H
+      // 背面半球不参与兜底，否则聚焦邻域落在球背面时会被抢走
+      const dist = camera.position.distanceTo(n.sprite.position)
+      if (dist > camDist + graphRadius * 0.45 && !n.mustShow && !relatedIds.has(n.id)) continue
+      const r = Math.max(4, (n.scale * sizeMul[n.dk] * H) / (4 * Math.tan((42 * Math.PI) / 360) * dist))
+      const dx = sx - localX
+      const dy = sy - localY
+      const d2 = dx * dx + dy * dy
+      const hitR = Math.max(tol, r * 0.85)
+      if (d2 > hitR * hitR) continue
+      if (!best || d2 < best.d2) best = { id: n.id, d2 }
+    }
+    return best?.id ?? null
+  }
+
   function cast(e: PointerEvent) {
     const rect = renderer.domElement.getBoundingClientRect()
     pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1
     pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1
     raycaster.setFromCamera(pointer, camera)
-    return raycaster.intersectObjects(picks, false).find((hit) => hit.object.visible)
+    const hit = raycaster.intersectObjects(picks, false).find((h) => h.object.visible)
+    if (hit) return { id: hit.object.userData.id as string, viaFallback: false }
+    const near = nearestByScreen(e, rect, 1)
+    return near ? { id: near, viaFallback: true } : null
   }
 
   function onDown(e: PointerEvent) {
@@ -1010,8 +1215,13 @@ onMounted(() => {
   }
   function onUp(e: PointerEvent) {
     if (Math.hypot(e.clientX - downX, e.clientY - downY) > 6) return
-    const hit = cast(e)
-    const id = hit ? (hit.object.userData.id as string) : null
+    const id = cast(e)?.id ?? null
+    // 场景态锁定：点别的星无效（要换对象必须先退出），但点空白仍然是"退出这个问题"
+    if (props.locked) {
+      if (!id) emit('select', null)
+      else if (!litIds.has(id)) emit('blocked', id)
+      return
+    }
     if (id && e.shiftKey) {
       emit('basket', id)
       return
@@ -1023,8 +1233,9 @@ onMounted(() => {
     const now = performance.now()
     if (now - lastCast < 60) return
     lastCast = now
-    const hit = cast(e)
-    const id = hit ? (hit.object.userData.id as string) : null
+    const id = cast(e)?.id ?? null
+    // "点不动"必须看得见，否则用户只会以为界面坏了
+    renderer.domElement.style.cursor = props.locked && id && !litIds.has(id) ? 'not-allowed' : dragging ? 'grabbing' : 'grab'
     const rect = el.getBoundingClientRect()
     emit('hover', id, id ? { x: e.clientX - rect.left, y: e.clientY - rect.top } : null)
   }
@@ -1083,7 +1294,7 @@ onMounted(() => {
       controls.target.lerpVectors(camTween.fromT, camTween.toT, k)
       if (camTween.t >= 1) camTween = null
       labelDirty = true
-    } else if (!reduce && !dragging && !props.focusId && now - lastInteract > 3000) {
+    } else if (!reduce && !dragging && props.displayMode === 'overview' && now - lastInteract > 3000) {
       // 待机慢转：只作为深度线索，交互即停
       const off = camera.position.clone().sub(controls.target)
       const ang = 0.02 * dt
@@ -1120,19 +1331,30 @@ onMounted(() => {
     // 雾分组呼吸：错相正弦 ^4，任意时刻只有 1–2 个天区亮起；聚焦时整体压暗
     for (const g of mistGroups) {
       const b = reduce ? 0.1 : 0.02 + 0.38 * Math.pow(0.5 + 0.5 * Math.sin(time * 0.785 + g.phase), 4)
-      const targetOp = props.focusId ? 0.015 : b
+      // 已提问（场景/对比）彻底安静；S0 选中与多选挑选时压到 0.45 倍但仍在呼吸，
+      // 否则挑星的时候背景雾反而比星还抢眼。
+      const targetOp =
+        props.displayMode === 'scene' || props.displayMode === 'compared' || props.displayMode === 's6'
+          ? 0.015
+          : props.displayMode === 'picked' || props.displayMode === 'pool'
+            ? b * 0.45
+            : b
       g.op += (targetOp - g.op) * (1 - Math.exp(-dt * 2.2))
       g.mat.opacity = g.op
     }
     if (backbone) {
-      const want = props.focusId ? BACKBONE_OP * 0.25 : BACKBONE_OP
+      const want = props.displayMode === 'scene' ? BACKBONE_OP * 0.25 : BACKBONE_OP
       backbone.mat.opacity += (want - backbone.mat.opacity) * (1 - Math.exp(-dt * 2.2))
     }
 
     // 中标常驻环跟着星体走
-    if (winRing) {
-      const t = nodeById.get(winRingId)
-      if (t) winRing.position.copy(t.sprite.position)
+    for (const e of emblems) {
+      if (!e.sprite.visible) continue
+      const t = nodeById.get(e.id)
+      if (t) {
+        e.sprite.position.copy(t.sprite.position)
+        e.sprite.scale.setScalar(e.base * (reduce ? 1 : 1 + Math.sin(time * 0.5 + t.phase) * 0.05))
+      }
     }
 
     // 脉冲环：0.6s 扩散一次后移除
@@ -1150,33 +1372,33 @@ onMounted(() => {
       ;(p.sprite.material as THREE.SpriteMaterial).opacity = 0.9 * (1 - p.t)
     }
 
-    // 聚焦邻域边：每帧只更新这些曲线
-    const focusActive = focusLines.length > 0
-    for (const fl of focusLines) {
-      const na = nodeById.get(fl.a)
-      const nb = nodeById.get(fl.b)
+    // 唯一的边层：曲线跟着星体的轻微漂移走，标签落在弧中点
+    for (const it of sceneLines) {
+      const na = nodeById.get(it.a)
+      const nb = nodeById.get(it.b)
       if (!na || !nb) continue
       endA.copy(na.sprite.position)
       endB.copy(nb.sprite.position)
-      const attr = fl.line.geometry.getAttribute('position') as THREE.BufferAttribute
+      const attr = it.line.geometry.getAttribute('position') as THREE.BufferAttribute
       const arr = attr.array as Float32Array
       for (let i = 0; i <= SEG; i++) {
-        pointOn(endA, endB, i / SEG, fl.a, fl.b, scratch)
+        pointOn(endA, endB, i / SEG, it.a, it.b, scratch)
         arr[i * 3] = scratch.x
         arr[i * 3 + 1] = scratch.y
         arr[i * 3 + 2] = scratch.z
       }
       attr.needsUpdate = true
-      pointOn(endA, endB, 0.5, fl.a, fl.b, scratch)
-      fl.tagObj.position.copy(scratch)
-      const tagEl = fl.tagObj.element as HTMLDivElement
+      pointOn(endA, endB, 0.5, it.a, it.b, scratch)
+      it.tagObj.position.copy(scratch)
+      const tagEl = it.tagObj.element as HTMLDivElement
       tagEl.style.opacity = String(Math.min(na.opacity, nb.opacity) * 2.2)
       tagEl.style.color =
-        fl.role === 'win' ? 'rgba(255, 200, 97, 1)' : fl.role === 'buy' ? 'rgba(121, 208, 255, 0.9)' : fl.role === 'supply' ? 'rgba(201, 138, 75, 0.85)' : 'rgba(142, 166, 196, 0.45)'
-      tagEl.classList.toggle('strong', fl.role === 'win')
+        it.role === 'win' ? 'rgba(255, 200, 97, 1)' : it.role === 'buy' ? 'rgba(121, 208, 255, 0.9)' : it.role === 'supply' ? 'rgba(201, 138, 75, 0.85)' : 'rgba(142, 166, 196, 0.5)'
+      tagEl.classList.toggle('strong', it.role === 'win')
     }
 
-    // 流光粒子带（原版 sprinkle/publish，仅聚焦态）
+    // 流光粒子带（见 SHOW_FLOW_BANDS：当前停用）
+    const focusActive = SHOW_FLOW_BANDS && bandEdgeList.length > 0
     bandFade += ((focusActive ? 1 : 0) - bandFade) * (1 - Math.exp(-dt * 2.2))
 
     function sprinkle(
@@ -1224,8 +1446,8 @@ onMounted(() => {
 
     let winCount = 0
     let bidCount = 0
-    if (bandFade > 0.03) {
-      for (const edge of focusEdgeList) {
+    if (SHOW_FLOW_BANDS && bandFade > 0.03) {
+      for (const edge of bandEdgeList) {
         if (edge.role === 'win') {
           winCount = sprinkle(winRibbon.pos, winRibbon.col, winCount, edge, 96, 1.08, 1.16, 0.72, 0.36)
         } else if (edge.role === 'bid') {
@@ -1260,7 +1482,7 @@ onMounted(() => {
   /* ---- 数据与强调态监听 ---- */
   watch(() => [props.nodes, props.edges, props.layoutMode], () => void rebuild(), { deep: false })
   watch(
-    () => [props.focusId, props.highlightIds, props.sceneIds, props.ranks, props.dimOthers, props.hiddenKinds],
+    () => [props.focusId, props.highlightIds, props.sceneIds, props.ranks, props.dimOthers, props.hiddenKinds, props.sceneEdges, props.displayMode, props.locked, props.subjectIds],
     () => applyEmphasis(),
     { deep: false },
   )

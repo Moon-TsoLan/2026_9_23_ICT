@@ -52,7 +52,72 @@ function scatter(ids: string[], spacing: number, face: (x: number, y: number, d:
 /** 排布模式：disc = 原来的圆盘座位 + 深度抖动；sphere = 簇心铺满球面、簇内球壳 */
 export type LayoutMode = 'disc' | 'sphere'
 
-export function layoutGraph(nodes: GraphNode[], edges: GraphEdge[], mode: LayoutMode = 'disc'): Placed[] {
+/** 布局 scale 基准的缓存：按"图的内容指纹 → 基准节点数"记忆化。
+ *
+ *  为什么需要：`F_POS = sqrt(n/20)` 里的 n 若取本次传入的节点总数，
+ *  那么场景层只多出几个节点（如 S1 的 545 vs 底图 536）也会让**整张图的坐标**
+ *  被重新缩放约 0.8% —— 数据层底图一个点没动，渲染层却整体位移。
+ *  这里把基准固定为"该图第一次布局时的节点数"（通常就是底图规模），
+ *  场景节点增加不再改变整图比例。 */
+const scaleBaseCache = new Map<string, number>()
+
+/** 由节点 id 集合生成稳定指纹（排序后拼接，避免顺序影响） */
+function fingerprintOf(nodes: GraphNode[]): string {
+  return nodes
+    .map((n) => n.id)
+    .sort()
+    .join('|')
+}
+
+/** 整体布局结果缓存：输入（节点集合 + 边集合 + 模式）不变时直接复用。
+ *  这是纯性能优化、零视觉影响——力导本身是确定性的（固定 home 座位 + 固定迭代），
+ *  同输入必然同输出。它消除了"场景切换时重跑一遍力导"的开销。 */
+const layoutCache = new Map<string, Placed[]>()
+
+/** 星体大小（原版公式）：buyer 恒 6.6；project 按度数；其余 base + sqrt(项目连接数) */
+export function starScaleOf(b: GraphNode, degree: number, projLinks = 0): number {
+  if (b.kind === 'buyer') return 6.6
+  if (b.kind === 'project') return 1.85 + Math.sqrt(Math.max(degree, 1)) * 1.15
+  const links = projLinks || degree
+  const base = b.kind === 'vendor' ? 0.95 : b.kind === 'bidder' ? 1.1 : 1.25
+  return base + Math.sqrt(Math.max(links, 1)) * 1.55
+}
+
+export function layoutGraph(
+  nodes: GraphNode[],
+  edges: GraphEdge[],
+  mode: LayoutMode = 'disc',
+  /** 显式指定 scale 基准；缺省时按内容指纹记忆化 */
+  scaleBase?: number,
+): Placed[] {
+  const cacheKey =
+    mode +
+    '#' +
+    (scaleBase ?? 'auto') +
+    '#' +
+    fingerprintOf(nodes) +
+    '##' +
+    edges
+      .map((e) => e.a + '>' + e.b + ':' + e.role + ':' + e.weight)
+      .sort()
+      .join(',')
+  const cached = layoutCache.get(cacheKey)
+  if (cached) return cached
+  const computed = computeLayout(nodes, edges, mode, scaleBase)
+  layoutCache.set(cacheKey, computed)
+  if (layoutCache.size > 12) {
+    const first = layoutCache.keys().next().value
+    if (first !== undefined) layoutCache.delete(first)
+  }
+  return computed
+}
+
+function computeLayout(
+  nodes: GraphNode[],
+  edges: GraphEdge[],
+  mode: LayoutMode,
+  scaleBase?: number,
+): Placed[] {
   const n = nodes.length
   if (!n) return []
 
@@ -83,14 +148,9 @@ export function layoutGraph(nodes: GraphNode[], edges: GraphEdge[], mode: Layout
     }
   }
 
-  /** 星体大小：原版公式（buyer 恒 6.6；project 按度数；其余 base + sqrt(项目连接数)） */
+  /** 星体大小：原版公式，已抽成模块函数以便增量落位时复用同一套比例 */
   function starScale(id: string): number {
-    const b = byId.get(id)!
-    if (b.kind === 'buyer') return 6.6
-    if (b.kind === 'project') return 1.85 + Math.sqrt(Math.max(degree.get(id) ?? 1, 1)) * 1.15
-    const links = projLinksOf.get(id)!.size || (degree.get(id) ?? 0)
-    const base = b.kind === 'vendor' ? 0.95 : b.kind === 'bidder' ? 1.1 : 1.25
-    return base + Math.sqrt(Math.max(links, 1)) * 1.55
+    return starScaleOf(byId.get(id)!, degree.get(id) ?? 1, projLinksOf.get(id)!.size)
   }
 
   const eye = norm(homeEye)
@@ -381,8 +441,25 @@ export function layoutGraph(nodes: GraphNode[], edges: GraphEdge[], mode: Layout
 
   // 位置与尺寸解耦：位置放得更开（/20），星体尺寸收一点（/30），
   // 图越大间距相对越松，避免"紧密"感。
-  const F_POS = Math.max(1, Math.sqrt(n / 20))
-  const F_SIZE = Math.max(1, Math.sqrt(n / 30))
+  // 基准数走记忆化：同一张图的场景增删不应改变整体比例（否则底图会整体位移）。
+  const fp = fingerprintOf(nodes)
+  let base = scaleBase
+  if (base === undefined) {
+    const cached = scaleBaseCache.get(fp)
+    if (cached !== undefined) base = cached
+    else {
+      base = n
+      scaleBaseCache.set(fp, base)
+      // 防止长时间切换场景导致缓存无界增长
+      if (scaleBaseCache.size > 24) {
+        const first = scaleBaseCache.keys().next().value
+        if (first !== undefined) scaleBaseCache.delete(first)
+      }
+    }
+  }
+  const scaleN = Math.max(1, base)
+  const F_POS = Math.max(1, Math.sqrt(scaleN / 20))
+  const F_SIZE = Math.max(1, Math.sqrt(scaleN / 30))
   return nodes.map((b) => {
     const p = pos.get(b.id)!
     return {
@@ -403,3 +480,173 @@ export function visualScale(placed: Placed[]): number {
 }
 
 export type { NodeKind }
+
+/* ========================================================================
+ * 稳定落位（增量布局）
+ *
+ * 与上面的 scaleBase 冻结是互补的两件事：
+ *   scaleBase 冻结 → 整图比例不随节点数变化（已实现）
+ *   placeStars     → 老节点的坐标本身不许变（这一段）
+ * 力导每次重算都会从 home 座位重新收敛，多几个点就会让全体漂移几个像素；
+ * 这里把已定位过的节点钉住，只给新节点找位置。见 docs/星图交互设计-v3.md §17.2、不变量 14。
+ * ==================================================================== */
+const posCache = new Map<string, Placed>()
+let cacheMode: LayoutMode | 'none' = 'none'
+/** 缓存里 scale 与"当前图该节点的理论 scale"的比例，用中位数，保证新节点大小与邻居一致 */
+let cachedSizeRatio = 1
+
+export function resetLayoutCache() {
+  posCache.clear()
+  cacheMode = 'none'
+  cachedSizeRatio = 1
+}
+
+/** 球面上均匀随机方向 */
+function randDir(seed: string, radius: number): V3 {
+  const u = hash(seed) * 2 - 1
+  const th = hash(seed + 't') * Math.PI * 2
+  const ring = Math.sqrt(Math.max(0, 1 - u * u))
+  return { x: Math.cos(th) * ring * radius, y: u * radius * 0.86, z: Math.sin(th) * ring * radius }
+}
+
+export function placeStars(
+  nodes: GraphNode[],
+  edges: GraphEdge[],
+  mode: LayoutMode = 'sphere',
+  scaleBase?: number,
+): Placed[] {
+  if (mode !== cacheMode) {
+    posCache.clear()
+    cacheMode = mode
+  }
+  const known = nodes.filter((n) => posCache.has(n.id))
+  if (!known.length) {
+    const all = layoutGraph(nodes, edges, mode, scaleBase)
+    for (const p of all) posCache.set(p.id, p)
+    return nodes.map((n) => posCache.get(n.id)!)
+  }
+
+  // 新节点的尺寸比例：用已知节点的 scale / 理论 scale 的中位数，和邻居保持一致
+  const ratios = known
+    .map((n) => {
+      const p = posCache.get(n.id)!
+      const t = starScaleOf(n, 1)
+      return t > 0 ? p.scale / t : 1
+    })
+    .sort((a, b) => a - b)
+  cachedSizeRatio = ratios[Math.floor(ratios.length / 2)] ?? 1
+
+  // 邻接表与度数（新节点靠邻居的已知位置落位）
+  const nbr = new Map<string, string[]>()
+  const deg = new Map<string, number>()
+  const links = new Map<string, number>()
+  for (const n of nodes) {
+    nbr.set(n.id, [])
+    deg.set(n.id, 0)
+    links.set(n.id, 0)
+  }
+  const byId = new Map(nodes.map((n) => [n.id, n]))
+  for (const e of edges) {
+    if (!nbr.has(e.a) || !nbr.has(e.b)) continue
+    nbr.get(e.a)!.push(e.b)
+    nbr.get(e.b)!.push(e.a)
+    deg.set(e.a, (deg.get(e.a) ?? 0) + 1)
+    deg.set(e.b, (deg.get(e.b) ?? 0) + 1)
+    if (byId.get(e.a)?.kind === 'project') links.set(e.b, (links.get(e.b) ?? 0) + 1)
+    if (byId.get(e.b)?.kind === 'project') links.set(e.a, (links.get(e.a) ?? 0) + 1)
+  }
+
+  // 典型间距：用已定位点的平均外半径的一成二，保证新节点不贴脸
+  let sum = 0
+  for (const p of posCache.values()) sum += Math.hypot(p.x, p.y, p.z)
+  const unit = Math.max(6, (sum / posCache.size) * 0.12)
+
+  const out = new Map<string, Placed>()
+  const fresh: Placed[] = []
+  for (const n of nodes) {
+    const hit = posCache.get(n.id)
+    if (hit) {
+      out.set(n.id, hit)
+      continue
+    }
+    const anchors = (nbr.get(n.id) ?? []).map((id) => posCache.get(id)).filter(Boolean) as Placed[]
+    const cen = anchors.length
+      ? mul(anchors.reduce((a, x) => add(a, x), v()), 1 / anchors.length)
+      : v()
+    const off = randDir(n.id, unit * (anchors.length ? 1.5 : 7))
+    const p: Placed = {
+      id: n.id,
+      x: cen.x + off.x,
+      y: cen.y + off.y,
+      z: cen.z + off.z,
+      scale: starScaleOf(n, deg.get(n.id) ?? 1, links.get(n.id) ?? 0) * cachedSizeRatio,
+    }
+    out.set(n.id, p)
+    fresh.push(p)
+  }
+
+  // 局部松弛：只动新节点，斥力 + 弹簧 + 最小间距；老节点当墙，一律不移
+  const all = [...out.values()]
+  const idx = new Map(all.map((p, j) => [p.id, j]))
+  const pairs: Array<{ a: number; b: number; rest: number; k: number }> = []
+  for (const e of edges) {
+    const a = idx.get(e.a)
+    const b = idx.get(e.b)
+    if (a === undefined || b === undefined) continue
+    const r = REST[e.role] ?? REST.bid
+    pairs.push({ a, b, rest: r.rest * (unit / 8), k: r.k })
+  }
+  const freshIdx = fresh.map((p) => idx.get(p.id)!).filter((j) => j !== undefined)
+  const minSep = unit * 0.55
+  for (let step = 0; step < 40; step++) {
+    for (const i of freshIdx) {
+      const p = all[i]!
+      let fx = 0
+      let fy = 0
+      let fz = 0
+      for (let j = 0; j < all.length; j++) {
+        if (j === i) continue
+        const q = all[j]!
+        const dx = p.x - q.x
+        const dy = p.y - q.y
+        const dz = p.z - q.z
+        const d2 = dx * dx + dy * dy + dz * dz
+        const d = Math.sqrt(d2) || 0.001
+        if (d > unit * 6) continue
+        const push = 26 / Math.max(d2, 2) / d
+        fx += dx * push
+        fy += dy * push
+        fz += dz * push
+      }
+      for (const e of pairs) {
+        const other = e.a === i ? e.b : e.b === i ? e.a : -1
+        if (other < 0) continue
+        const q = all[other]!
+        const dx = q.x - p.x
+        const dy = q.y - p.y
+        const dz = q.z - p.z
+        const d = Math.hypot(dx, dy, dz) || 0.001
+        const k = ((d - e.rest) * e.k) / d
+        fx += dx * k
+        fy += dy * k
+        fz += dz * k
+      }
+      p.x += Math.max(-3, Math.min(3, fx))
+      p.y += Math.max(-3, Math.min(3, fy))
+      p.z += Math.max(-3, Math.min(3, fz))
+      for (const j of freshIdx) {
+        if (j === i) continue
+        const q = all[j]!
+        const d = Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z) || 0.001
+        if (d < minSep) {
+          const k = ((minSep - d) * 0.5) / d
+          p.x += (p.x - q.x) * k
+          p.y += (p.y - q.y) * k
+          p.z += (p.z - q.z) * k
+        }
+      }
+    }
+  }
+  for (const p of fresh) posCache.set(p.id, p)
+  return nodes.map((n) => out.get(n.id)!)
+}
