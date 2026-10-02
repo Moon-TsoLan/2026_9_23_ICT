@@ -11,3 +11,7 @@ dist/
 .codex/
 .workbuddy/
 data/
+
+# 评估生成产物（跑脚本产生，不入库）
+eval/gold_report.json
+eval/gold_report.md
