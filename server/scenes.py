@@ -426,6 +426,27 @@ def scene_s4(suppliers: list[str], limit: int = 20) -> dict:
                     {"key": "coop_times", "label": "合作次数", "align": "right"},
                     {"key": "coop_amount", "label": "合作金额", "align": "right"},
                 ],
+                # 交集场景要回答的是"分别跟他们各合作了多少"，所以每行带一份按主体拆开的格子；
+                # subjects 给出列顺序，前端据此渲染矩阵。
+                "subjects": suppliers,
+                "by_subject_rows": [
+                    {
+                        "purchaser": r["purchaser"],
+                        "cells": {
+                            name: {
+                                "times": next((x["times"] for x in per_pair if x["purchaser"] == r["purchaser"] and x["name"] == name), 0),
+                                "amount": num(
+                                    next(
+                                        (x["amount"] for x in per_pair if x["purchaser"] == r["purchaser"] and x["name"] == name),
+                                        None,
+                                    )
+                                ),
+                            }
+                            for name in suppliers
+                        },
+                    }
+                    for r in rows
+                ],
                 "rows": [
                     {"purchaser": r["purchaser"], "coop_times": r["coop_times"], "coop_amount": num(r["coop_amount"])}
                     for r in rows

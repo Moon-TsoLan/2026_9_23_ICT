@@ -5,12 +5,19 @@ import { api } from '@/api/client'
 import type { PartyHit } from '@/types/explore'
 import { NODE_KIND_LABEL } from '@/types/graph'
 
+/** 下拉里标的不是"身份"，而是"能不能拿它当这个场景的主体"：中标/投标只在具体项目上成立 */
+function hitKind(k: PartyHit['kind']): string {
+  if (k === 'buyer') return '采购单位'
+  if (k === 'winner') return '可查 S3/S4/S5'
+  return '仅投标方'
+}
+
 const props = withDefaults(
   defineProps<{
     modelValue: string
     placeholder?: string
-    /** 限定候选类型：buyer=采购单位；supplier=供应商（winner/bidder）；any=全部 */
-    kind?: 'buyer' | 'supplier' | 'any'
+    /** 限定候选类型：buyer=采购单位；winner=仅中标供应商；supplier=供应商（winner/bidder）；any=全部 */
+    kind?: 'buyer' | 'winner' | 'supplier' | 'any'
   }>(),
   { placeholder: '输入名称检索', kind: 'any' },
 )
@@ -54,9 +61,12 @@ watch(text, (kw) => {
     loading.value = true
     try {
       const res = await api.parties(s)
-      hits.value = res.items.filter((h) =>
-        props.kind === 'any' ? true : props.kind === 'buyer' ? h.kind === 'buyer' : h.kind !== 'buyer',
-      )
+      hits.value = res.items.filter((h) => {
+        if (props.kind === 'any') return true
+        if (props.kind === 'buyer') return h.kind === 'buyer'
+        if (props.kind === 'winner') return h.kind === 'winner'
+        return h.kind !== 'buyer'
+      })
       openList.value = true
     } catch {
       hits.value = []
@@ -84,6 +94,20 @@ function onBlur() {
   // 延迟收起，让点击候选先生效
   window.setTimeout(() => (openList.value = false), 160)
 }
+
+/** 回车等价于"选中当前候选"：有候选就取第一个，否则按名称精确匹配，都没有则显式展开提示。
+ *  此前只绑定了 Escape，导致多选场景（S4/S5）里打完字按回车毫无反应。 */
+function onEnter() {
+  const s = text.value.trim()
+  if (!s) return
+  const target = hits.value.find((h) => h.name === s) ?? hits.value[0]
+  if (target) {
+    pick(target)
+    return
+  }
+  // 没有候选也没有精确匹配：展开"没有匹配的主体"提示，避免静默
+  openList.value = true
+}
 </script>
 
 <template>
@@ -94,6 +118,7 @@ function onBlur() {
       :placeholder="placeholder"
       @focus="hits.length && (openList = true)"
       @blur="onBlur"
+      @keydown.enter.prevent="onEnter"
       @keydown.escape="openList = false"
     />
     <button v-if="text" class="clear" aria-label="清除" @mousedown.prevent="clear">
@@ -101,7 +126,7 @@ function onBlur() {
     </button>
     <div v-if="openList && hits.length" class="drop">
       <button v-for="hit in hits" :key="hit.id" @mousedown.prevent="pick(hit)">
-        <span class="kind">{{ NODE_KIND_LABEL[hit.kind] }}</span>
+        <span class="kind">{{ hitKind(hit.kind) }}</span>
         <span class="truncate">{{ hit.name }}</span>
       </button>
     </div>
