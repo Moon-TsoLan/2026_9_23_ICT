@@ -103,6 +103,7 @@ def seal_candidate(
     issues: list[str] | None = None,
     confidence: float | None = 0.8,
     source_class: str | None = None,
+    page_no: int | None = None,
 ) -> Candidate:
     fields = blank_fields(entity_type)
     raw_fields = align_fields(entity_type, raw_fields)
@@ -117,7 +118,7 @@ def seal_candidate(
         entity_type=entity_type,
         project_id=project_id,
         package_no=package_no,
-        source=Source(source_type=source_type, file_id=file_id),
+        source=Source(source_type=source_type, file_id=file_id, page_no=page_no),
         source_priority=source_priority,
         fields=fields,
         issues=issues or [],

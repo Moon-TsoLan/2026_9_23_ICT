@@ -1,118 +1,76 @@
-"""Scan work/attachments/<id>/ and write index.json. This does not open contest zips."""
+"""Attachment index for one announcement, built from file bytes by ict.parse.census.
+
+This replaces the old probe that asked the PDF text layer and trusted extensions, and it
+drops the `a markdown twin exists` shortcut entirely: an extension of .docx can hide an OLE
+file, and text density cannot see a table that lives inside a picture.
+"""
 
 from __future__ import annotations
 
-import hashlib
 import mimetypes
 from pathlib import Path
 
-from ict.config import ATTACHMENTS_ROOT, LOW_TEXT_CHARS_PER_PAGE
+from ict.config import ATTACHMENTS_ROOT
 from ict.ids import format_file_id
+from ict.parse.census import FileEntry, build_census
 from ict.schemas import AttachmentIndex, IndexedFile
 from ict.state import write_json
 
-IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tif", ".tiff", ".webp"}
-SKIP_NAMES = {".extract_complete", "index.json"}
-SKIP_SUFFIXES = {".zip", ".rar", ".7z"}
+READABLE_BY_FORMAT = {"pdf": "text_extractable", "docx": "text_extractable", "xlsx": "text_extractable", "text": "text_extractable"}
 
 
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+def _readability(entry: FileEntry) -> str:
+    if entry.note.startswith("pdf_open_failed") or entry.note == "encrypted_pdf":
+        return "parse_failed"
+    if entry.fmt == "image":
+        return "ocr_needed"
+    if entry.needs_normalisation:
+        return "needs_normalisation"
+    return READABLE_BY_FORMAT.get(entry.fmt, "unknown")
 
 
-def _probe_pdf(path: Path) -> tuple[int | None, float | None, str, str | None]:
-    from ict.documents import markdown_path_for_pdf
+def _density(entry: FileEntry) -> float | None:
+    # Cheap and only for what we can read natively; the gate decides the rest.
+    if entry.fmt in {"pdf", "docx", "xlsx"} and not entry.needs_normalisation:
+        try:
+            from ict.parse.peek import peek_entry
 
-    markdown = markdown_path_for_pdf(path)
-    if markdown is not None and markdown.stat().st_size > 0:
-        return None, None, "text_extractable", "markdown"
-    import pymupdf
-
-    try:
-        document = pymupdf.open(path)
-    except Exception as exc:
-        hint = "encrypted" if "encrypt" in str(exc).lower() else "parse_failed"
-        return None, None, "parse_failed", hint
-    if document.is_encrypted:
-        document.close()
-        return None, None, "parse_failed", "encrypted"
-    chars = 0
-    for page in document:
-        chars += len(page.get_text() or "")
-    pages = document.page_count
-    document.close()
-    density = None if not pages else chars / pages
-    if density is not None and density < LOW_TEXT_CHARS_PER_PAGE:
-        return pages, density, "low_text", None
-    return pages, density, "text_extractable", None
+            peek = peek_entry(entry)
+            pages = entry.pages or 1
+            return peek.full_chars / max(1, pages) if peek.readable else None
+        except Exception:  # noqa: BLE001 - a failed density guess never blocks indexing
+            return None
+    return None
 
 
-def _probe_docx(path: Path) -> tuple[str, str | None]:
-    try:
-        import docx
-
-        document = docx.Document(str(path))
-        text = "\n".join(paragraph.text for paragraph in document.paragraphs)
-        return ("text_extractable" if text.strip() else "low_text"), None
-    except Exception:
-        return "parse_failed", None
+def to_indexed(entry: FileEntry, seq: int) -> IndexedFile:
+    return IndexedFile(
+        file_id=entry.file_id or format_file_id(seq),
+        display_name=entry.name,
+        relative_path=entry.relative_path,
+        mime_type=mimetypes.guess_type(entry.name)[0],
+        extension=entry.declared_ext,
+        page_count=entry.pages,
+        text_density=_density(entry),
+        readability=_readability(entry),
+        fmt=entry.fmt,
+        note=entry.note,
+        digest=entry.digest,
+        native_readable=entry.native_readable,
+        needs_normalisation=entry.needs_normalisation,
+    )
 
 
 def build_index(announcement_id: str, root: Path | None = None) -> AttachmentIndex:
     directory = (root or ATTACHMENTS_ROOT) / announcement_id
     if not directory.exists():
         return AttachmentIndex(announcement_id=announcement_id, attachment_directory=None, files=[])
-    files: list[IndexedFile] = []
-    seen: dict[str, str] = {}
-    seq = 1
-    paths = sorted(path for path in directory.rglob("*") if path.is_file() and path.name not in SKIP_NAMES)
-    for path in paths:
-        digest = _sha256(path)
-        if digest in seen:
-            continue
-        suffix = path.suffix.lower()
-        if suffix in SKIP_SUFFIXES:
-            continue
-        relative = path.relative_to(directory).as_posix()
-        file_id = format_file_id(seq)
-        seen[digest] = file_id
-        seq += 1
-        page_count = None
-        density = None
-        hint = None
-        if suffix in IMAGE_SUFFIXES:
-            readability = "unsupported"
-        elif suffix == ".pdf":
-            page_count, density, readability, hint = _probe_pdf(path)
-        elif suffix == ".docx":
-            readability, hint = _probe_docx(path)
-        elif suffix in {".doc", ".xls", ".xlsx"}:
-            readability = "text_extractable"
-        else:
-            readability = "unsupported" if suffix in {".zip", ".rar", ".7z"} else "unknown"
-        payload = {
-            "file_id": file_id,
-            "display_name": path.name,
-            "relative_path": relative,
-            "mime_type": mimetypes.guess_type(path.name)[0],
-            "extension": suffix,
-            "page_count": page_count,
-            "text_density": density,
-            "readability": readability,
-        }
-        if hint:
-            payload["failure_hint"] = hint
-        files.append(IndexedFile.model_validate(payload))
-    index = AttachmentIndex(
-        announcement_id=announcement_id,
-        attachment_directory=str(directory),
-        files=files,
-    )
-    write_json(directory / "index.json", index)
+    entries, duplicates = build_census(directory)
+    files = [to_indexed(entry, index) for index, entry in enumerate(entries, start=1)]
+    index = AttachmentIndex(announcement_id=announcement_id, attachment_directory=str(directory), files=files)
+    payload = index.model_dump()
+    payload["duplicate_files"] = duplicates
+    write_json(directory / "index.json", payload)
     return index
 
 

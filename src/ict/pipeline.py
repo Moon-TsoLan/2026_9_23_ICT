@@ -9,14 +9,20 @@ from pathlib import Path
 from ict.catalog import Catalog
 from ict.config import ATTACHMENTS_ROOT, DATA_HTML
 from ict.html_context import parse_notice, winner_hints
-from ict.index.build import load_index
+from ict.index.build import build_index, load_index
 from ict.llm import LLMClient, build_client
 from ict.schemas import CandidateFile, Failure, RunReport
 from ict.state import RunStore, write_json
 from ict.steps.s01_understand import understand
 from ict.steps.s02_html import extract_html_candidates, understand_tables
 from ict.steps.s03_plan import plan_projects
-from ict.steps.s04_attach import extract_attachment_candidates, locate_pages, triage_files
+from ict.steps.s04_attach import (
+    extract_attachment_candidates,
+    file_names_of,
+    locate_pages,
+    parse_pages,
+    triage_files,
+)
 from ict.steps.s07_normalize import normalize_candidates
 from ict.steps.s08_merge import merge_projects
 from ict.steps.s08b_repair import repair_packages
@@ -30,12 +36,13 @@ def _status_from_failures(base: str, failures: list[Failure]) -> str:
     return base
 
 
-def run_announcement(announcement_id: str, llm: LLMClient | None = None, html_dir: Path = DATA_HTML) -> RunReport:
+def run_announcement(announcement_id: str, llm: LLMClient | None = None, html_dir: Path = DATA_HTML,
+                    attachments_root: Path | None = None, persist: bool = True) -> RunReport:
     started = time.perf_counter()
     html_path = html_dir / f"{announcement_id}.html"
     notice = parse_notice(html_path)
     client = build_client() if llm is None else llm
-    store = RunStore(announcement_id)
+    store = RunStore(announcement_id, persist=persist)
     catalog = Catalog()
     calls: Counter[str] = Counter()
     all_failures: list[Failure] = []
@@ -71,7 +78,10 @@ def run_announcement(announcement_id: str, llm: LLMClient | None = None, html_di
     store.state.counts["html_candidates"] = len(html_candidates)
     all_failures.extend(html_failures)
 
-    index = load_index(announcement_id, ATTACHMENTS_ROOT)
+    attachments_dir = (attachments_root or ATTACHMENTS_ROOT) / announcement_id
+    index = load_index(announcement_id, attachments_root or ATTACHMENTS_ROOT)
+    if index is None and attachments_dir.is_dir():
+        index = build_index(announcement_id, attachments_root or ATTACHMENTS_ROOT)
     has_attachment = index is not None and index.attachment_directory is not None and bool(index.files)
     store.begin("plan_project_gaps")
     plans = plan_projects(store.run_id, understanding, html_candidates, has_attachment)
@@ -99,8 +109,19 @@ def run_announcement(announcement_id: str, llm: LLMClient | None = None, html_di
         store.state.counts["selected_files"] = sum(1 for item in file_decisions.file_decisions if item.read_strategy == "target_pages")
         all_failures.extend(file_decisions.failures)
 
+        parse_failures: list[Failure] = []
+        store.begin("parse_pages")
+        parsed, parse_summary = parse_pages(store.run_id, file_decisions, index, parse_failures)
+        parsed_status = "skipped" if not parsed else ("partial" if parse_failures else "success")
+        store.write_output("parse_pages", {"run_id": store.run_id, "status": parsed_status, "files": parse_summary,
+                                           "failures": [failure.model_dump() for failure in parse_failures]})
+        store.finish("parse_pages", parsed_status)
+        store.state.counts["parsed_pages"] = sum(len(pages) for pages in parsed.values())
+        store.write_output("triage_files", file_decisions)
+        all_failures.extend(parse_failures)
+
         store.begin("locate_pages")
-        page_decisions = locate_pages(store.run_id, plans, file_decisions, index, client, calls)
+        page_decisions = locate_pages(store.run_id, plans, file_decisions, parsed, index, client, calls)
         store.write_output("locate_pages", page_decisions)
         store.finish("locate_pages", page_decisions.status)
         store.state.counts["selected_pages"] = len(page_decisions.page_decisions)
@@ -112,11 +133,12 @@ def run_announcement(announcement_id: str, llm: LLMClient | None = None, html_di
             understanding.project_name or "",
             plans,
             page_decisions,
-            index,
+            parsed,
             client,
             seq,
             counter=calls,
             file_classes={item.file_id: item.file_class for item in file_decisions.file_decisions},
+            file_names=file_names_of(index),
         )
         attach_file = CandidateFile(
             run_id=store.run_id,
@@ -152,7 +174,9 @@ def run_announcement(announcement_id: str, llm: LLMClient | None = None, html_di
     store.state.counts["final_cobs"] = sum(len(project.cobs) for project in merged.projects)
     store.state.counts["final_subs"] = sum(len(project.subs) for project in merged.projects)
     public = [project.model_dump(exclude={"provenance"}) for project in merged.projects]
-    write_json(store.directory / "projects.json", public)
+    if persist:
+        write_json(store.directory / "projects.json", public)
+    store.projects = public
 
     final = "success"
     if understanding.status == "failed" or not merged.projects:
@@ -184,6 +208,7 @@ def _finish(store: RunStore, calls: Counter, failures: list[Failure], started: f
         failure_summary=[{"failure_code": code, "count": count} for code, count in sorted(summary.items())],
         review_required=store.state.review_required or store.state.status != "success",
     )
+    report.projects = getattr(store, "projects", None)
     store.begin("persist_and_report")
     store.write_output("persist_and_report", report)
     store.finish("persist_and_report", "success")

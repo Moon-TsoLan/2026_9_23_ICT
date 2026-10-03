@@ -16,6 +16,7 @@ STEP_FILES = {
     "extract_html_candidates": "03_html_candidates.json",
     "plan_project_gaps": "04_project_plans.json",
     "triage_files": "05_file_decisions.json",
+    "parse_pages": "05b_parsed_pages.json",
     "locate_pages": "06_page_decisions.json",
     "extract_attachment_candidates": "07_attachment_extraction.json",
     "normalize_candidates": "08_normalized_candidates.json",
@@ -40,11 +41,13 @@ def write_json(path: Path, payload) -> None:
 
 
 class RunStore:
-    def __init__(self, announcement_id: str) -> None:
+    def __init__(self, announcement_id: str, persist: bool = True) -> None:
         self.announcement_id = announcement_id
         self.run_id = f"run_{announcement_id}"
+        self.persist = persist
         self.directory = RUNS_ROOT / announcement_id
-        self.directory.mkdir(parents=True, exist_ok=True)
+        if persist:
+            self.directory.mkdir(parents=True, exist_ok=True)
         created = now_iso()
         self.state = RunState(
             run_id=self.run_id,
@@ -60,6 +63,7 @@ class RunStore:
                 "selected_pages": 0,
                 "html_candidates": 0,
                 "attachment_candidates": 0,
+                "parsed_pages": 0,
                 "normalized_candidates": 0,
                 "final_cobs": 0,
                 "final_subs": 0,
@@ -86,10 +90,14 @@ class RunStore:
         self.state.updated_at = now_iso()
         self.save()
 
-    def write_output(self, step: str, payload) -> Path:
+    def write_output(self, step: str, payload) -> Path | None:
+        if not self.persist:
+            return None
         path = self.directory / STEP_FILES[step]
         write_json(path, payload)
         return path
 
     def save(self) -> None:
+        if not self.persist:
+            return
         write_json(self.directory / "run_state.json", self.state)

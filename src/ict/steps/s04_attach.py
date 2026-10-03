@@ -1,4 +1,13 @@
-"""Steps 4-6. The model selects files and pages, then extracts only those pages."""
+"""Steps 4, 4b, 5 and 6 for attachments.
+
+4   screen    census data plus a native text view, then a model gate, per file
+4b  parse     one page-parsing call per selected file, kept in memory
+5   locate    page selection inside the already parsed pages, with real page numbers
+6   extract   entity candidates from the selected pages, one call per package scope
+
+The old reader that looked for a pre-converted markdown twin is gone, so page numbers,
+table structure and scanned content now come from the same source for every format.
+"""
 
 from __future__ import annotations
 
@@ -8,24 +17,32 @@ from pathlib import Path
 
 from ict.candidates import seal_candidate
 from ict.config import (
-    FILE_CLASS_PRIORITY,
-    FILE_PROBE_PAGES,
-    FILE_TEXT_HEAD,
-    MAX_FILES_PER_PROJECT,
+    ATTACHMENTS_ROOT,
+    CLASS_PRIORITY,
+    FILE_CLASSES,
     MAX_PAGES_PER_ANNOUNCEMENT,
     MAX_PAGES_PER_FILE,
+    MAX_SELECTED_FILES_PER_ANNOUNCEMENT,
     PAGE_TEXT_HEAD,
-    SOURCE_PRIORITY,
+    PARSE_MAX_PAGES_PER_FILE,
+    PARSE_PAGE_PAD,
+    PARSE_RUN_PAGES,
+    SCREEN_EXPECTED,
+    parse_settings,
 )
-from ict.documents import MarkdownUnavailable, read_document
+from ict.documents import read_native
 from ict.ids import make_project_id
 from ict.llm import LLMClient, LLMError, complete_json
+from ict.parse.client import ParseClient, ParseError, as_pages, contiguous_runs
+from ict.parse.peek import peek_entry
+from ict.parse.screen import ScreenDecision, gate_file, name_rule
 from ict.schemas import (
     AttachmentIndex,
     Candidate,
     Failure,
     FileDecision,
     FileDecisions,
+    IndexedFile,
     PageDecision,
     PageDecisions,
     ProjectPlans,
@@ -34,10 +51,25 @@ from ict.schemas import (
 FILE_PACKAGE_RE = re.compile(r"(?:标\s*包|采购包|合同包|第)?\s*([0-9]+|[A-Za-z])\s*包|(?:标\s*包|采购包|合同包)\s*[:：]?\s*([0-9]+|[A-Za-z])")
 PAGE_PACKAGE_RE = re.compile(r"第\s*([0-9]+)\s*包|(?:标\s*包|采购包|合同包|包号|包)\s*[:：]?\s*([0-9]+|[A-Za-z])(?![0-9A-Za-z])")
 
-
+KIND_TO_CLASS = {
+    "award_detail": "award_detail",
+    "bid_quote": "bid_quote",
+    "winner_detail": "winner_detail",
+    "tender_requirement": "tender_requirement",
+    "qualification": "qualification",
+    "contract": "contract",
+    "evaluation": "evaluation",
+    "other": "unrelated",
+    "unknown": "unknown",
+}
+PARSE_KINDS = {"award_detail", "bid_quote", "winner_detail"}
+PARSE_METHOD_FORCED = "forced"
 def page_packages(text: str, known: list[str]) -> set[str]:
     known_set = set(known)
-    return {next(group for group in match.groups() if group) for match in PAGE_PACKAGE_RE.finditer(text or "")} & known_set
+    found = set()
+    for match in PAGE_PACKAGE_RE.finditer(text or ""):
+        found.add(next(group for group in match.groups() if group))
+    return found & known_set
 
 
 def coerce_package_scope(scope: str, possible: list[str], known: list[str], file_name: str) -> str:
@@ -69,40 +101,112 @@ def _package_from_filename(file_name: str) -> str | None:
     return None
 
 
-FILE_CLASSES = {
-    "award_detail",
-    "bid_quote",
-    "winner_detail",
-    "tender_requirement",
-    "qualification",
-    "contract",
-    "evaluation",
-    "unrelated",
-    "unknown",
-}
-READ_STRATEGIES = {"skip", "target_pages", "unsupported"}
-CLASS_PRIORITY = {
-    "award_detail": 100,
-    "bid_quote": 90,
-    "winner_detail": 80,
-    "evaluation": 70,
-    "tender_requirement": 40,
-    "qualification": 30,
-    "contract": 30,
-    "unrelated": 30,
-    "unknown": 30,
-}
+def _entry(index: AttachmentIndex, item: IndexedFile):
+    from ict.parse.census import FileEntry
+
+    root = Path(index.attachment_directory or (ATTACHMENTS_ROOT / index.announcement_id))
+    path = root / item.relative_path
+    return FileEntry(file_id=item.file_id, name=item.display_name, relative_path=item.relative_path,
+                     path=path, size_bytes=path.stat().st_size if path.exists() else 0,
+                     declared_ext=item.extension, fmt=item.fmt, note=item.note, digest=item.digest,
+                     pages=item.page_count)
 
 
-def _validate_files(parsed: dict) -> str:
-    if not isinstance(parsed.get("file_decisions"), list):
-        return "需要 file_decisions 数组"
-    for item in parsed["file_decisions"]:
-        if item.get("file_class") not in FILE_CLASSES:
-            return "file_class 不在允许值内"
-        if item.get("read_strategy") not in READ_STRATEGIES:
-            return "read_strategy 不在允许值内"
-    return ""
+def _client() -> ParseClient:
+    settings = parse_settings()
+    return ParseClient(settings["url"], settings.get("token", ""), float(settings.get("timeout", 600)))
+
+
+def triage_files(run_id: str, plans: ProjectPlans, index: AttachmentIndex | None, llm: LLMClient | None,
+                 counter=None) -> FileDecisions:
+    """Step 4. Screen every file; nothing is parsed before a file is kept."""
+    failures: list[Failure] = []
+    if index is None or index.attachment_directory is None:
+        failures.append(Failure(failure_code="attachment_index_miss", failure_message="附件索引不存在"))
+        return FileDecisions(run_id=run_id, status="skipped", failures=failures)
+    if not any(project.needs_attachment for project in plans.projects):
+        return FileDecisions(run_id=run_id, status="skipped", failures=failures)
+
+    decisions: list[FileDecision] = []
+    for item in index.files:
+        entry = _entry(index, item)
+        if not entry.path.exists():
+            decisions.append(FileDecision(file_id=item.file_id, file_class="unknown", priority=0,
+                                          read_strategy="unsupported", reason="file_missing",
+                                          failure_code="document_parse_failed", failure_message="附件文件不存在"))
+            failures.append(Failure(failure_code="document_parse_failed", failure_message=item.display_name,
+                                    location=item.file_id))
+            continue
+        peek = peek_entry(entry)
+        decision: ScreenDecision = gate_file(entry, peek, llm, counter=counter)
+        file_class = KIND_TO_CLASS.get(decision.kind, "unknown")
+        if file_class not in FILE_CLASSES:
+            file_class = "unknown"
+        keep = decision.decision == "parse"
+        decisions.append(
+            FileDecision(
+                file_id=item.file_id,
+                file_class=file_class,
+                expected_fields=SCREEN_EXPECTED.get(file_class, []),
+                possible_packages=[],
+                priority=float(CLASS_PRIORITY.get(file_class, 30)) * max(decision.confidence, 0.3),
+                read_strategy="target_pages" if keep else "skip",
+                reason="%s:%s:%s" % (decision.method, decision.reason or decision.kind, "%.2f" % decision.confidence),
+                screen=decision.short() | {"name_rule": decision.name_rule, "format": entry.fmt,
+                                           "pages": entry.pages, "view_chars": peek.full_chars},
+            )
+        )
+    selected = [item for item in decisions if item.read_strategy == "target_pages"]
+    selected.sort(key=lambda item: item.priority, reverse=True)
+    keep_ids = {item.file_id for item in selected[:MAX_SELECTED_FILES_PER_ANNOUNCEMENT]}
+    for item in decisions:
+        if item.read_strategy == "target_pages" and item.file_id not in keep_ids:
+            item.read_strategy = "skip"
+            item.reason = "over_file_cap:" + item.reason
+    status = "partial" if failures else "success"
+    return FileDecisions(run_id=run_id, status=status, file_decisions=decisions, failures=failures)
+
+
+def parse_pages(run_id: str, files: FileDecisions, index: AttachmentIndex, failures: list[Failure]):
+    """Step 4b. One parsing call per kept file; pages stay in memory for steps 5 and 6."""
+    chosen = [item for item in files.file_decisions if item.read_strategy == "target_pages"]
+    parsed: dict[str, list[dict]] = {}
+    summary: list[dict] = []
+    if not chosen:
+        return parsed, summary
+    client = _client()
+    for decision in chosen:
+        item = next((entry for entry in index.files if entry.file_id == decision.file_id), None)
+        if item is None:
+            continue
+        entry = _entry(index, item)
+        try:
+            if entry.fmt in {"docx", "xlsx", "xlsm"} and not entry.needs_normalisation:
+                pages = read_native(entry.path)
+            else:
+                cap = min(entry.pages or PARSE_MAX_PAGES_PER_FILE, PARSE_MAX_PAGES_PER_FILE)
+                response = client.parse(entry.path, max_pages=cap)
+                pages = as_pages(response)
+                decision.parse_meta = (response.get("meta") or {})
+        except ParseError as exc:
+            code = "parse_unreachable" if str(exc.reason).startswith("parse_unreachable") else "parse_http_failed"
+            failures.append(Failure(failure_code=code, failure_message=str(exc.reason)[:200], location=decision.file_id))
+            decision.read_strategy = "skip"
+            decision.reason = "parse_failed:" + str(exc.reason)[:80]
+            continue
+        except Exception as exc:  # noqa: BLE001 - one unreadable file must not stop the run
+            failures.append(Failure(failure_code="document_parse_failed", failure_message=type(exc).__name__ + ":" + str(exc)[:120],
+                                    location=decision.file_id))
+            decision.read_strategy = "skip"
+            decision.reason = "parse_failed:" + type(exc).__name__
+            continue
+        parsed[decision.file_id] = pages
+        summary.append({"file_id": decision.file_id, "name": entry.name, "pages": len(pages),
+                        "chars": sum(page["chars"] for page in pages),
+                        "tables": sum(len(page["tables"]) for page in pages),
+                        "table_headers": {page["page_no"]: [table["headers"] for table in page["tables"]][:1]
+                                          for page in pages if page["tables"]}})
+    return parsed, summary
 
 
 def _validate_pages(parsed: dict) -> str:
@@ -114,353 +218,164 @@ def _validate_pages(parsed: dict) -> str:
     return ""
 
 
-READ_FAILURE = {
-    "low_text": "scanned_or_low_text_pdf",
-    "unsupported": "unsupported_image",
-    "encrypted": "encrypted_pdf",
-    "parse_failed": "document_parse_failed",
-}
-
-
-def _file_path(index: AttachmentIndex, file_id: str) -> Path | None:
-    if not index.attachment_directory:
-        return None
-    root = Path(index.attachment_directory)
-    for item in index.files:
-        if item.file_id == file_id:
-            return root / item.relative_path
-    return None
-
-
-def _probe(index: AttachmentIndex, file_id: str) -> dict:
-    path = _file_path(index, file_id)
-    meta = next(item for item in index.files if item.file_id == file_id)
-    if path is None or meta.readability != "text_extractable":
-        return {"file_id": file_id, "display_name": meta.display_name, "readability": meta.readability, "first_pages": []}
-    try:
-        pages = read_document(path, list(range(1, FILE_PROBE_PAGES + 1)))
-    except MarkdownUnavailable as exc:
-        return {
-            "file_id": file_id,
-            "display_name": meta.display_name,
-            "readability": "unknown",
-            "failure": exc.reason,
-            "first_pages": [],
-        }
-    except Exception:
-        return {"file_id": file_id, "display_name": meta.display_name, "readability": "parse_failed", "first_pages": []}
-    return {
-        "file_id": file_id,
-        "display_name": meta.display_name,
-        "page_count": meta.page_count,
-        "text_density": meta.text_density,
-        "readability": meta.readability,
-        "first_pages": [
-            {
-                "page_no": page["page_no"],
-                "text_head": page["text"][:FILE_TEXT_HEAD],
-                "table_headers": [table["headers"] for table in page["tables"]],
-            }
-            for page in pages
-        ],
-    }
-
-
-def triage_files(run_id: str, plans: ProjectPlans, index: AttachmentIndex | None, llm: LLMClient | None, counter=None) -> FileDecisions:
-    failures: list[Failure] = []
-    if index is None or index.attachment_directory is None:
-        failures.append(Failure(failure_code="attachment_index_miss", failure_message="附件索引不存在"))
-        return FileDecisions(run_id=run_id, status="skipped", failures=failures)
-    if not any(project.needs_attachment for project in plans.projects):
-        return FileDecisions(run_id=run_id, status="skipped", failures=failures)
-    decisions: list[FileDecision] = []
-    readable = []
-    for item in index.files:
-        hint = (item.model_extra or {}).get("failure_hint")
-        if item.readability == "text_extractable":
-            readable.append(item)
-            continue
-        code = READ_FAILURE.get(hint or item.readability, "document_parse_failed")
-        decisions.append(
-            FileDecision(
-                file_id=item.file_id,
-                file_class="unknown",
-                priority=0,
-                read_strategy="unsupported",
-                reason=item.readability,
-                failure_code=code,
-                failure_message=hint,
-            )
-        )
-        failures.append(Failure(failure_code=code, failure_message=item.display_name, location=item.file_id))
-    if llm is None:
-        failures.append(Failure(failure_code="llm_call_failed", failure_message="未配置 DeepSeek"))
-        return FileDecisions(run_id=run_id, status="failed", file_decisions=decisions, failures=failures)
-    probes = [_probe(index, item.file_id) for item in readable]
-    try:
-        parsed = complete_json(
-            llm,
-            step="triage_files",
-            prompt_version="triage-files-v1",
-            user=json.dumps(
-                {"plans": [project.model_dump() for project in plans.projects], "files": probes},
-                ensure_ascii=False,
-            ),
-            validate=_validate_files,
-            counter=counter,
-        )
-    except (LLMError, ValueError) as exc:
-        code = "llm_call_failed" if isinstance(exc, LLMError) else "llm_schema_invalid"
-        failures.append(Failure(failure_code=code, failure_message=str(exc)))
-        return FileDecisions(run_id=run_id, status="failed", file_decisions=decisions, failures=failures)
-    for item in parsed.get("file_decisions") or []:
-        if item.get("file_id") not in {file.file_id for file in readable}:
-            continue
-        strategy = item.get("read_strategy") or "skip"
-        if strategy not in {"skip", "target_pages", "unsupported"}:
-            strategy = "skip"
-        decisions.append(
-            FileDecision(
-                file_id=item["file_id"],
-                file_class=item.get("file_class") or "unknown",
-                expected_fields=item.get("expected_fields") or [],
-                possible_packages=[str(value) for value in item.get("possible_packages") or []],
-                priority=float(item.get("priority") or 0),
-                read_strategy=strategy,
-                reason=item.get("reason") or "",
-            )
-        )
-    selected = [item for item in decisions if item.read_strategy == "target_pages"]
-    selected.sort(key=lambda item: (item.priority, item.file_class in FILE_CLASS_PRIORITY), reverse=True)
-    keep = {item.file_id for item in selected[: MAX_FILES_PER_PROJECT * max(1, len(plans.projects))]}
-    for item in decisions:
-        if item.read_strategy == "target_pages" and item.file_id not in keep:
-            item.read_strategy = "skip"
-            item.reason = "超过每个项目的文件上限"
-    status = "partial" if failures else "success"
-    return FileDecisions(run_id=run_id, status=status, file_decisions=decisions, failures=failures)
-
-
-def locate_pages(run_id: str, plans: ProjectPlans, files: FileDecisions, index: AttachmentIndex, llm: LLMClient | None, counter=None) -> PageDecisions:
-    chosen = [item for item in files.file_decisions if item.read_strategy == "target_pages"]
+def locate_pages(run_id: str, plans: ProjectPlans, files: FileDecisions, parsed: dict[str, list[dict]],
+                 index: AttachmentIndex, llm: LLMClient | None, counter=None) -> PageDecisions:
+    """Step 5. Choose pages from pages we already have, so page numbers stay true."""
+    chosen = [item for item in files.file_decisions if item.read_strategy == "target_pages" and item.file_id in parsed]
     if not chosen:
         return PageDecisions(run_id=run_id, status="skipped", failures=list(files.failures))
     if llm is None:
-        return PageDecisions(
-            run_id=run_id,
-            status="failed",
-            failures=[Failure(failure_code="llm_call_failed", failure_message="未配置 DeepSeek")],
-        )
-    page_inputs = []
-    failures: list[Failure] = []
+        return PageDecisions(run_id=run_id, status="failed",
+                             failures=[Failure(failure_code="llm_call_failed", failure_message="未配置模型")])
     known_packages = [project.package_no for project in plans.projects]
-    mentioned: dict[tuple[str, int], set[str]] = {}
+    display_names = {item.file_id: item.display_name for item in index.files}
+    page_inputs = []
     for decision in chosen:
-        path = _file_path(index, decision.file_id)
-        if path is None:
-            continue
-        try:
-            pages = read_document(path)
-        except MarkdownUnavailable as exc:
-            failures.append(
-                Failure(
-                    failure_code="no_text_extractable",
-                    failure_message=f"unknown:{exc.reason}",
-                    location=decision.file_id,
-                )
-            )
-            continue
-        except Exception as exc:
-            failures.append(
-                Failure(failure_code="unexpected_error", failure_message=str(exc), location=decision.file_id)
-            )
-            continue
+        pages = parsed[decision.file_id]
         slim = []
         for page in pages:
-            mentioned[(decision.file_id, page["page_no"])] = page_packages(page["text"], known_packages)
-            headers = [table["headers"] for table in page["tables"]]
-            if page["chars"] < 20 and not headers:
+            rows = [row for table in page["tables"] for row in table["rows"]]
+            if page["chars"] < 20 and not rows:
                 continue
-            slim.append(
-                {
-                    "page_no": page["page_no"],
-                    "source": "markdown",
-                    "text_head": page["text"][:PAGE_TEXT_HEAD],
-                    "table_headers": headers,
-                }
-            )
-        page_inputs.append(
-            {
-                "file_id": decision.file_id,
-                "display_name": path.name,
-                "possible_packages": decision.possible_packages,
-                "pages": slim[:80],
-            }
-        )
+            slim.append({"page_no": page["page_no"], "text_head": page["text"][:PAGE_TEXT_HEAD],
+                         "table_headers": [table["headers"] for table in page["tables"]],
+                         "table_rows": len(rows),
+                         "row_sample": " | ".join(rows[0][:8]) if rows else "",
+                         "tables": len(page["tables"]), "chars": page["chars"]})
+        page_inputs.append({"file_id": decision.file_id, "display_name": display_names.get(decision.file_id, decision.file_id),
+                            "file_class": decision.file_class, "possible_packages": decision.possible_packages,
+                            "pages": slim[:80]})
     queries = [query for project in plans.projects for query in project.search_queries]
-    file_meta = {item["file_id"]: item for item in page_inputs}
     try:
-        parsed = complete_json(
-            llm,
-            step="locate_pages",
-            prompt_version="locate-pages-v1",
-            user=json.dumps(
-                {"known_packages": known_packages, "search_queries": queries, "files": page_inputs},
-                ensure_ascii=False,
-            ),
-            validate=_validate_pages,
-            counter=counter,
-        )
+        produced = complete_json(
+            llm, step="locate_pages", prompt_version="locate-pages-v1",
+            user=json.dumps({"known_packages": known_packages, "search_queries": queries, "files": page_inputs},
+                            ensure_ascii=False),
+            validate=_validate_pages, counter=counter)
     except (LLMError, ValueError) as exc:
         code = "llm_call_failed" if isinstance(exc, LLMError) else "llm_schema_invalid"
-        return PageDecisions(run_id=run_id, status="failed", failures=[*failures, Failure(failure_code=code, failure_message=str(exc))])
+        return PageDecisions(run_id=run_id, status="failed", failures=[Failure(failure_code=code, failure_message=str(exc))])
+    name_by_file = {}
+    for item in index.files:
+        name_by_file[item.file_id] = item.display_name
+    mentioned: dict[tuple[str, int], set[str]] = {}
+    for file_id, pages in parsed.items():
+        for page in pages:
+            mentioned[(file_id, page["page_no"])] = page_packages(page["text"], known_packages)
     decisions: list[PageDecision] = []
     per_file: dict[str, int] = {}
-    for item in parsed.get("page_decisions") or []:
+    for item in produced.get("page_decisions") or []:
         file_id = item.get("file_id")
+        if file_id not in parsed:
+            continue
         per_file[file_id] = per_file.get(file_id, 0) + 1
         if per_file[file_id] > MAX_PAGES_PER_FILE or len(decisions) >= MAX_PAGES_PER_ANNOUNCEMENT:
             continue
         mode = item.get("extraction_mode") or "text"
         if mode not in {"text", "table", "text_and_table", "unsupported"}:
             mode = "text"
-        meta = file_meta.get(file_id) or {}
         page_no = int(item.get("page_no") or 0)
-        scope = coerce_package_scope(
-            str(item.get("package_scope") or "unknown"),
-            list(meta.get("possible_packages") or []),
-            known_packages,
-            str(meta.get("display_name") or ""),
-        )
+        meta = next((entry for entry in page_inputs if entry["file_id"] == file_id), {})
+        scope = coerce_package_scope(str(item.get("package_scope") or "unknown"),
+                                     list(meta.get("possible_packages") or []), known_packages,
+                                     name_by_file.get(file_id, ""))
         if len(mentioned.get((file_id, page_no), set())) >= 2:
             scope = "announcement"
-        decisions.append(
-            PageDecision(
-                file_id=file_id,
-                page_no=page_no,
-                relevance=float(item.get("relevance") or 0),
-                expected_fields=item.get("expected_fields") or [],
-                package_scope=scope,
-                extraction_mode=mode,
-                reason=item.get("reason") or "",
-            )
-        )
-    status = "partial" if failures or not decisions else "success"
-    return PageDecisions(run_id=run_id, status=status, page_decisions=decisions, failures=failures)
+        decisions.append(PageDecision(file_id=file_id, page_no=page_no,
+                                      relevance=float(item.get("relevance") or 0),
+                                      expected_fields=item.get("expected_fields") or [],
+                                      package_scope=scope, extraction_mode=mode,
+                                      reason=item.get("reason") or ""))
+    status = "partial" if not decisions else "success"
+    return PageDecisions(run_id=run_id, status=status, page_decisions=decisions)
 
 
-def extract_attachment_candidates(
-    run_id: str,
-    project_name: str,
-    plans: ProjectPlans,
-    pages: PageDecisions,
-    index: AttachmentIndex,
-    llm: LLMClient | None,
-    seq_start: int,
-    counter=None,
-    file_classes: dict[str, str] | None = None,
-) -> tuple[list[Candidate], list[Failure], list[dict], int]:
-    failures: list[Failure] = []
+def _validate_candidates(parsed: dict) -> str:
+    if not isinstance(parsed.get("candidates"), list):
+        return "需要 candidates 数组"
+    return ""
+
+
+def file_names_of(index: AttachmentIndex | None) -> dict[str, str]:
+    return {item.file_id: item.display_name for item in (index.files if index else [])}
+
+
+def extract_attachment_candidates(run_id: str, project_name: str, plans: ProjectPlans, pages: PageDecisions,
+                                 parsed: dict[str, list[dict]], llm: LLMClient | None, seq_start: int,
+                                 counter=None, file_classes: dict[str, str] | None = None,
+                                 failures: list[Failure] | None = None,
+                                 file_names: dict[str, str] | None = None):
+    """Step 6. Extract from parsed pages, one call per package scope, chunked not truncated."""
+    failures = failures if failures is not None else []
     candidates: list[Candidate] = []
     quality: list[dict] = []
     seq = seq_start
-    if not pages.page_decisions:
+    if not pages.page_decisions or llm is None:
+        if not pages.page_decisions:
+            return candidates, failures, quality, seq
+        failures.append(Failure(failure_code="llm_call_failed", failure_message="未配置模型"))
         return candidates, failures, quality, seq
-    if llm is None:
-        failures.append(Failure(failure_code="llm_call_failed", failure_message="未配置 DeepSeek"))
-        return candidates, failures, quality, seq
-    by_package: dict[str, list] = {}
+
+    by_package: dict[str, list[dict]] = {}
     for decision in pages.page_decisions:
         if decision.extraction_mode == "unsupported":
             continue
-        path = _file_path(index, decision.file_id)
-        if path is None:
+        page_list = parsed.get(decision.file_id) or []
+        page = next((item for item in page_list if item["page_no"] == decision.page_no), None)
+        if page is None:
+            quality.append({"file_id": decision.file_id, "page_no": decision.page_no,
+                            "readability": "missing_page", "failure_code": "unexpected_error"})
             continue
-        try:
-            loaded = read_document(path, [decision.page_no])
-        except Exception as exc:
-            quality.append(
-                {"file_id": decision.file_id, "page_no": decision.page_no, "readability": "parse_failed", "failure_code": "document_parse_failed"}
-            )
-            failures.append(Failure(failure_code="document_parse_failed", failure_message=str(exc), location=decision.file_id))
-            continue
-        if not loaded or loaded[0]["chars"] < 20:
-            quality.append(
-                {
-                    "file_id": decision.file_id,
-                    "page_no": decision.page_no,
-                    "readability": "low_text",
-                    "failure_code": "scanned_or_low_text_pdf",
-                }
-            )
-            continue
-        quality.append(
-            {"file_id": decision.file_id, "page_no": decision.page_no, "readability": "text_extractable", "failure_code": None}
-        )
-        by_package.setdefault(decision.package_scope, []).append(
-            {
-                "file_id": decision.file_id,
-                "file_name": path.name,
-                "page_no": decision.page_no,
-                "text": loaded[0]["text"][:6000],
-                "tables": loaded[0]["tables"][:4],
-            }
-        )
+        quality.append({"file_id": decision.file_id, "page_no": decision.page_no,
+                        "readability": "text_extractable", "failure_code": None,
+                        "chars": page["chars"], "tables": len(page["tables"])})
+        by_package.setdefault(decision.package_scope, []).append({
+            "file_id": decision.file_id,
+            "file_name": (file_names or {}).get(decision.file_id, decision.file_id),
+            "page_no": page["page_no"],
+            "text": page["text"][:6000],
+            "tables": page["tables"][:6],
+            "source_type": {"vl": "pdf", "docx": "docx", "xlsx": "xlsx", "pdf": "pdf"}.get(page.get("source"), "pdf"),
+        })
+
     plans_by_no = {project.package_no: project for project in plans.projects}
     for package_no, contexts in by_package.items():
         plan = plans_by_no.get(package_no)
-        if len(contexts) > 12:
-            failures.append(
-                Failure(
-                    failure_code="page_context_truncated",
-                    failure_message=f"包 {package_no} 超出 12 页，未送入 {len(contexts) - 12} 页",
-                    location=str(package_no),
-                )
-            )
-        payload = {
-            "current_package": {
+        for chunk_start in range(0, len(contexts), PARSE_RUN_PAGES):
+            chunk = contexts[chunk_start:chunk_start + PARSE_RUN_PAGES]
+            if chunk_start + PARSE_RUN_PAGES < len(contexts):
+                failures.append(Failure(failure_code="page_context_split",
+                                        failure_message="包 %s 页数 %d，拆成多次调用" % (package_no, len(contexts)),
+                                        location=str(package_no)))
+            payload = {"current_package": {
                 "project_id": None if plan is None else plan.project_id,
                 "package_no": None if package_no in {"unknown", "announcement"} else package_no,
-                "missing_fields": [] if plan is None else plan.missing_fields,
-            },
-            "page_contexts": contexts[:12],
-        }
-        try:
-            parsed = complete_json(
-                llm,
-                step="extract_attachment_candidates",
-                prompt_version="attachment-extract-v1",
-                user=json.dumps(payload, ensure_ascii=False),
-                validate=lambda item: "" if isinstance(item.get("candidates"), list) else "需要 candidates 数组",
-                counter=counter,
-            )
-        except (LLMError, ValueError) as exc:
-            code = "llm_call_failed" if isinstance(exc, LLMError) else "llm_schema_invalid"
-            failures.append(Failure(failure_code=code, failure_message=str(exc), location=package_no))
-            continue
-        for item in parsed.get("candidates") or []:
-            entity = item.get("entity_type")
-            if entity not in {"cob", "sub"}:
+                "missing_fields": [] if plan is None else plan.missing_fields},
+                "page_contexts": chunk}
+            try:
+                produced = complete_json(
+                    llm, step="extract_attachment_candidates", prompt_version="attachment-extract-v1",
+                    user=json.dumps(payload, ensure_ascii=False), validate=_validate_candidates, counter=counter)
+            except (LLMError, ValueError) as exc:
+                code = "llm_call_failed" if isinstance(exc, LLMError) else "llm_schema_invalid"
+                failures.append(Failure(failure_code=code, failure_message=str(exc)[:200], location=package_no))
                 continue
-            file_name = next((context["file_name"] for context in contexts if context["file_id"] == item.get("file_id")), contexts[0]["file_name"] if contexts else "")
-            item_package = item.get("package_no") or payload["current_package"]["package_no"] or _package_from_filename(file_name)
-            project_id = make_project_id(project_name, str(item_package)) if item_package and project_name else None
-            source_type = "pdf"
-            file_id = item.get("file_id") or (contexts[0]["file_id"] if contexts else None)
-            file_class = (file_classes or {}).get(file_id or "", "bid_quote")
-            candidates.append(
-                seal_candidate(
-                    candidate_id=f"cand_{seq:06d}",
-                    entity_type=entity,
-                    project_id=project_id,
+            for entry in produced.get("candidates") or []:
+                entity = entry.get("entity_type")
+                if entity not in {"cob", "sub"}:
+                    continue
+                file_id = entry.get("file_id") or (chunk[0]["file_id"] if chunk else None)
+                context = next((item for item in chunk if item["file_id"] == file_id), chunk[0] if chunk else {})
+                file_class = (file_classes or {}).get(file_id or "", "bid_quote")
+                item_package = entry.get("package_no") or payload["current_package"]["package_no"] or \
+                    _package_from_filename(context.get("file_name", ""))
+                project_id = make_project_id(project_name, str(item_package)) if item_package and project_name else None
+                candidates.append(seal_candidate(
+                    candidate_id="cand_%06d" % seq, entity_type=entity, project_id=project_id,
                     package_no=None if item_package is None else str(item_package),
-                    source_type=source_type,
-                    file_id=file_id,
-                    source_priority=CLASS_PRIORITY.get(file_class, 90),
-                    raw_fields=item.get("fields") or {},
-                    issues=item.get("issues") or [],
-                    source_class=file_class,
-                )
-            )
-            seq += 1
+                    source_type=context.get("source_type", "pdf"), file_id=file_id,
+                    source_priority=int(CLASS_PRIORITY.get(file_class, 90)),
+                    raw_fields=entry.get("fields") or {}, issues=entry.get("issues") or [],
+                    source_class=file_class, page_no=context.get("page_no")))
+                seq += 1
     return candidates, failures, quality, seq

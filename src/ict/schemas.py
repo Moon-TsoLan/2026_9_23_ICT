@@ -24,7 +24,12 @@ FailureCode = Literal[
     "field_normalization_failed",
     "merge_conflict_unresolved",
     "page_context_truncated",
+    "page_context_split",
     "consistency_check_failed",
+    "parse_unreachable",
+    "parse_http_failed",
+    "parse_refused",
+    "office_convert_failed",
     "unexpected_error",
 ]
 EntityType = Literal["cob", "sub"]
@@ -35,7 +40,8 @@ AnnouncementType = Literal["winning_announcement", "deal_announcement", "unknown
 PackageMode = Literal["single", "multi", "unclear"]
 TableRole = Literal["cob_detail", "cob_summary", "sub_score", "winner", "agency_fee", "other"]
 RowGrain = Literal["cob", "supplier", "project", "other"]
-Readability = Literal["unknown", "text_extractable", "low_text", "parse_failed", "unsupported"]
+Readability = Literal["unknown", "text_extractable", "low_text", "parse_failed", "unsupported",
+                 "needs_normalisation", "ocr_needed"]
 FileClass = Literal[
     "award_detail",
     "bid_quote",
@@ -124,6 +130,7 @@ class HtmlTables(Model):
 class Source(Model):
     source_type: SourceType
     file_id: str | None = None
+    page_no: int | None = None
 
 
 class FieldObservation(Model):
@@ -194,6 +201,11 @@ class IndexedFile(Model):
     page_count: int | None = None
     text_density: float | None = None
     readability: Readability
+    fmt: str = "unknown"
+    note: str = ""
+    digest: str = ""
+    native_readable: bool = False
+    needs_normalisation: bool = False
 
 
 class AttachmentIndex(Model):
@@ -318,3 +330,5 @@ class RunReport(Model):
     llm_calls: dict[str, int]
     failure_summary: list[dict[str, Any]]
     review_required: bool
+    # in-memory only: excluded so 10_run_report.json stays exactly as the contract defines it
+    projects: list[dict[str, Any]] | None = Field(default=None, exclude=True)

@@ -32,6 +32,11 @@ class LLMClient:
     def complete(self, *, step: str, prompt_version: str, user: str) -> LLMResult:
         raise NotImplementedError
 
+    def complete_with_images(self, *, step: str, prompt_version: str, images: list[str],
+                             user_text: str) -> LLMResult:
+        """Optional vision call; models without image input simply do not implement it."""
+        raise NotImplementedError
+
 
 class OpenAICompatibleClient(LLMClient):
     def __init__(self, base_url: str, api_key: str, model: str, timeout: float = 180) -> None:
@@ -65,6 +70,35 @@ class OpenAICompatibleClient(LLMClient):
         text = payload["choices"][0]["message"]["content"]
         return LLMResult(text, self.model, self.model, prompt_version, latency_ms)
 
+    def complete_with_images(self, *, step: str, prompt_version: str, images: list[str],
+                             user_text: str) -> LLMResult:
+        """One user turn of page pictures plus the instruction. No conversation state."""
+        system = (PROMPT_DIR / f"{prompt_version}.md").read_text(encoding="utf-8")
+        content: list[dict] = [{"type": "text", "text": user_text}]
+        content += [{"type": "image_url", "image_url": {"url": uri}} for uri in images]
+        started = time.perf_counter()
+        response = httpx.post(
+            f"{self.base_url}/chat/completions",
+            headers={"Authorization": f"Bearer {self.api_key}"},
+            json={
+                "model": self.model,
+                "temperature": 0,
+                "max_tokens": 300,
+                "thinking": {"type": "disabled"},
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": content},
+                ],
+            },
+            timeout=self.timeout,
+        )
+        latency_ms = int((time.perf_counter() - started) * 1000)
+        if response.status_code >= 400:
+            raise LLMError(f"{step} http {response.status_code}: {response.text[:300]}")
+        payload = response.json()
+        produced = payload["choices"][0]["message"]["content"]
+        return LLMResult(produced, self.model, self.model, prompt_version, latency_ms)
+
 
 class FakeLLMClient(LLMClient):
     def __init__(self, responses: dict[str, str | list[str]]) -> None:
@@ -82,6 +116,10 @@ class FakeLLMClient(LLMClient):
         else:
             text = payload
         return LLMResult(text, "fake", "test", prompt_version, 1)
+
+    def complete_with_images(self, *, step: str, prompt_version: str, images: list[str],
+                             user_text: str) -> LLMResult:
+        return self.complete(step=step, prompt_version=prompt_version, user=user_text)
 
 
 def build_client() -> LLMClient | None:

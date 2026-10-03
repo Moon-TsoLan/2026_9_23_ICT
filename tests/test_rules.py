@@ -7,31 +7,11 @@ from ict.html_context import bidder_body_sections, parse_notice
 from ict.money import parse_amount, parse_price_cell, parse_quantity
 from ict.schemas import AnnouncementUnderstanding, PackageUnderstanding
 from ict.steps.s03_plan import plan_projects
-from ict.steps.s04_attach import coerce_package_scope
+from ict.steps.s04_attach import coerce_package_scope, page_packages
 from ict.steps.s07_normalize import normalize_candidates
 from ict.steps.s08_merge import merge_projects
 
 HTML = Path(r"D:\all_contest\2026_9_23_ICT\data\赛题五基准测试数据\赛题五.基准测试数据_html\t20260202_26139731.html")
-
-
-def test_missing_markdown_is_paddle_not_connected(monkeypatch, tmp_path):
-    from ict import documents
-    from ict.documents import MarkdownUnavailable, ensure_markdown
-
-    pdf_root = tmp_path / "attachments" / "demo"
-    md_root = tmp_path / "attachments-md"
-    pdf_root.mkdir(parents=True)
-    pdf = pdf_root / "报价.pdf"
-    pdf.write_bytes(b"%PDF")
-    monkeypatch.setattr(documents, "ATTACHMENTS_ROOT", tmp_path / "attachments")
-    monkeypatch.setattr(documents, "ATTACHMENTS_MD_ROOT", md_root)
-    monkeypatch.delenv("ICT_PADDLE_COMMAND", raising=False)
-    try:
-        ensure_markdown(pdf)
-    except MarkdownUnavailable as exc:
-        assert exc.reason == "paddle_not_connected"
-    else:
-        raise AssertionError("expected MarkdownUnavailable")
 
 
 def test_alias_field_names_keep_object_name():
