@@ -6,20 +6,26 @@ import re
 from typing import Any
 
 _NUMBER = re.compile(r"-?\d+(?:\.\d+)?")
+# A percent sign makes the text a rate rather than an amount. This is the only semantic
+# guard in this module: "折扣率：96.60%" once became a package total of 96.6 yuan. Every
+# other wording judgement (预算/限价/保证金/折扣) stays with the model, per AGENTS.md.
+_PERCENT = re.compile(r"[%％]")
 _QTY = re.compile(
     r"^\s*(\d+(?:\.\d+)?)\s*(?:[\(（]\s*([^)）]+)\s*[\)）]|([^\d\s,，;；]+))?\s*$"
 )
 
 
 def parse_amount(raw: str | None) -> tuple[float | None, bool]:
-    """Return yuan and whether the text itself said 万元."""
+    """Return yuan and whether the text itself said 万元. A percentage is not an amount."""
     if raw is None:
         return None, False
     text = str(raw).strip()
     if not text:
         return None, False
-    negative = text.startswith("(") or text.startswith("（") or text.startswith("-")
     wan = "万元" in text
+    if _PERCENT.search(text):
+        return None, wan
+    negative = text.startswith("(") or text.startswith("（") or text.startswith("-")
     match = _NUMBER.search(text.replace(",", "").replace("，", ""))
     if not match:
         return None, wan
@@ -27,7 +33,9 @@ def parse_amount(raw: str | None) -> tuple[float | None, bool]:
     if negative and value > 0:
         value = -value
     if wan:
-        value *= 10000
+        # Amounts are quoted to the cent at most, so six decimals is pure float cleanup:
+        # 0.28 * 10000 lands on 2800.0000000000005 otherwise.
+        value = round(value * 10000, 6)
     return value, wan
 
 

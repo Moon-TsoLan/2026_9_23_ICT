@@ -3,14 +3,13 @@
 输出一个 JSON 对象，字段为：
 project_name, purchaser, source_project_no, announcement_type, package_mode, packages, summary_amount, unclear_reason。
 
-announcement_type 只能是 winning_announcement、deal_announcement、unknown。
-package_mode 只能是 single、multi、unclear。
+每个包还可以带 amount_alternatives：这个包里你看到的、但没有选作中标（成交）金额的其它金额，写法与它相同。只留痕，不参与判定；没有就省略。
+
+金额必须连单位一起抄。单位可能紧贴数字（￥81.8万元、1,486,000.00元），也可能只写在这一列的标题里：表头是「中标金额(万元)」、格里只有 52.842 时，raw_text 要写成「52.842万元」，因为程序只认值里出现的单位。整列同此处理。格里和列标题都没有单位的才只抄数字。
+包的中标（成交）金额必须是原文照抄。折扣率、费率、下浮率、投标保证金、预算金额、最高限价、控制价、代理服务费都不是中标（成交）金额，不要当作包金额；它们出现在同一个包里时，抄进 amount_alternatives。带百分号的数字一律不是金额。
+
 single 时 packages 恰好一个；原文没写包号则 package_no 为 "1"。
 multi 时 packages 至少两个，包号不重复。
-package_no 只写编号本身，必须是字符串。"第3包""采购包3""包3"都写成 "3"；"标包A""包A"写成 "A"。不要输出"第3包""采购包3"这种带前后缀的写法。编号用原文的数字或字母，不要把 A 改成 1，也不要补前导零。
-每个 package 含 package_no, title, package_evidence_text, package_amount。
-package_amount 与 summary_amount 含 raw_text, amount_yuan, scope, confidence。
-summary_amount.scope 固定为 announcement。package_amount.scope 固定为 package。
 多包时不要把公告总金额写进每一个包。无法判断包结构时 package_mode 为 unclear。
 缺失用 null，不要写空字符串。
 正文 tables、body_sections 里的中标或成交记录优先于公告概要。概要总金额为 0、为空，或概要只有评审专家时，不能单独作为 unclear 的理由。

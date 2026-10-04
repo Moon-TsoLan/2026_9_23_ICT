@@ -1,7 +1,7 @@
 # 主路线多步 Agent 设计契约
 
-版本：v0.7  
-日期：2026-09-27  
+版本：v0.8  
+日期：2026-10-04  
 适用范围：任务一主提取流程。本文记录当前主路线的数据契约、状态流转，以及已经落地的调用方式。
 
 ---
@@ -52,7 +52,7 @@
 3. `package_no` 永远是字符串，可为 `"1"`、`"4"`、`"A"`。
 4. 附件只能绑定当前公告，不能按项目编号跨公告补字段。
 5. LLM 输出先进入候选层，不直接写最终业务表。
-6. 候选层只记录来源级溯源：来自 HTML 或来自哪一个附件文件；不记录行级、单元格级证据。
+6. 候选层记录到来源级溯源（HTML 或哪一个附件文件），另加 `evidence`：表序号、整行原文、报价归属。这三样是第 8 步判同一性的输入，事后无法反查，所以在抽取时盖章。仍不记录单元格级坐标。
 7. `null` 表示未知或缺失，禁止用空字符串、`"无"`、`"详见附件"` 冒充空值。
 8. 主路线只处理文本可提取内容；不可提取内容记录失败。
 9. 状态文件是每一步的契约输出，字段名和枚举值不得在实现中随意改名。
@@ -98,7 +98,8 @@ work/runs/<announcement_id>/
 | `project_id` | string | 项目唯一 ID，格式为 `<project_name>|<package_no>`；若项目名包含 `|`，实现时必须先转义 |
 | `file_id` | string | 当前 run 内附件文件唯一 ID，格式为 `a001`、`a002` |
 | `candidate_id` | string | 当前 run 内候选唯一 ID，格式为 `cand_000001` |
-| `source` | object | 候选来源，仅到 HTML 或附件文件级，不落到行或单元格 |
+| `source` | object | 候选来源：`source_type`、`file_id`、`page_no` |
+| `evidence` | object/null | 来源级以下的证据：`table_index`、`row_text`、`quote_supplier`、`bidder_supplier`、`winner_supplier` |
 
 ### 3.2 空值语义
 
@@ -447,6 +448,7 @@ PDF 若在 `work/attachments-md/` 下有同相对路径的 `.md`，索引把该 
 | `project_id` | string | 是 | `<project_name>|<package_no>` |
 | `package_evidence_text` | string | 是 | 原文中证明该包存在的文本 |
 | `package_amount` | object/null | 是 | 包级金额；原文未提供时为 `null` |
+| `amount_alternatives` | array | 是 | 同一个包里看到但没选作 `package_amount` 的其它金额，写法相同。只留痕，不参与判定；实测 49 个包里 22 个的金额出现在多处 |
 
 ### `package_amount` 字段定义
 
@@ -710,7 +712,8 @@ PDF 若在 `work/attachments-md/` 下有同相对路径的 `.md`，索引把该 
 | `entity_type` | `EntityType` | 是 | COB 或 SUB |
 | `project_id` | string/null | 是 | 能确定包时必填；不能确定为 `null` |
 | `package_no` | string/null | 是 | 能确定包时必填 |
-| `source` | object | 是 | 来源级溯源，仅包含 `source_type` 与 `file_id` |
+| `source` | object | 是 | 来源级溯源：`source_type`、`file_id`、`page_no` |
+| `evidence` | object/null | 是 | 表序号、整行原文与报价归属，见 3.1 |
 | `source_priority` | integer | 是 | 来源优先级 |
 | `fields` | object | 是 | 字段观察结果 |
 | `issues` | array | 是 | 候选问题标签 |
@@ -1117,7 +1120,8 @@ total_price
 
 不得把全量附件目录或其它包的页面放进同一次调用。品目抄写规则与第 2B 步相同。
 
-模型没有给出 `package_no` 时，先用本组的包号；本组包号也为空时，文件名里恰好有一个包号则用文件名。附件候选的 `source_type` 当前一律记为 `pdf`，`source_priority` 一律为 90。
+模型没有给出 `package_no` 时，先用本组的包号；本组包号也为空时，文件名里恰好有一个包号则用文件名。附件候选的 `source_type` 按解析途径记（`pdf`、`docx`、`xlsx`），`source_priority` 取 `CLASS_PRIORITY[file_class]`。
+每条候选另带 `evidence`：`table_index` 与 `row_text` 由模型回抄，`bidder_supplier` 由模型按行给出，`quote_supplier` 沿用 4b 的文件级判定，`winner_supplier` 只在输入里为空时才由模型找。
 
 ## 6.2 输出文件
 
@@ -1304,6 +1308,21 @@ total_price
 2. `1(套)` 规范化为 `quantity=1`、`unit="套"`。
 3. 无法拆分时 `quantity=null`，原始值保留在 `raw_value`。
 
+### 文本
+
+只对 COB 的文本字段（`object_name`、`brand`、`product_supplier`、`spec_model`、`category_name`、
+`category_code`、`unit`）做保守归一化，结果写进 `normalized_value`，`raw_value` 原样保留当证据：
+
+1. 全角圆括号转半角，`　` 与不间断空格转普通空格。
+2. 连续空白折叠为一个空格，首尾去空白。
+3. 删掉紧挨汉字的空格；拉丁字母与数字之间的空格是内容，保留。
+4. 大小写一律不动。顿号、逗号、冒号、分号一律不动——它们在标的名称里承载语义。
+5. `supplier_name` 不在范围内：公司全称里的全角括号常是登记名的一部分，而 SUB 的合并键本来就已经
+   做了同样的归一化。
+
+这一层解决的是两份材料写同一个产品、一个「（1 拖 40）」一个「（1拖40）」，被当成字段分歧。它与分组用
+的键是两件事：键只管召回，比归一化值更激进（连拉丁之间的空格也删），因为最终是否同一标的由模型判。
+
 ## 7.3 校验错误标签
 
 | 值 | 含义 |
@@ -1433,27 +1452,32 @@ total_price
 | `unmatched_summary_rows[].reason` | string | 未匹配原因 |
 | `unassigned_candidates[].candidate_id` | string | 无法确定包归属的候选 |
 | `unassigned_candidates[].reason` | string | 无法归属原因 |
-| `list_sources` | object | 包号到清单归属：`html` 为 HTML 明细封闭清单，`attachment` 为附件开放清单 |
-| `alternatives` | object | 每包内有两套以上不同价格组的标的，列出未选中的价格组，供第 8b 步选择 |
+| `list_sources` | object | 包号到清单来源：`html` 每个标的都有 HTML 行、`attachment` 都没有、`mixed` 混合、`none` 没有标的。只是审计标签，不再决定任何取舍 |
+| `alternatives` | object | 每包内有多于一种价格读法的标的，列出全部读法供第 8b 步选择；每项带 `reading_kind`（`single`/`sum`）与 `sources` |
 | `repairs` | array | 第 8、8b 步做过的确定性或模型修复，`action` 见 8b.2 |
 | `checks` | array | 第 8b 步结束时的分级检查结果，见 8b.1 |
+| `merge_decisions` | array | 模型每条 delta 一项：`op`、引用的组与候选、`accepted`、`reject`、模型的 `reason` 与 `confidence`；求和被否决时另记一项 |
+| `amount_audit` | object | 包号到该包金额的审计：采用的值、原文、来源、`suspect`、是否参与对账、以及看到过的全部金额观测 |
 
 ## 8.2 合并顺序
 
+同一性由模型判，算术与来源资格由规则判。完整规范与依据见 `doc/第8步标的合并规范.md`（v5）。
+
 1. `package_no` 为空，或包号不在第 1 步包列表中的候选，记入 `unassigned_candidates`，不参与合并，也不把字段补到同名的其它行上。
-2. `tender_requirement` 候选不进入合并，记入 `unmatched_summary_rows`。
-3. 项目行：名称等于项目名、包含项目名，或被项目名包含且长度不少于项目名 80% 的 COB，在包内还有其它名称时去掉，记入 `unmatched_summary_rows`。项目行带价格、剩下只有一个标的且该标的没有价格时，价格移到这个标的上。
-4. 清单归属：
-   - HTML 成交明细（`source_type=html`、`source_priority>=70`、不是汇总行、名称不是指引）存在，且没有任何行带 `line_fields_point_to_attachment` 或 `points_to_attachment` 行字段时，清单封闭，`list_sources` 记 `html`。附件只能并入同名行，对不上名称的附件行丢弃。
-   - HTML 只有一个名称、没有价格、且行字段指向附件时，清单开放。附件 `bid_quote` 或 `award_detail` 有数量或单价的行替换 HTML 行，`list_sources` 记 `attachment`。
-   - 其余情况沿用汇总行逻辑：HTML 汇总行被附件明细替换，找不到明细的汇总行记入 `unmatched_summary_rows`。
-5. 聚类：按规范化名称分组。封闭清单里只有 HTML 明细行能开新组。数量和单价两边都有值且不同，才分成两行；空值不拆行。
-6. 描述字段（名称、品目、规格等）取权威最高的候选，其余候选只补空字段。权威顺序为：是否 HTML 明细、`source_priority`、字段完整度。品牌以 HTML 为准。
-7. 价格组：`unit_price`、`quantity`、`unit`、`total_price` 四个字段整组取自同一候选，不逐字段拼。取权威最高、且单价 × 数量与总价偏离不超过 5% 的候选；组内空字段只从兼容的候选补。与选中组不一致的候选记 `price_bundle` 冲突，并写入 `alternatives`。
-8. 包金额对账：各行总价之和比包金额高出 8% 以上，或在附件清单下低出 8% 以上时，逐次换用 `alternatives` 里能让偏差严格变小的价格组，直到不能再改进。每次换组记 `price_bundle_by_amount`。HTML 封闭清单低于包金额时不换组。
-9. 单个标的、没有单价和总价、包金额存在时，总价取包金额，记 `total_from_package_amount`。
-10. SUB 业务键为 `supplier_name`，去掉含「成员」的括号（联合体成员说明）后比较。高 `source_priority` 优先，低优先级只补空字段，`is_winner` 任一来源为真即为真。同一供应商有 HTML 来源时，名称用 HTML 的写法。
-11. 冲突字段记录到 `conflicts`。`provenance` 另记 `price_candidate_ids`，即每个标的价格组来自哪个候选。
+2. 包金额按固定优先级取一个：本包 `package_amount` → 单包时的 `summary_amount` → 附件观测（仅在原文写法唯一时填，且该来源不参与对账）。取不到为 `null`。金额永不由行和推导。
+3. 包金额体检：`raw_text` 含百分号，或金额不为正 → 记入 `amount_audit[].suspect`，`package_total_amount` 置 `null`，本包不对账。体检只看金额本身，不与标的清单比较。
+4. 指针行排除：HTML 行自己没有任何数字价格、且带 `line_fields_point_to_attachment` 或某个行字段为 `points_to_attachment`，而本包另有可当标的且写了价格的候选时，该行排除，记 `html_pointer_row`。
+5. 项目全称行排除：名称等于项目名，或包含项目名且余下部分只是括号或标点，**且**公告侧另有非项目名的可当标的的行时排除。价格只由全序最高的那一行转移到唯一无价标的上，记 `项目全称行，价格并入唯一标的`；其余记 `项目全称行不作为标的`。
+6. 基线分组：按规范化名称（去空白、全角括号转半角）完全相同分组，组号按全序排定。这是模型要修改的基线，也是没有模型时的全部结果。
+7. 模型一次调用（`merge-objects-v1`），输出对基线的修改 `deltas`，六种：`merge`、`split`、`sum`、`exclude`、`name_from`、`price_from`。按 `exclude → split → merge → sum → name_from → price_from` 固定顺序应用，逐条校验、逐条否决、逐条留痕。整个调用失败或两次输出都不合法时退回基线，记 `merge_model_fallback`。本包只有一条 HTML 命名候选时不发起调用。模型不能写任何数字，也不能引用没给它的编号。
+8. 来源资格（取代封闭清单）：`tender_requirement` 不供价、不新增标的；报价归属明确且不是中标人的，不供价、不新增标的；两者都仍可补描述字段，名称与既有组相同就并入该组。归属不明时放行，交包金额裁决。整组都被资格挡下时记入 `unmatched_summary_rows`，原因为 `tender_requirement` 或 `non_winner_quote`。
+9. 描述字段（名称、品目、规格、品牌、制造商）按全序取最高者为基，其余只补空字段；两边都有且不等记 `conflicts`。品牌冲突且基是 HTML 明细行时不记冲突。
+10. 价格读法：`unit_price`、`quantity`、`unit`、`total_price` 四个字段整组取自同一候选，不逐字段拼。归一化失败的价格不是价格，不构成读法；只写了数量的行不构成读法，但它的数量仍可用来补空。模型指认 `sum` 且通过资格门（成员都有数量、单位不冲突、单价不冲突）时多一种求和读法，**数字由规则重算**。
+11. 包金额裁决：一个组有 ≥2 种读法时，逐轮换用能让 `|行和 − 包金额|` 严格变小、且改动最小的一种，直到不能再改进。每次记 `price_bundle_by_amount`，带换前换后的偏差。**没有死区**。包金额不可用时不裁决，求和读法也不采纳，记 `sum_unverified_no_package_amount`。
+12. 单个标的、没有单价和总价、包金额可用时，总价取包金额，记 `total_from_package_amount`。
+13. SUB 业务键为 `supplier_name`，去掉含「成员」的括号（联合体成员说明）后比较。高 `source_priority` 优先，低优先级只补空字段，`is_winner` 任一来源为真即为真。同一供应商有 HTML 来源时，名称用 HTML 的写法。
+14. 冲突字段记录到 `conflicts`。`provenance` 记 `cob_candidate_ids`、`price_candidate_ids`（选中读法的编号，求和读法为 `sum:<group_id>`）、`price_source_ids`（求和时写成 `a+b`）、`sub_candidate_ids`。
+15. 全序（所有"选一份来源"的地方共用，保证结果不随输入顺序变）：是否 HTML 明细行 → `source_priority` → 实值字段数 → `file_id` → `page_no` → `table_index` → `candidate_id`。"是否 HTML 明细行"读第 2A 步的 `table_role ∈ {cob_detail, winner}`，不再用 `source_priority >= 70`；拿不到表元信息时按 HTML 行原样接受。
 
 ## 8.3 最终 Project 字段定义
 
@@ -1494,7 +1518,7 @@ total_price
 2. 去重。
 3. 中标供应商自己也是产品供应商时保留。
 
-COB 的 `product_supplier` 只取自拥有清单的来源：HTML 封闭清单只用 HTML 的制造商列，附件里的制造商不补进来；附件开放清单用附件的制造商。
+COB 的 `product_supplier` 按该标的自己的成员全序取：有 HTML 行就用 HTML 的制造商列，HTML 没写才用附件补。原先的「HTML 封闭清单只用 HTML 的制造商列，附件里的制造商不补进来」随封闭清单一起删除——它的参照物已不存在，而按标的排序表达了同一个意思。投标人列被误当制造商的情况在第 2B 步就已经拦下（`product_supplier_from_bidder_column`）。
 
 ---
 
@@ -1508,19 +1532,24 @@ COB 的 `product_supplier` 只取自拥有清单的来源：HTML 封闭清单只
 |---|---|---|
 | `missing_cob` | hard | 包内没有标的 |
 | `missing_winner` | hard | 包内没有 `is_winner=true` 的供应商 |
-| `row_mismatch` | hard | 某行单价 × 数量与总价偏离超过 5% |
-| `amount_overflow` | hard | 各行总价之和高于包金额 8% 以上 |
-| `amount_underflow` | medium | 附件清单下，各行总价之和低于包金额 8% 以上 |
-| `amount_underflow` | soft | HTML 封闭清单下同样情况，只记录 |
+| `amount_overflow` | hard | 各行总价之和高于包金额超过一分钱。缺价行只会让行和更高，所以缺价不豁免 |
+| `missing_line_price` | medium | 有标的既无单价也无总价 |
+| `amount_underflow` | soft | 各行总价之和低于包金额超过一分钱 |
 
 hard 和 medium 检查在修复后仍存在时记 `consistency_check_failed`，运行标为待复核。soft 不影响状态。
+
+容差只剩一分钱（`CENT = 0.01`）：金额是逐字抄来的，推导总价按四位小数取整，低于一分是浮点与取整噪声，不是分歧。三处与旧版的差别都不是调参：
+
+- `row_mismatch` 与行内 5% 容差已删除。自相矛盾的行不再被降级或剔除，两种读法都留在 `alternatives` 里交给包金额与人工。要不要恢复、以什么判据恢复，等实测再定。
+- 包级 8% 容差已删除，`amount_underflow` 一律 soft。t20260202_26139731 包 3 的金标行和是 1579600，包金额 2431310，相差 −35%，而那正是正确答案：公告的标的清单本来就可以不覆盖整包。下溢是信息，不是缺陷。
+- `missing_line_price` 是新增的。旧版写的是 `if amount and totals:`，一行价格都没有时 `totals` 为空、整段跳过，于是 6 个包 / 19 条无价标的静默报 success。
 
 ## 8b.2 修复顺序
 
 只修 hard 和 medium 检查所在的包，不重新抽取。
 
 1. `missing_winner`：从正文中「中标」「成交」章节（不含「未中标」「未成交」）的供应商锚点取该包中标人名单。单包公告里没有包号的锚点归到这个包。名单里的供应商在包内时标为中标，记 `winner_from_award_text`。标完仍没有中标人时，把名单里包内没有的供应商作为中标人新增（`score` 为空），记 `winner_added_from_award_text`。最后重算 `cooperative_product_suppliers`。
-2. 价格类检查且该包有 `alternatives` 时，调用模型一次，提示词 `repair-package-v1`。输入是包金额、各行当前价格组、每行可换的价格组和违规项；输出 `{"choices": [{"cluster_id": 0, "candidate_id": "cand_x"}]}`。模型只能从给出的选项中选整组，不能自己写数字；不确定时输出空列表，记 `model_no_choice`。
+2. `amount_overflow` 且该包有 `alternatives` 时，调用模型一次，提示词 `repair-package-v1`。输入是包金额、各行当前读法、每行可换的读法和违规项；输出 `{"choices": [{"cluster_id": 0, "candidate_id": "cand_x"}]}`。模型只能从给出的选项中选整组，不能自己写数字；不确定时输出空列表，记 `model_no_choice`。选项的 `candidate_id` 可能是求和读法的编号 `sum:<group_id>`，照抄即可。下溢与缺价都不进修复：下溢不是缺陷，缺价没有别的读法可选。
 3. 选项 ID 不在给定范围内的选择丢弃。套用选择后按（hard 检查数，行总价和与包金额的偏差）比较，严格变好才接受，记 `price_bundle_by_model`；否则回退，记 `model_choice_rejected`。
 4. 最后重跑 8b.1 检查。
 

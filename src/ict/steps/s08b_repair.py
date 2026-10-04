@@ -11,13 +11,13 @@ from collections import Counter
 
 from ict.llm import LLMClient, LLMError, complete_json
 from ict.schemas import Failure, MergedProjects, Project, Sub
-from ict.steps.s08_merge import _norm_name, consistency_checks, package_checks
+from ict.steps.s08_merge import _norm_name, amount_checked, consistency_checks, package_checks
 
 PRICE_KEYS = ("unit_price", "quantity", "unit", "total_price")
 
 
-def _score(project: Project, list_source: str | None) -> tuple[int, float]:
-    checks = package_checks(project, list_source)
+def _score(project: Project, amount_ok: bool = True) -> tuple[int, float]:
+    checks = package_checks(project, amount_checked=amount_ok)
     hard = sum(1 for item in checks if item["level"] in {"hard", "medium"})
     totals = [cob.total_price for cob in project.cobs if isinstance(cob.total_price, (int, float))]
     amount = project.package_total_amount
@@ -113,13 +113,17 @@ def repair_packages(
 ) -> list[Failure]:
     failures: list[Failure] = []
     for position, project in enumerate(merged.projects):
-        source = merged.list_sources.get(project.package_no)
-        checks = [item for item in package_checks(project, source) if item["level"] in {"hard", "medium"}]
+        amount_ok = amount_checked(merged, project)
+        checks = [item for item in package_checks(project, amount_checked=amount_ok)
+                  if item["level"] in {"hard", "medium"}]
         if not checks:
             continue
         if any(item["check"] == "missing_winner" for item in checks):
             _mark_winners(project, winner_hints.get(project.package_no, []), merged.repairs)
-        price_checks = [item for item in checks if item["check"] in {"amount_overflow", "amount_underflow", "row_mismatch"}]
+        # Only an overflow can be repaired by picking another reading. A shortfall is not a defect
+        # (the object list may simply be partial) and a row with no price has no reading to pick,
+        # so both go to review instead of to the model.
+        price_checks = [item for item in checks if item["check"] == "amount_overflow"]
         alternatives = merged.alternatives.get(project.project_id) or []
         if not price_checks or not alternatives or llm is None:
             continue
@@ -133,7 +137,7 @@ def repair_packages(
             merged.repairs.append({"package_no": project.package_no, "action": "model_no_choice"})
             continue
         trial = _apply(project, alternatives, choices)
-        if _score(trial, source) < _score(project, source):
+        if _score(trial, amount_ok) < _score(project, amount_ok):
             merged.projects[position] = trial
             merged.repairs.append({"package_no": project.package_no, "action": "price_bundle_by_model", "choices": choices})
         else:

@@ -2,11 +2,33 @@
 
 from __future__ import annotations
 
+import re
+
 from ict.catalog import Catalog
 from ict.money import parse_price_cell, parse_quantity
 from ict.schemas import Candidate, CandidateFile, Failure
 
 PRICE_FIELDS = ("unit_price", "total_price")
+# Half-width applies to the round brackets and the ideographic space only. The enumeration comma,
+# the colon and the semicolon are left alone on purpose: names such as 「触控一体机6台、教师办公
+# 电脑14台」 carry meaning in that punctuation, and a tenth of the corpus's spec_model values are
+# multi-word model numbers where a space between latin tokens is content (`BeneVision TMS30A`).
+WIDTH_MAP = {"（": "(", "）": ")", "　": " ", "\u00a0": " "}
+_CJK = "㐀-䶿一-鿿豈-﫿"
+
+
+def norm_text(value) -> str:
+    """The conservative text cleaning step 7 owed its fields: typesetting noise, nothing else.
+
+    Case stays as written, a space between two latin or digit tokens stays, and the enumeration
+    punctuation stays. What goes is full-width brackets and the padding around CJK - which is what
+    made one document's 「（1 拖 40）」 and another's 「（1拖40）」 read as a disagreement about
+    the same object, and pushed a package that matches gold into review.
+    """
+    text = re.sub(r"\s+", " ", str(value).translate(str.maketrans(WIDTH_MAP))).strip()
+    text = re.sub("(?<=[" + _CJK + "]) +", "", text)
+    text = re.sub(" +(?=[" + _CJK + "])", "", text)
+    return text.strip()
 
 
 def _number(value) -> float | None:
@@ -44,11 +66,12 @@ def normalize_candidates(run_id: str, candidates: list[Candidate], catalog: Cata
 
 def _normalize_cob(candidate: Candidate, catalog: Catalog, errors: list[str], warnings: list[str]) -> None:
     fields = candidate.fields
+    units = (candidate.evidence.column_units if candidate.evidence is not None else None) or {}
     for key in PRICE_FIELDS:
         obs = fields[key]
         if obs.status != "present":
             continue
-        parsed = parse_price_cell(obs.raw_value)
+        parsed = parse_price_cell(obs.raw_value, units.get(key))
         obs.normalization = {
             "currency": "CNY",
             "unit": "yuan",
@@ -77,7 +100,7 @@ def _normalize_cob(candidate: Candidate, catalog: Catalog, errors: list[str], wa
                 unit.normalized_value = parsed_unit
                 unit.status = "present"
     if unit.status == "present" and unit.normalized_value is None:
-        unit.normalized_value = str(unit.raw_value).strip()
+        unit.normalized_value = norm_text(unit.raw_value)
     price = _number(fields["unit_price"].normalized_value)
     quantity = _number(fields["quantity"].normalized_value)
     total = fields["total_price"]
@@ -94,11 +117,11 @@ def _normalize_cob(candidate: Candidate, catalog: Catalog, errors: list[str], wa
     if name.status != "present":
         errors.append("missing_object_name")
     else:
-        name.normalized_value = str(name.raw_value).strip()
+        name.normalized_value = norm_text(name.raw_value)
     for key in ("brand", "product_supplier", "spec_model", "category_name", "category_code"):
         obs = fields[key]
         if obs.status == "present" and isinstance(obs.raw_value, str):
-            obs.normalized_value = obs.raw_value.strip() or None
+            obs.normalized_value = norm_text(obs.raw_value) or None
     code = fields["category_code"].normalized_value or fields["category_code"].raw_value
     cname = fields["category_name"].normalized_value or fields["category_name"].raw_value
     hit = catalog.match(None if code is None else str(code), None if cname is None else str(cname))

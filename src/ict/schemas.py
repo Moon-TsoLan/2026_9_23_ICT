@@ -91,6 +91,10 @@ class PackageUnderstanding(Model):
     project_id: str
     package_evidence_text: str
     package_amount: Amount | None = None
+    # Every other amount the model saw for this package but did not pick. Audit only: step 8
+    # still receives exactly one package_amount. 22 of 49 packages in the corpus mention the
+    # amount in more than one place, and the choice used to be invisible.
+    amount_alternatives: list[Amount] = Field(default_factory=list)
 
 
 class AnnouncementUnderstanding(Model):
@@ -133,6 +137,26 @@ class Source(Model):
     page_no: int | None = None
 
 
+class CandidateEvidence(Model):
+    """Provenance below file level. Step 8 cannot recover any of it later.
+
+    The design contract used to stop provenance at the file. Identity resolution between two
+    rows needs to know which table and which line each value came from, and who owns a quote,
+    so these are stamped at extraction time. They are evidence for the merge model and for
+    audit; no rule branches on their wording.
+    """
+
+    table_index: int | None = None
+    row_text: str | None = None
+    # field -> the header text of the column it came from, e.g. {"unit_price": "单价(万元)"}.
+    # Amounts are per-cell but the 万元/元 unit is often only written in the column header, and
+    # step 7 needs that header to decide whether to multiply. Copied, never interpreted here.
+    column_units: dict[str, str] = Field(default_factory=dict)
+    quote_supplier: str | None = None     # file level: whose document this is
+    bidder_supplier: str | None = None    # row level: which bidder this line belongs to
+    winner_supplier: str | None = None    # the award supplier named in this material
+
+
 class FieldObservation(Model):
     raw_value: Any = None
     normalized_value: Any = None
@@ -153,6 +177,20 @@ class Candidate(Model):
     validation_errors: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     source_class: str | None = None
+    evidence: CandidateEvidence | None = None
+
+
+class PackageAmountObservation(Model):
+    """A package-level award amount copied verbatim from an attachment page."""
+
+    package_no: str
+    raw_text: str
+    amount_yuan: float | None = None
+    source_type: str = "pdf"
+    file_id: str | None = None
+    file_name: str | None = None
+    page_no: int | None = None
+    file_class: str | None = None
 
 
 class CandidateFile(Model):
@@ -161,6 +199,7 @@ class CandidateFile(Model):
     candidates: list[Candidate] = Field(default_factory=list)
     failures: list[Failure] = Field(default_factory=list)
     page_quality: list[dict[str, Any]] | None = None
+    package_amounts: list[PackageAmountObservation] = Field(default_factory=list)
 
 
 class FieldStat(Model):
@@ -176,8 +215,9 @@ class ProjectPlan(Model):
     package_no: str
     cob_candidate_ids: list[str] = Field(default_factory=list)
     sub_candidate_ids: list[str] = Field(default_factory=list)
-    field_stats: dict[str, FieldStat] = Field(default_factory=dict)
+    field_stats: dict[str, FieldStat] = Field(default_factory=list if False else dict)
     missing_fields: list[str] = Field(default_factory=list)
+    needs: list[dict[str, str]] = Field(default_factory=list)
     suspects: list[str] = Field(default_factory=list)
     has_attachment: bool
     needs_attachment: bool
@@ -224,6 +264,10 @@ class FileDecision(Model):
     reason: str
     failure_code: FailureCode | None = None
     failure_message: str | None = None
+    # Whose document the screen gate says this is, and whether the document itself is an award
+    # notice. Step 6 only looks for a winner supplier when this left it empty.
+    quote_supplier: str | None = None
+    is_award_notice: bool | None = None
 
 
 class FileDecisions(Model):
@@ -293,10 +337,39 @@ class MergedProjects(Model):
     unmatched_summary_rows: list[dict[str, str]] = Field(default_factory=list)
     unassigned_candidates: list[dict[str, str]] = Field(default_factory=list)
     list_sources: dict[str, str] = Field(default_factory=dict)
+    amount_origins: dict[str, str] = Field(default_factory=dict)
     alternatives: dict[str, list[dict[str, Any]]] = Field(default_factory=dict)
     repairs: list[dict[str, Any]] = Field(default_factory=list)
     checks: list[dict[str, Any]] = Field(default_factory=list)
     failures: list[Failure] = Field(default_factory=list)
+    # Step 8 audit trail: one entry per model delta, accepted or rejected, plus the arithmetic
+    # the rules recomputed. Empty when the merge ran on the deterministic baseline.
+    merge_decisions: list[dict[str, Any]] = Field(default_factory=list)
+    amount_audit: dict[str, dict[str, Any]] = Field(default_factory=dict)
+
+
+class MergeEvidence(Model):
+    """Read-only context assembled in the pipeline for step 8.
+
+    Everything here already exists inside `run_announcement`'s scope; step 8 simply could not
+    see it. Keys are strings so the structure survives a round trip through JSON.
+    """
+
+    file_names: dict[str, str] = Field(default_factory=dict)
+    file_classes: dict[str, str] = Field(default_factory=dict)
+    file_quote_suppliers: dict[str, str] = Field(default_factory=dict)
+    # file_id -> whether the screen gate read the document itself as an award notice. The supplier
+    # such a document names is a winner by definition, which is how a quote file earns the right to
+    # supply prices when the HTML never marked anyone as the winner.
+    file_award_notices: dict[str, bool] = Field(default_factory=dict)
+    # str(table_index) -> {table_role, package_scope, section, headers}
+    html_tables: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    # "file_id:page_no" -> {file_name, text_head, table_headers}
+    attachment_pages: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    # package_no -> supplier names the award text names as winners
+    winner_hints: dict[str, list[str]] = Field(default_factory=dict)
+    # package_no -> every package-level amount observed, from any source
+    amount_observations: dict[str, list[dict[str, Any]]] = Field(default_factory=dict)
 
 
 class RunStep(Model):

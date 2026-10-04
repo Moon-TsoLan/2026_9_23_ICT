@@ -73,6 +73,37 @@ PGDATABASE=ict_prod
 
 **`ict_demo` 不要删**——演示视频、离线演示都还要用。
 
+## 4b. 实测批次库（不覆盖演示库）
+
+主路线每跑完一批，结果落在 `work/runs/<announcement_id>/`。想在前端里检索这一批的真实产出，就另建一个
+同结构库并用 `db/load_runs.py` 导入，**演示库 `ict_demo` 保持原样**：
+
+```bash
+docker exec ict-pg psql -U ict -d postgres -c "CREATE DATABASE ict_batch20261004 OWNER ict   ENCODING 'UTF8' TEMPLATE template0 LC_COLLATE 'C' LC_CTYPE 'C'"
+Get-Content db\001_schema.sql -Raw | docker exec -i ict-pg psql -U ict -d ict_batch20261004 -v ON_ERROR_STOP=1 -q
+python db/load_runs.py --db ict_batch20261004 --runs work/runs --reset
+```
+
+只改进程环境变量就能让后端指向批次库，不必动 `.env`：
+
+```powershell
+$env:DATABASE_URL = "postgresql://ict:ict_dev_pw@localhost:5432/ict_batch20261004"
+D:\python\python.exe -m uvicorn server.app:app --port 8000
+```
+
+前端 `npm run dev` 起来后开 `http://localhost:5173/`（vite 绑的是 `localhost`，用 `127.0.0.1` 会连不上）。
+
+导入脚本取的是 `09_merged_projects.json`（含 `provenance`）而不是对外的 `projects.json`，
+这样才能把每条标的回溯到 `08_normalized_candidates.json` 里的那条候选，填上 `source_type` 与
+`source_file_id`。`announcement.raw_json` 里带了运行报告和第 8 步的审计
+（`merge_decisions` / `amount_audit` / `unmatched_summary_rows` / `conflicts` / `checks`），
+前端不用改表就能取到。
+
+**已知缺口**：`cob` 表只有 `source_type`（html/pdf/docx/…）和 `source_file_id`，没有"文件类"
+（`award_detail` / `bid_quote` / `qualification` / `unknown`）这一列。所以 UI 里筛不出"来自资格证明
+材料的标的"这类行，只能靠 `source_type='pdf'` 粗筛或直接查 `raw_json`。要按类筛就得给 `cob` 加列，
+那是改表结构，等定夺。
+
 ## 5. 文件说明
 
 | 文件 | 内容 |
@@ -80,6 +111,7 @@ PGDATABASE=ict_prod
 | `docker-compose.yml` | Postgres 16 容器定义（编码/排序规则锁定，跨环境一致） |
 | `db/001_schema.sql` | 建表 + 索引 + 视图 + 归一化函数（DDL，不含数据） |
 | `db/queries.sql` | 只读查询集（检索 + S1–S5 + 星图 + 统计） |
+| `db/load_runs.py` | 把 `work/runs/` 的批次结果导入一个同结构库（只读源、幂等 `--reset`） |
 
 ## 6. 注意
 

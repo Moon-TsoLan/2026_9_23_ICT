@@ -20,6 +20,9 @@ STEP_FILES = {
     "locate_pages": "06_page_decisions.json",
     "extract_attachment_candidates": "07_attachment_extraction.json",
     "normalize_candidates": "08_normalized_candidates.json",
+    # Written next to the normalized candidates but not a registered step: it is the read-only
+    # context step 8 was given, kept so a merge decision can be replayed by hand.
+    "merge_evidence": "08b_merge_evidence.json",
     "merge_candidates": "09_merged_projects.json",
     "repair_packages": "09_merged_projects.json",
     "persist_and_report": "10_run_report.json",

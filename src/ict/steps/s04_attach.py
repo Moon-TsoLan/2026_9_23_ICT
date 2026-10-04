@@ -19,22 +19,25 @@ from ict.candidates import seal_candidate
 from ict.config import (
     ATTACHMENTS_ROOT,
     CLASS_PRIORITY,
+    DEFAULT_FILE_CLASS,
+    DEFAULT_SOURCE_PRIORITY,
     FILE_CLASSES,
     MAX_PAGES_PER_ANNOUNCEMENT,
     MAX_PAGES_PER_FILE,
-    MAX_SELECTED_FILES_PER_ANNOUNCEMENT,
+    PAGE_CONTEXT_CHARS,
+    PAGE_CONTEXT_TABLES,
+    PAGE_LOCATE_LIMIT,
     PAGE_TEXT_HEAD,
     PARSE_MAX_PAGES_PER_FILE,
     PARSE_PAGE_PAD,
     PARSE_RUN_PAGES,
-    SCREEN_EXPECTED,
     parse_settings,
 )
 from ict.documents import read_native
 from ict.ids import make_project_id
 from ict.llm import LLMClient, LLMError, complete_json
 from ict.parse.client import ParseClient, ParseError, as_pages, contiguous_runs
-from ict.parse.peek import peek_entry
+from ict.parse.peek import page_profiles, peek_entry
 from ict.parse.screen import ScreenDecision, gate_file, name_rule
 from ict.schemas import (
     AttachmentIndex,
@@ -127,6 +130,8 @@ def triage_files(run_id: str, plans: ProjectPlans, index: AttachmentIndex | None
     if not any(project.needs_attachment for project in plans.projects):
         return FileDecisions(run_id=run_id, status="skipped", failures=failures)
 
+    needs = [entry for project in plans.projects for entry in (project.needs or [])]
+    package_set = {project.package_no for project in plans.projects}
     decisions: list[FileDecision] = []
     for item in index.files:
         entry = _entry(index, item)
@@ -138,33 +143,70 @@ def triage_files(run_id: str, plans: ProjectPlans, index: AttachmentIndex | None
                                     location=item.file_id))
             continue
         peek = peek_entry(entry)
-        decision: ScreenDecision = gate_file(entry, peek, llm, counter=counter)
+        decision: ScreenDecision = gate_file(entry, peek, llm, counter=counter, needs=needs)
         file_class = KIND_TO_CLASS.get(decision.kind, "unknown")
         if file_class not in FILE_CLASSES:
             file_class = "unknown"
         keep = decision.decision == "parse"
+        # Two facts, neither one a judgement of its own. expected_fields is exactly what the model
+        # said it saw in this file. The package hint is the single number the filename names, kept
+        # only when the announcement really has that package. Both feed inputs that already exist
+        # downstream; no new branch decides anything.
+        hint = _package_from_filename(entry.name)
+        possible = [hint] if hint and hint in package_set else []
         decisions.append(
             FileDecision(
                 file_id=item.file_id,
                 file_class=file_class,
-                expected_fields=SCREEN_EXPECTED.get(file_class, []),
-                possible_packages=[],
+                expected_fields=list(decision.found_fields),
+                possible_packages=possible,
                 priority=float(CLASS_PRIORITY.get(file_class, 30)) * max(decision.confidence, 0.3),
                 read_strategy="target_pages" if keep else "skip",
                 reason="%s:%s:%s" % (decision.method, decision.reason or decision.kind, "%.2f" % decision.confidence),
                 screen=decision.short() | {"name_rule": decision.name_rule, "format": entry.fmt,
                                            "pages": entry.pages, "view_chars": peek.full_chars},
+                quote_supplier=decision.quote_supplier or None,
+                is_award_notice=decision.is_award_notice,
             )
         )
-    selected = [item for item in decisions if item.read_strategy == "target_pages"]
-    selected.sort(key=lambda item: item.priority, reverse=True)
-    keep_ids = {item.file_id for item in selected[:MAX_SELECTED_FILES_PER_ANNOUNCEMENT]}
-    for item in decisions:
-        if item.read_strategy == "target_pages" and item.file_id not in keep_ids:
-            item.read_strategy = "skip"
-            item.reason = "over_file_cap:" + item.reason
+    # No file-count cap (user instruction 2026-10-03): everything the gate keeps is parsed.
+    # Cost is bounded per page instead, in parse_pages and in the step 5 limits.
+    decisions.sort(key=lambda item: (item.read_strategy != "target_pages", -item.priority))
     status = "partial" if failures else "success"
     return FileDecisions(run_id=run_id, status=status, file_decisions=decisions, failures=failures)
+
+
+def _budget_pages(entry, cap: int, failures: list[Failure]) -> tuple[list[int] | None, list[dict]]:
+    """Which pages to parse when the file is longer than the budget.
+
+    Returns (pages, profiles); pages is None to mean "the front of the file, as before" - which is
+    what happens for short files, for non-PDF containers with no native text, for a profile that
+    could not be read, and whenever the ranking lands on the same front pages anyway. Nothing here
+    judges content value: it ranks two structural counts and keeps page order as the tie-break.
+    """
+    if entry.fmt != "pdf" or not (entry.pages or 0) > cap:
+        return None, []
+    try:
+        profiles = page_profiles(entry.path)
+    except Exception as exc:  # noqa: BLE001 - a bad profile must not cost the file its parse
+        failures.append(Failure(failure_code="document_parse_failed",
+                                failure_message="page_profile:" + type(exc).__name__,
+                                location=entry.file_id))
+        return None, []
+    if not profiles:
+        return None, []
+    chosen = rank_budget(profiles, cap)
+    if chosen == list(range(1, cap + 1)):
+        return None, profiles
+    return chosen, profiles
+
+
+def rank_budget(profiles: list[dict], cap: int) -> list[int]:
+    """The pure half of `_budget_pages`: order pages by two structural counts, keep page order as
+    the tie-break, take the budget. Sorted ascending on the way out so the request is stable."""
+    ranked = sorted(profiles, key=lambda item: (-(1 if item["tables"] else 0),
+                                                 -item["price_hits"], item["page_no"]))
+    return sorted(item["page_no"] for item in ranked[:cap])
 
 
 def parse_pages(run_id: str, files: FileDecisions, index: AttachmentIndex, failures: list[Failure]):
@@ -180,12 +222,14 @@ def parse_pages(run_id: str, files: FileDecisions, index: AttachmentIndex, failu
         if item is None:
             continue
         entry = _entry(index, item)
+        profiles: list[dict] = []
         try:
             if entry.fmt in {"docx", "xlsx", "xlsm"} and not entry.needs_normalisation:
                 pages = read_native(entry.path)
             else:
                 cap = min(entry.pages or PARSE_MAX_PAGES_PER_FILE, PARSE_MAX_PAGES_PER_FILE)
-                response = client.parse(entry.path, max_pages=cap)
+                wanted, profiles = _budget_pages(entry, cap, failures)
+                response = client.parse(entry.path, pages=wanted, max_pages=cap)
                 pages = as_pages(response)
                 decision.parse_meta = (response.get("meta") or {})
         except ParseError as exc:
@@ -201,11 +245,22 @@ def parse_pages(run_id: str, files: FileDecisions, index: AttachmentIndex, failu
             decision.reason = "parse_failed:" + type(exc).__name__
             continue
         parsed[decision.file_id] = pages
-        summary.append({"file_id": decision.file_id, "name": entry.name, "pages": len(pages),
-                        "chars": sum(page["chars"] for page in pages),
-                        "tables": sum(len(page["tables"]) for page in pages),
-                        "table_headers": {page["page_no"]: [table["headers"] for table in page["tables"]][:1]
-                                          for page in pages if page["tables"]}})
+        record = {"file_id": decision.file_id, "name": entry.name, "pages": len(pages),
+                  "chars": sum(page["chars"] for page in pages),
+                  "tables": sum(len(page["tables"]) for page in pages),
+                  "table_headers": {page["page_no"]: [table["headers"] for table in page["tables"]][:1]
+                                    for page in pages if page["tables"]}}
+        if profiles:
+            # The truncation used to be silent: a 752-page bundle was cut at 40 and nobody recorded
+            # that pages 41 onwards held the actual detail table.
+            reached = {page["page_no"] for page in pages}
+            record["pages_total"] = entry.pages
+            record["budget"] = cap
+            record["table_pages_missed"] = sum(1 for item in profiles
+                                                if item["tables"] and item["page_no"] not in reached)
+            record["price_pages_missed"] = sum(1 for item in profiles
+                                               if item["price_hits"] and item["page_no"] not in reached)
+        summary.append(record)
     return parsed, summary
 
 
@@ -244,13 +299,13 @@ def locate_pages(run_id: str, plans: ProjectPlans, files: FileDecisions, parsed:
                          "tables": len(page["tables"]), "chars": page["chars"]})
         page_inputs.append({"file_id": decision.file_id, "display_name": display_names.get(decision.file_id, decision.file_id),
                             "file_class": decision.file_class, "possible_packages": decision.possible_packages,
-                            "pages": slim[:80]})
-    queries = [query for project in plans.projects for query in project.search_queries]
+                            "found_fields": decision.expected_fields, "pages": slim[:PAGE_LOCATE_LIMIT]})
     try:
         produced = complete_json(
             llm, step="locate_pages", prompt_version="locate-pages-v1",
-            user=json.dumps({"known_packages": known_packages, "search_queries": queries, "files": page_inputs},
-                            ensure_ascii=False),
+            user=json.dumps({"known_packages": known_packages,
+                             "needs": [entry for project in plans.projects for entry in (project.needs or [])],
+                             "files": page_inputs}, ensure_ascii=False),
             validate=_validate_pages, counter=counter)
     except (LLMError, ValueError) as exc:
         code = "llm_call_failed" if isinstance(exc, LLMError) else "llm_schema_invalid"
@@ -293,6 +348,12 @@ def locate_pages(run_id: str, plans: ProjectPlans, files: FileDecisions, parsed:
 def _validate_candidates(parsed: dict) -> str:
     if not isinstance(parsed.get("candidates"), list):
         return "需要 candidates 数组"
+    amounts = parsed.get("package_amounts")
+    if amounts is not None and not isinstance(amounts, list):
+        return "package_amounts 必须是数组"
+    for item in amounts or []:
+        if not isinstance(item, dict) or not str(item.get("package_no") or "") or not str(item.get("raw_text") or ""):
+            return "package_amounts 每项需要 package_no 与 raw_text"
     return ""
 
 
@@ -304,7 +365,12 @@ def extract_attachment_candidates(run_id: str, project_name: str, plans: Project
                                  parsed: dict[str, list[dict]], llm: LLMClient | None, seq_start: int,
                                  counter=None, file_classes: dict[str, str] | None = None,
                                  failures: list[Failure] | None = None,
-                                 file_names: dict[str, str] | None = None):
+                                 file_names: dict[str, str] | None = None,
+                                file_found_fields: dict[str, list[str]] | None = None,
+                                package_amounts: list | None = None,
+                                file_quote_suppliers: dict[str, str] | None = None,
+                                winner_suppliers: dict[str, list[str]] | None = None,
+                                file_award_notices: dict[str, bool] | None = None):
     """Step 6. Extract from parsed pages, one call per package scope, chunked not truncated."""
     failures = failures if failures is not None else []
     candidates: list[Candidate] = []
@@ -333,9 +399,11 @@ def extract_attachment_candidates(run_id: str, project_name: str, plans: Project
             "file_id": decision.file_id,
             "file_name": (file_names or {}).get(decision.file_id, decision.file_id),
             "page_no": page["page_no"],
-            "text": page["text"][:6000],
-            "tables": page["tables"][:6],
+            "text": page["text"][:PAGE_CONTEXT_CHARS],
+            "tables": page["tables"][:PAGE_CONTEXT_TABLES],
+            "found_fields": (file_found_fields or {}).get(decision.file_id, []),
             "source_type": {"vl": "pdf", "docx": "docx", "xlsx": "xlsx", "pdf": "pdf"}.get(page.get("source"), "pdf"),
+            "quote_supplier": (file_quote_suppliers or {}).get(decision.file_id),
         })
 
     plans_by_no = {project.package_no: project for project in plans.projects}
@@ -350,7 +418,12 @@ def extract_attachment_candidates(run_id: str, project_name: str, plans: Project
             payload = {"current_package": {
                 "project_id": None if plan is None else plan.project_id,
                 "package_no": None if package_no in {"unknown", "announcement"} else package_no,
-                "missing_fields": [] if plan is None else plan.missing_fields},
+                "missing_fields": [] if plan is None else plan.missing_fields,
+                "needs": [] if plan is None else (plan.needs or []),
+                # Already established upstream, so step 6 copies it instead of re-deriving it.
+                # Empty means nobody knows yet and the page is the only place left to look.
+                "winner_supplier": _known_winner(package_no, chunk, winner_suppliers,
+                                                 file_quote_suppliers, file_award_notices)},
                 "page_contexts": chunk}
             try:
                 produced = complete_json(
@@ -366,7 +439,7 @@ def extract_attachment_candidates(run_id: str, project_name: str, plans: Project
                     continue
                 file_id = entry.get("file_id") or (chunk[0]["file_id"] if chunk else None)
                 context = next((item for item in chunk if item["file_id"] == file_id), chunk[0] if chunk else {})
-                file_class = (file_classes or {}).get(file_id or "", "bid_quote")
+                file_class = (file_classes or {}).get(file_id or "", DEFAULT_FILE_CLASS)
                 item_package = entry.get("package_no") or payload["current_package"]["package_no"] or \
                     _package_from_filename(context.get("file_name", ""))
                 project_id = make_project_id(project_name, str(item_package)) if item_package and project_name else None
@@ -374,8 +447,91 @@ def extract_attachment_candidates(run_id: str, project_name: str, plans: Project
                     candidate_id="cand_%06d" % seq, entity_type=entity, project_id=project_id,
                     package_no=None if item_package is None else str(item_package),
                     source_type=context.get("source_type", "pdf"), file_id=file_id,
-                    source_priority=int(CLASS_PRIORITY.get(file_class, 90)),
+                    source_priority=int(CLASS_PRIORITY.get(file_class, DEFAULT_SOURCE_PRIORITY)),
                     raw_fields=entry.get("fields") or {}, issues=entry.get("issues") or [],
-                    source_class=file_class, page_no=context.get("page_no")))
+                    source_class=file_class, page_no=context.get("page_no"),
+                    table_index=_int_or_none(entry.get("table_index")),
+                    row_text=_row_text_of(entry),
+                    quote_supplier=entry.get("quote_supplier") or context.get("quote_supplier"),
+                    bidder_supplier=entry.get("bidder_supplier"),
+                    winner_supplier=entry.get("winner_supplier")
+                    or payload["current_package"]["winner_supplier"]))
                 seq += 1
+            if package_amounts is not None:
+                package_amounts.extend(_package_amount_records(
+                    produced.get("package_amounts"), chunk, package_no, file_classes, file_names))
     return candidates, failures, quality, seq
+
+
+def _known_winner(package_no: str, chunk: list[dict], winner_suppliers: dict[str, list[str]] | None,
+                  file_quote_suppliers: dict[str, str] | None,
+                  file_award_notices: dict[str, bool] | None) -> str | None:
+    """The winner step 6 should copy rather than look for.
+
+    Two upstream sources, in order: the award text of the announcement, then a document the screen
+    gate read as an award notice - such a document names the winner by definition, so its supplier
+    is already known and re-deriving it from the page would only risk a different spelling.
+    """
+    known = (winner_suppliers or {}).get(package_no) or []
+    if known:
+        return known[0]
+    for context in chunk:
+        file_id = context.get("file_id")
+        if (file_award_notices or {}).get(file_id):
+            owner = (file_quote_suppliers or {}).get(file_id)
+            if owner:
+                return owner
+    return None
+
+
+def _int_or_none(value) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _row_text_of(entry: dict) -> str | None:
+    """The line a candidate came from. The model echoes it; a list is joined, a string is kept."""
+    row = entry.get("row_text")
+    if isinstance(row, (list, tuple)):
+        row = " | ".join(str(cell) for cell in row if str(cell).strip())
+    return None if row in (None, "") else str(row)
+
+
+def _package_amount_records(items, chunk: list[dict], group_package: str,
+                            file_classes: dict[str, str] | None, file_names: dict[str, str] | None) -> list:
+    """Keep only what the page wrote in black and white: a package number and an amount string.
+
+    An entry without a package number or without text is dropped. Everything else is kept as the
+    page wrote it - a package number the announcement does not have stays in the output for audit,
+    and step 8 simply never looks it up. An amount string that will not parse stays with
+    amount_yuan=None; nothing here guesses a number the page did not print.
+    """
+    from ict.money import parse_amount
+    from ict.schemas import PackageAmountObservation
+
+    out: list = []
+    seen: set[tuple] = set()
+    for item in items or []:
+        if not isinstance(item, dict):
+            continue
+        package_no = str(item.get("package_no") or group_package or "").strip()
+        raw_text = str(item.get("raw_text") or "").strip()
+        if not package_no or not raw_text:
+            continue
+        context = next((entry for entry in chunk if entry["file_id"] == item.get("file_id")),
+                       chunk[0] if chunk else {})
+        value, _ = parse_amount(raw_text)
+        key = (package_no, raw_text, context.get("file_id"), context.get("page_no"))
+        if key in seen:
+            continue
+        seen.add(key)
+        file_id = context.get("file_id")
+        out.append(PackageAmountObservation(
+            package_no=package_no, raw_text=raw_text, amount_yuan=value,
+            source_type=context.get("source_type", "pdf"), file_id=file_id,
+            file_name=(file_names or {}).get(file_id or "", ""),
+            page_no=context.get("page_no"),
+            file_class=(file_classes or {}).get(file_id or "", DEFAULT_FILE_CLASS)))
+    return out

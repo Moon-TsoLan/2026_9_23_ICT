@@ -58,12 +58,18 @@ FILE_CLASS_PRIORITY = ("award_detail", "bid_quote")
 
 
 SCREEN_TEXT_CHARS = 3000
-SCREEN_CONF_MIN = 0.6
 SCREEN_THUMB_DPI = 130
 SCREEN_THUMB_PAGES = 2
 PARSE_PAGE_PAD = 1
 PARSE_MAX_PAGES_PER_RUN = 8
 PARSE_MAX_PAGES_PER_FILE = 40
+
+# Step 5 and 6 knobs, named so tuning never means editing a call site.
+PAGE_CONTEXT_CHARS = 6000          # 第 6 步每页送进模型的正文上限
+PAGE_CONTEXT_TABLES = 6            # 第 6 步每页送进模型的表格张数上限
+PAGE_LOCATE_LIMIT = 80             # 第 5 步每个文件送进模型的页数上限
+DEFAULT_FILE_CLASS = "bid_quote"   # 4b 没能给出文件类型时的兜底类
+DEFAULT_SOURCE_PRIORITY = 90       # 兜底类对应的来源优先级
 
 
 def load_local_env() -> None:
@@ -106,16 +112,9 @@ CLASS_PRIORITY = {
     "award_detail": 100, "bid_quote": 90, "winner_detail": 80, "evaluation": 70,
     "tender_requirement": 40, "qualification": 30, "contract": 30, "unrelated": 30, "unknown": 30,
 }
-MAX_SELECTED_FILES_PER_ANNOUNCEMENT = 6
 PARSE_RUN_PAGES = 12
-SCREEN_EXPECTED = {
-    "award_detail": ["object_name", "unit_price", "quantity", "total_price", "brand", "spec_model"],
-    "bid_quote": ["object_name", "unit_price", "quantity", "unit", "total_price", "brand", "spec_model", "product_supplier"],
-    "winner_detail": ["supplier_name", "is_winner", "score"],
-}
 
 
 # Data-driven name filter, to be filled from a full-corpus study in the optimisation phase.
 # Empty means: the model gate decides every file. See eval/主路线流程与过拟合风险.md 2.4.
 SCREEN_DROP_KINDS: set[str] = set()
-

@@ -1,24 +1,43 @@
 """Step 8. Merge candidates inside one project.
 
-HTML award detail owns the object list when it is a real line list.
-Attachments then only join a matching name. Tender files never add objects.
-Price fields move as one bundle; the package amount decides between bundles.
+Whether two rows are the same object is a content judgement, so the model makes it: it sees every
+candidate of the package together with the evidence stamped on it, and proposes deltas against a
+deterministic baseline grouping. Rules keep everything else - what a delta is allowed to say, the
+arithmetic of a sum, which price bundle a row ends up with, and the reconciliation against the
+package amount. With no model available the baseline stands on its own, so the step still runs and
+the same input still gives the same output.
+
+Two things are never delegated. A number is only ever written by rules: the model names rows and
+the sum is recomputed here. And a source that cannot own a price - a tender requirement, or a
+quote from a supplier the announcement does not name as the winner - cannot supply one, whatever
+the model says.
 """
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass, field
 
 from ict.config import COB_FIELDS, SUB_FIELDS
-from ict.schemas import AnnouncementUnderstanding, Candidate, Cob, Failure, MergedProjects, Project, Sub
+from ict.llm import LLMClient, LLMError, complete_json
+from ict.schemas import (AnnouncementUnderstanding, Candidate, Cob, Failure, MergeEvidence,
+                         MergedProjects, Project, Sub)
 
 PRICE_BUNDLE = ("unit_price", "quantity", "unit", "total_price")
 LINE_FIELDS = ("brand", "spec_model", "quantity", "unit_price", "total_price")
-ROW_TOLERANCE = 0.05
-AMOUNT_TOLERANCE = 0.08
+# One cent. Amounts are copied verbatim and derived totals are rounded, so anything below this is
+# arithmetic noise rather than a disagreement. It replaces two business tolerances (5% for a row,
+# 8% for a package) that had no basis in the data.
+CENT = 0.01
 MEMBER_RE = re.compile(r"\([^()]*成员[^()]*\)")
+DETAIL_ROLES = {"cob_detail", "winner"}
+EXCLUDE_KINDS = ("subtotal_row", "project_row", "not_an_object")
+DELTA_ORDER = ("exclude", "split", "merge", "sum", "name_from", "price_from")
+PROMPT = "merge-objects-v1"
 
+
+# --------------------------------------------------------------------------- values
 
 def _value(candidate: Candidate, key: str):
     field = candidate.fields[key]
@@ -52,21 +71,8 @@ def _same(left, right) -> bool:
     return abs(left_number - right_number) <= 0.01
 
 
-def _html_detail(candidate: Candidate) -> bool:
-    return (
-        candidate.source.source_type == "html"
-        and candidate.source_priority >= 70
-        and "summary_row" not in candidate.issues
-        and candidate.fields["object_name"].status != "points_to_attachment"
-    )
-
-
 def _tender(candidate: Candidate) -> bool:
     return candidate.source_class == "tender_requirement"
-
-
-def _authority(candidate: Candidate) -> tuple:
-    return (int(_html_detail(candidate)), candidate.source_priority, _completeness(candidate))
 
 
 def _completeness(candidate: Candidate) -> int:
@@ -83,15 +89,26 @@ def _has_price(candidate: Candidate) -> bool:
     return any(_value(candidate, key) not in (None, "") for key in ("unit_price", "quantity", "total_price"))
 
 
-def _row_bad(values: dict) -> bool:
-    price, quantity, total = _number(values.get("unit_price")), _number(values.get("quantity")), _number(values.get("total_price"))
-    if price is None or quantity is None or not total:
+def _pointer_row(candidate: Candidate) -> bool:
+    """An HTML row that says the object exists and points every detail into the attachment.
+
+    Both signals are statuses the extraction side already assigned: `points_to_attachment` on a
+    line field, or the `line_fields_point_to_attachment` issue step 2B stamps on a whole table.
+    This rule reads statuses; it does not read wording.
+    """
+    if candidate.source.source_type != "html" or _priced(candidate):
         return False
-    return abs(price * quantity - total) / abs(total) > ROW_TOLERANCE
+    if "line_fields_point_to_attachment" in candidate.issues:
+        return True
+    return any(candidate.fields[key].status == "points_to_attachment" for key in LINE_FIELDS)
 
 
 def _bundle_of(candidate: Candidate) -> dict:
     return {key: _value(candidate, key) for key in PRICE_BUNDLE}
+
+
+def _bundle_key(bundle: dict) -> tuple:
+    return tuple(bundle.get("unit") if key == "unit" else _number(bundle.get(key)) for key in PRICE_BUNDLE)
 
 
 def _compatible(left: dict, right: dict) -> bool:
@@ -104,32 +121,15 @@ def _compatible(left: dict, right: dict) -> bool:
     return True
 
 
-def _points_line(candidate: Candidate) -> bool:
-    if "line_fields_point_to_attachment" in candidate.issues:
-        return True
-    return any(candidate.fields[key].status == "points_to_attachment" for key in LINE_FIELDS)
+def _priced(candidate: Candidate) -> bool:
+    """A row that can serve as a price reading: it states a unit price or a total, as a number.
 
-
-def _line_item(candidate: Candidate) -> bool:
-    return _value(candidate, "quantity") not in (None, "") or _value(candidate, "unit_price") not in (None, "")
-
-
-def is_project_name(name, project_name) -> bool:
-    item, project = _norm_name(name), _norm_name(project_name)
-    if not item or not project:
-        return False
-    if item == project or project in item:
-        return True
-    return item in project and len(item) >= 0.8 * len(project)
-
-
-@dataclass
-class _Cluster:
-    base: Candidate
-    options: list[Candidate]
-    chosen: Candidate | None
-    bundle: dict = field(default_factory=dict)
-    derived: bool = False
+    Step 7 leaves a cell that failed to parse as present with a null normalized_value, so a
+    template placeholder such as '{=响应报价/数量} 元' used to arrive here as a price and was even
+    offered to the repair model as an option. A row carrying only a quantity is not a reading
+    either: it has nothing to say about money.
+    """
+    return any(_number(_value(candidate, key)) is not None for key in ("unit_price", "total_price"))
 
 
 def _copy_field(base: Candidate, key: str, value) -> None:
@@ -137,14 +137,505 @@ def _copy_field(base: Candidate, key: str, value) -> None:
     base.fields[key].status = "present"
 
 
+def _printable(bundle: dict) -> dict:
+    return {key: bundle.get(key) for key in PRICE_BUNDLE}
+
+
+def is_project_name(name, project_name) -> bool:
+    """A row named after the whole project is not an object; the field's own definition says so.
+
+    Containment runs one way: the object name carries the project name, with at most a
+    parenthetical or punctuation tail such as （第一期）. The old rule also accepted an object name
+    that was a fragment of the project name once it covered 80% of the length. That ratio had no
+    basis in the data and a short but genuine object name lost out to it, so it is gone; the model
+    can still mark such a row as project_row, and that decision is logged.
+    """
+    item, project = _norm_name(name), _norm_name(project_name)
+    if not item or not project:
+        return False
+    if item == project:
+        return True
+    if project not in item:
+        return False
+    return _tail_is_decoration(item.replace(project, "", 1))
+
+
+def _tail_is_decoration(rest: str) -> bool:
+    text = rest.strip()
+    if not text:
+        return True
+    if text[:1] in "(（[" and text[-1:] in ")）]":
+        return True
+    return not re.search(r"[\u4e00-\u9fffA-Za-z0-9]", text)
+
+
+# --------------------------------------------------------------------------- context
+
+@dataclass
+class _Context:
+    package_no: str
+    project_name: str | None
+    winners: set[str]
+    detail_ids: set[str]
+
+
+@dataclass
+class Reading:
+    """One way of reading a group's price. The model never writes these numbers."""
+
+    label: str
+    bundle: dict
+    derived: bool
+    sources: list[str]
+    kind: str                      # single | sum
+
+
+@dataclass
+class Group:
+    group_id: int
+    members: list[Candidate] = field(default_factory=list)
+    name_from: str | None = None
+    price_from: str | None = None
+    sum_members: list[str] | None = None
+
+
+@dataclass
+class _Cluster:
+    base: Candidate
+    members: list[Candidate]
+    options: list[Candidate]
+    chosen: Candidate | None
+    readings: list[Reading] = field(default_factory=list)
+    reading: Reading | None = None
+    bundle: dict = field(default_factory=dict)
+    derived: bool = False
+    name_override: str | None = None
+
+
+def _detail_ids(candidates: list[Candidate], evidence: MergeEvidence | None) -> set[str]:
+    """HTML rows that came from a real object table, not from a summary or a score table.
+
+    This used to be `source_priority >= 70`, a threshold with no basis in the data. The table's own
+    role is a structural fact and step 2A already decided it, so it is read instead. Rows whose
+    table is unknown - older runs, or a caller without evidence - are taken at face value.
+    """
+    tables = (evidence.html_tables if evidence is not None else {}) or {}
+    ids: set[str] = set()
+    for candidate in candidates:
+        if candidate.entity_type != "cob" or candidate.source.source_type != "html":
+            continue
+        index = candidate.evidence.table_index if candidate.evidence is not None else None
+        meta = tables.get(str(index)) if index is not None else None
+        if meta is None or meta.get("table_role") in DETAIL_ROLES:
+            ids.add(candidate.candidate_id)
+    return ids
+
+
+def _winner_names(items: list[Candidate], evidence: MergeEvidence | None, package_no: str) -> set[str]:
+    """Everyone this package's award text names as a winner, normalized for comparison."""
+    names: set[str] = set()
+    for candidate in items:
+        if candidate.entity_type != "sub":
+            continue
+        winner = _value(candidate, "is_winner")
+        if winner in (None, "") or str(winner).lower() in {"false", "否", "0"}:
+            continue
+        name = _norm_name(_value(candidate, "supplier_name"))
+        if name:
+            names.add(name)
+    if evidence is None:
+        return names
+    for name in (evidence.winner_hints or {}).get(package_no, []) or []:
+        if _norm_name(name):
+            names.add(_norm_name(name))
+    # A document the gate read as an award notice names the winner by definition, which is how a
+    # quote file earns the right to supply prices when the HTML marked nobody.
+    for file_id, notice in (evidence.file_award_notices or {}).items():
+        owner = (evidence.file_quote_suppliers or {}).get(file_id)
+        if notice and owner and _norm_name(owner):
+            names.add(_norm_name(owner))
+    return names
+
+
+def _rank(candidate: Candidate, ctx: _Context) -> tuple:
+    """The one total order every tie in this step is broken by, so output never depends on input
+    order: HTML detail first, then source priority, then how much the row actually says, then
+    file, page, table and candidate id."""
+    evidence = candidate.evidence
+    detail = candidate.source.source_type == "html" and candidate.candidate_id in ctx.detail_ids \
+        and "summary_row" not in candidate.issues \
+        and candidate.fields["object_name"].status != "points_to_attachment"
+    return (-int(detail), -candidate.source_priority, -_completeness(candidate),
+            candidate.source.file_id or "", candidate.source.page_no or 0,
+            evidence.table_index if evidence is not None and evidence.table_index is not None else 0,
+            candidate.candidate_id)
+
+
+def _owner_of(candidate: Candidate) -> str | None:
+    evidence = candidate.evidence
+    if evidence is None:
+        return None
+    return evidence.bidder_supplier or evidence.quote_supplier or None
+
+
+def _is_winner_quote(candidate: Candidate, ctx: _Context) -> bool | None:
+    if candidate.source.source_type == "html":
+        return None
+    owner = _owner_of(candidate)
+    if not owner or not ctx.winners:
+        return None
+    return _norm_name(owner) in ctx.winners
+
+
+def _ownership(candidate: Candidate, ctx: _Context) -> tuple[bool, bool, str | None]:
+    """(may supply a price, may be an object, blocking reason).
+
+    Two structural facts decide this, not the wording of a file: the class the screen gate gave the
+    document, and whether the quote belongs to a supplier the announcement names as the winner.
+    This is what replaced the closed list. The closed list barred every attachment row whose name
+    did not match an HTML row character for character, which threw away whole price lists over an
+    OCR'd dash - and it also happened to block a losing bidder's quote, which is the one thing
+    that genuinely has to be blocked. An owner nobody can name is not blocked: the package amount
+    arbitrates it instead.
+    """
+    if candidate.source.source_type == "html":
+        return True, True, None
+    if _tender(candidate):
+        return False, False, "tender_requirement"
+    owner = _owner_of(candidate)
+    if not owner or not ctx.winners:
+        return True, True, None
+    if _norm_name(owner) in ctx.winners:
+        return True, True, None
+    return False, False, "non_winner_quote"
+
+
+# --------------------------------------------------------------------------- baseline and deltas
+
+def _baseline(cobs: list[Candidate], ctx: _Context) -> tuple[list[Group], list[Candidate]]:
+    """The deterministic grouping: rows whose normalized names are identical.
+
+    This is the floor the model edits and the whole result when there is no model. Name equality
+    is not identity - it misses an OCR'd dash and it merges three different objects that share a
+    name - which is exactly why the model gets to split and merge on top of it.
+    """
+    ordered = sorted(cobs, key=lambda item: _rank(item, ctx))
+    by_name: dict[str, list[Candidate]] = {}
+    nameless: list[Candidate] = []
+    for candidate in ordered:
+        name = _norm_name(_value(candidate, "object_name"))
+        if not name:
+            nameless.append(candidate)
+            continue
+        by_name.setdefault(name, []).append(candidate)
+    buckets = sorted(by_name.values(), key=lambda members: _rank(members[0], ctx))
+    return [Group(group_id=index, members=list(members)) for index, members in enumerate(buckets)], nameless
+
+
+def _needs_model(cobs: list[Candidate]) -> bool:
+    """One HTML row with a name has nothing to disambiguate. Anything else does."""
+    if not cobs:
+        return False
+    return not (len(cobs) == 1 and cobs[0].source.source_type == "html")
+
+
+def _gid(value) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _delta_group(delta: dict):
+    """The group a delta points at. Models drop the _id suffix often enough to absorb it."""
+    value = delta.get("group_id")
+    return value if value is not None else delta.get("group")
+
+
+def _candidate_view(candidate: Candidate, group_id: int, ctx: _Context,
+                    evidence: MergeEvidence | None) -> dict:
+    """One row of the table the merge model reads. Only what was actually observed is sent."""
+    ev = candidate.evidence
+    html = candidate.source.source_type == "html"
+    view: dict = {"candidate_id": candidate.candidate_id, "group_id": group_id,
+                  "origin": "html" if html else "attachment"}
+    if ev is not None and ev.table_index is not None:
+        view["table_index"] = ev.table_index
+    if html:
+        meta = ((evidence.html_tables or {}).get(str(ev.table_index))
+                if evidence is not None and ev is not None and ev.table_index is not None else None) or {}
+        if meta.get("table_role"):
+            view["table_role"] = meta["table_role"]
+        if meta.get("section"):
+            view["table_section"] = meta["section"]
+    else:
+        view["file_id"] = candidate.source.file_id
+        names = (evidence.file_names if evidence is not None else {}) or {}
+        view["file_name"] = names.get(candidate.source.file_id or "")
+        classes = (evidence.file_classes if evidence is not None else {}) or {}
+        view["file_class"] = candidate.source_class or classes.get(candidate.source.file_id or "")
+        if candidate.source.page_no is not None:
+            view["page_no"] = candidate.source.page_no
+        owner = _owner_of(candidate)
+        if owner:
+            view["quote_supplier"] = owner
+        winner_quote = _is_winner_quote(candidate, ctx)
+        if winner_quote is not None:
+            view["is_winner_quote"] = winner_quote
+    if ev is not None:
+        if ev.row_text:
+            view["row_text"] = ev.row_text
+        if ev.bidder_supplier:
+            view["bidder_supplier"] = ev.bidder_supplier
+        if ev.winner_supplier:
+            view["winner_supplier"] = ev.winner_supplier
+    for key in COB_FIELDS:
+        value = _value(candidate, key)
+        if value not in (None, ""):
+            view[key] = value
+    view["field_states"] = {key: candidate.fields[key].status for key in COB_FIELDS}
+    if candidate.issues:
+        view["issues"] = list(candidate.issues)
+    return {key: value for key, value in view.items() if value not in (None, "", [], {})}
+
+
+def _ask_merge(ctx: _Context, groups: list[Group], cobs: list[Candidate], amount: float | None,
+               raw: str | None, suspect: str | None, evidence: MergeEvidence | None,
+               llm: LLMClient, counter) -> tuple[list[dict], str | None]:
+    by_group = {candidate.candidate_id: group.group_id for group in groups for candidate in group.members}
+    payload = {
+        "project_name": ctx.project_name,
+        "package_no": ctx.package_no,
+        "package_total_amount": amount,
+        "package_amount_raw": raw,
+        "package_amount_suspect": suspect is not None,
+        "winner_suppliers": sorted(ctx.winners),
+        "baseline_groups": [{"group_id": group.group_id,
+                             "candidate_ids": [item.candidate_id for item in group.members]}
+                            for group in groups],
+        "candidates": [_candidate_view(item, by_group.get(item.candidate_id, -1), ctx, evidence)
+                       for item in sorted(cobs, key=lambda entry: _rank(entry, ctx))],
+    }
+    group_ids = {group.group_id for group in groups}
+    candidate_ids = {item.candidate_id for item in cobs}
+    try:
+        produced = complete_json(llm, step="merge_candidates", prompt_version=PROMPT,
+                                 user=json.dumps(payload, ensure_ascii=False),
+                                 validate=lambda parsed: _validate_merge(parsed, group_ids, candidate_ids),
+                                 counter=counter)
+    except (LLMError, ValueError) as exc:
+        return [], "llm_call_failed" if isinstance(exc, LLMError) else "llm_schema_invalid"
+    deltas = produced.get("deltas")
+    return (deltas if isinstance(deltas, list) else []), None
+
+
+def _validate_merge(parsed: dict, group_ids: set[int], candidate_ids: set[str]) -> str:
+    deltas = parsed.get("deltas")
+    if not isinstance(deltas, list):
+        return "需要 deltas 数组"
+    for delta in deltas:
+        if not isinstance(delta, dict):
+            return "deltas 每一项必须是对象"
+        op = delta.get("op")
+        if op not in DELTA_ORDER:
+            return "op 不在允许值内"
+        gid = _gid(_delta_group(delta))
+        if op == "exclude":
+            if delta.get("candidate_id") not in candidate_ids:
+                return "exclude 的 candidate_id 不在输入里"
+            if delta.get("kind") not in EXCLUDE_KINDS:
+                return "exclude 的 kind 不在 subtotal_row、project_row、not_an_object 之中"
+        elif op == "merge":
+            wanted = [_gid(item) for item in (delta.get("groups") or [])]
+            if len(wanted) < 2 or any(item is None or item not in group_ids for item in wanted):
+                return "merge 需要至少两个已知 group_id"
+        elif op == "split":
+            if gid not in group_ids:
+                return "split 的 group_id 不在输入里"
+            parts = delta.get("parts")
+            if not isinstance(parts, list) or len(parts) < 2:
+                return "split 需要至少两个 parts"
+        elif op == "sum":
+            if gid not in group_ids:
+                return "sum 的 group_id 不在输入里"
+            members = delta.get("members")
+            if not isinstance(members, list) or len(members) < 2:
+                return "sum 需要至少两个 members"
+            if any(item not in candidate_ids for item in members):
+                return "sum 的 members 里有未知 candidate_id"
+        else:
+            if gid not in group_ids:
+                return "%s 的 group_id 不在输入里" % op
+            if delta.get("candidate_id") not in candidate_ids:
+                return "%s 的 candidate_id 不在输入里" % op
+    return ""
+
+
+def _apply_deltas(groups: list[Group], deltas: list[dict], by_id: dict[str, Candidate],
+                  ctx: _Context, decisions: list[dict]) -> tuple[list[Group], list[tuple[Candidate, str]]]:
+    """Apply the model's edits one at a time. A delta that does not hold is dropped on its own.
+
+    Nothing is all-or-nothing: an unresolvable group id costs that one edit, not the package. The
+    order is fixed so the result cannot depend on the order the model happened to write them in.
+    """
+    live: dict[int, Group] = {group.group_id: group for group in groups}
+    alias: dict[int, int] = {group.group_id: group.group_id for group in groups}
+    next_id = max(live) + 1 if live else 0
+    excluded: list[tuple[Candidate, str]] = []
+    dropped: set[str] = set()
+
+    def resolve(value) -> Group | None:
+        gid = _gid(value)
+        if gid is None:
+            return None
+        return live.get(alias.get(gid, gid))
+
+    def log(delta: dict, accepted: bool, reject: str | None = None, extra: dict | None = None) -> None:
+        entry = {"package_no": ctx.package_no, "accepted": accepted}
+        entry.update({key: value for key, value in delta.items() if key in
+                      ("op", "group_id", "group", "groups", "parts", "members", "candidate_id", "kind",
+                       "name_from", "price_from", "reason", "confidence")})
+        if reject:
+            entry["reject"] = reject
+        if extra:
+            entry.update(extra)
+        decisions.append(entry)
+
+    ordered = sorted((delta for delta in deltas if isinstance(delta, dict)),
+                     key=lambda delta: DELTA_ORDER.index(delta.get("op"))
+                     if delta.get("op") in DELTA_ORDER else len(DELTA_ORDER))
+    for delta in ordered:
+        op = delta.get("op")
+        if op == "exclude":
+            candidate = by_id.get(delta.get("candidate_id"))
+            if candidate is None or candidate.candidate_id in dropped:
+                log(delta, False, "unknown_candidate")
+                continue
+            group = next((item for item in live.values() if candidate in item.members), None)
+            if group is not None and len(group.members) == 1:
+                live.pop(group.group_id, None)
+            elif group is not None:
+                group.members.remove(candidate)
+            dropped.add(candidate.candidate_id)
+            excluded.append((candidate, str(delta.get("kind"))))
+            log(delta, True)
+        elif op == "split":
+            group = resolve(_delta_group(delta))
+            if group is None:
+                log(delta, False, "unknown_group")
+                continue
+            parts, seen = [], set()
+            for part in delta.get("parts") or []:
+                members = [by_id[item] for item in (part or []) if item in by_id and item not in seen]
+                seen.update(item.candidate_id for item in members)
+                if members:
+                    parts.append(members)
+            if len(parts) < 2 or seen != {item.candidate_id for item in group.members}:
+                log(delta, False, "parts_do_not_partition_group")
+                continue
+            live.pop(group.group_id, None)
+            created = []
+            for members in parts:
+                live[next_id] = Group(group_id=next_id, members=members)
+                created.append(next_id)
+                next_id += 1
+            alias[group.group_id] = created[0]
+            log(delta, True, extra={"new_group_ids": created})
+        elif op == "merge":
+            sources = []
+            for value in delta.get("groups") or []:
+                group = resolve(value)
+                if group is not None and group not in sources:
+                    sources.append(group)
+            if len(sources) < 2:
+                log(delta, False, "fewer_than_two_live_groups")
+                continue
+            members = [item for group in sources for item in group.members]
+            for group in sources:
+                live.pop(group.group_id, None)
+            live[next_id] = Group(group_id=next_id, members=members)
+            for group in sources:
+                alias[group.group_id] = next_id
+            log(delta, True, extra={"new_group_id": next_id})
+            next_id += 1
+        elif op == "sum":
+            group = resolve(_delta_group(delta))
+            if group is None:
+                log(delta, False, "unknown_group")
+                continue
+            owned = {item.candidate_id for item in group.members}
+            members = [item for item in (delta.get("members") or []) if item in owned]
+            if len(members) < 2:
+                log(delta, False, "members_not_in_group")
+                continue
+            group.sum_members = members
+            log(delta, True)
+        elif op in {"name_from", "price_from"}:
+            group = resolve(_delta_group(delta))
+            target = delta.get("candidate_id")
+            if group is None or target not in {item.candidate_id for item in group.members}:
+                log(delta, False, "candidate_not_in_group")
+                continue
+            if op == "price_from" and not _ownership(by_id[target], ctx)[0]:
+                log(delta, False, "source_cannot_own_price")
+                continue
+            setattr(group, op, target)
+            log(delta, True)
+    return sorted(live.values(), key=lambda group: _rank(group.members[0], ctx)), excluded
+
+
+# --------------------------------------------------------------------------- arithmetic
+
+def _sum_bundle(members: list[Candidate]) -> tuple[dict | None, str | None]:
+    """Recompute a summed bundle. The model names the rows; the number is ours.
+
+    Refused unless the rows can actually be added: every one of them has a quantity, they agree on
+    the unit (or all stay silent about it), and they do not disagree on the unit price - a split
+    row keeps its price by definition, so differing prices mean these are different readings, not
+    parts of one object.
+    """
+    if len(members) < 2:
+        return None, "sum_too_few_members"
+    quantities, totals, prices, units = [], [], [], set()
+    for candidate in members:
+        quantity = _number(_value(candidate, "quantity"))
+        if quantity is None:
+            return None, "sum_missing_quantity"
+        quantities.append(quantity)
+        total = _number(_value(candidate, "total_price"))
+        if total is not None:
+            totals.append(total)
+        price = _number(_value(candidate, "unit_price"))
+        if price is not None:
+            prices.append(price)
+        unit = _value(candidate, "unit")
+        if unit not in (None, ""):
+            units.add(str(unit).strip())
+    if len(units) > 1:
+        return None, "sum_unit_conflict"
+    if len({round(price, 4) for price in prices}) > 1:
+        return None, "sum_price_conflict"
+    unit_price = prices[0] if prices else None
+    quantity = round(sum(quantities), 6)
+    if len(totals) == len(members):
+        total = round(sum(totals), 4)
+    elif unit_price is not None:
+        total = round(unit_price * quantity, 4)
+    else:
+        return None, "sum_no_value"
+    return {"unit_price": unit_price, "quantity": quantity,
+            "unit": next(iter(units)) if units else None, "total_price": total}, None
+
+
 def _fill_bundle(chosen: Candidate, options: list[Candidate]) -> tuple[dict, bool]:
+    """Blank fields of the chosen bundle, filled only from bundles that do not contradict it."""
     bundle = _bundle_of(chosen)
     derived = _derived_total(chosen)
-    for other in sorted(options, key=_authority, reverse=True):
+    for other in options:
         if other is chosen:
             continue
         values = _bundle_of(other)
-        if _row_bad(values) or not _compatible(bundle, values):
+        if not _compatible(bundle, values):
             continue
         for key in PRICE_BUNDLE:
             if bundle[key] in (None, "") and values[key] not in (None, ""):
@@ -154,15 +645,53 @@ def _fill_bundle(chosen: Candidate, options: list[Candidate]) -> tuple[dict, boo
     return bundle, derived
 
 
-def _reconcile(group: list[Candidate], conflicts: list[dict], list_owner: str) -> _Cluster:
-    base = max(group, key=_authority)
-    for extra in sorted(group, key=_authority, reverse=True):
-        if extra is base:
+def _readings(group: Group, ctx: _Context, by_id: dict[str, Candidate],
+              decisions: list[dict]) -> tuple[list[Reading], list[Candidate]]:
+    """Every price this group could end up with, most authoritative first."""
+    eligible = [item for item in sorted(group.members, key=lambda entry: _rank(entry, ctx))
+                if _ownership(item, ctx)[0]]
+    # A reading has to state a price, but a blank may still be filled from any row that says
+    # something about money: a row carrying only a quantity is not a reading, yet dropping it as a
+    # donor loses a quantity nobody else wrote.
+    donors = [item for item in eligible if _has_price(item)]
+    options = [item for item in eligible if _priced(item)]
+    readings: list[Reading] = []
+    seen: set[tuple] = set()
+    for candidate in options:
+        bundle, derived = _fill_bundle(candidate, donors)
+        key = _bundle_key(bundle)
+        if key in seen:
             continue
+        seen.add(key)
+        readings.append(Reading(label=candidate.candidate_id, bundle=bundle, derived=derived,
+                                sources=[candidate.candidate_id], kind="single"))
+    if group.sum_members:
+        members = [by_id[item] for item in group.sum_members if item in by_id]
+        bundle, reason = _sum_bundle(members)
+        if bundle is None:
+            decisions.append({"package_no": ctx.package_no, "op": "sum", "group_id": group.group_id,
+                              "members": group.sum_members, "accepted": False, "reject": reason})
+        elif _bundle_key(bundle) not in seen:
+            readings.append(Reading(label="sum:%d" % group.group_id, bundle=bundle, derived=True,
+                                    sources=list(group.sum_members), kind="sum"))
+    return readings, options
+
+
+def _reconcile(group: Group, ctx: _Context, by_id: dict[str, Candidate], conflicts: list[dict],
+               decisions: list[dict]) -> _Cluster:
+    """One group into one row.
+
+    Description fields are filled by rank, so an HTML detail row still wins over an attachment row
+    that says less, and an attachment row now fills what the HTML left empty - the manufacturer
+    included. That last part is a change: the manufacturer used to be refused from any attachment
+    whenever the package's list was HTML-owned, a rule that only made sense while the closed list
+    decided who owned the list. Per object, rank already says it.
+    """
+    members = sorted(group.members, key=lambda item: _rank(item, ctx))
+    base = members[0]
+    for extra in members[1:]:
         for key in COB_FIELDS:
             if key in PRICE_BUNDLE:
-                continue
-            if key == "product_supplier" and list_owner == "html" and extra.source.source_type != "html":
                 continue
             left, right = _value(base, key), _value(extra, key)
             if right in (None, ""):
@@ -170,141 +699,28 @@ def _reconcile(group: list[Candidate], conflicts: list[dict], list_owner: str) -
             if left in (None, ""):
                 _copy_field(base, key, right)
                 continue
-            if _same(left, right) or (key == "brand" and _html_detail(base)):
+            if _same(left, right) or (key == "brand" and base.candidate_id in ctx.detail_ids):
                 continue
             base.fields[key].status = "conflict"
-            conflicts.append({"field": key, "candidate_ids": [base.candidate_id, extra.candidate_id], "values": [left, right]})
-    if list_owner == "html" and base.source.source_type != "html":
-        base.fields["product_supplier"].normalized_value = None
-        base.fields["product_supplier"].status = "missing"
-    options = [item for item in group if _has_price(item)]
-    if not options:
-        return _Cluster(base=base, options=[], chosen=None, bundle={key: None for key in PRICE_BUNDLE})
-    ranked = sorted(options, key=_authority, reverse=True)
-    good = [item for item in ranked if not _row_bad(_bundle_of(item))]
-    chosen = (good or ranked)[0]
-    bundle, derived = _fill_bundle(chosen, options)
-    for other in options:
-        if other is chosen or _compatible(bundle, _bundle_of(other)):
-            continue
-        conflicts.append(
-            {
-                "field": "price_bundle",
-                "candidate_ids": [chosen.candidate_id, other.candidate_id],
-                "values": [_printable(bundle), _printable(_bundle_of(other))],
-            }
-        )
-    return _Cluster(base=base, options=options, chosen=chosen, bundle=bundle, derived=derived)
-
-
-def _printable(bundle: dict) -> dict:
-    return {key: bundle.get(key) for key in PRICE_BUNDLE}
-
-
-def _contradicts(left: Candidate, right: Candidate) -> bool:
-    for key in ("quantity", "unit_price"):
-        left_value, right_value = _value(left, key), _value(right, key)
-        if left_value not in (None, "") and right_value not in (None, "") and not _same(left_value, right_value):
-            return True
-    return False
-
-
-def _clusters(items: list[Candidate], closed: bool) -> list[list[Candidate]]:
-    """Same name forms one row. In a closed list only HTML rows may start a row."""
-    by_name: dict[str, list[Candidate]] = {}
-    for candidate in items:
-        name = _norm_name(_value(candidate, "object_name"))
-        if name:
-            by_name.setdefault(name, []).append(candidate)
-    groups: list[list[Candidate]] = []
-    for members in by_name.values():
-        leaders = [item for item in members if _html_detail(item)] if closed else members
-        followers = [item for item in members if not _html_detail(item)] if closed else []
-        if not leaders:
-            leaders, followers = members, []
-        buckets: list[list[Candidate]] = []
-        for candidate in leaders:
-            for bucket in buckets:
-                if not any(_contradicts(candidate, other) for other in bucket):
-                    bucket.append(candidate)
-                    break
-            else:
-                buckets.append([candidate])
-        for candidate in followers:
-            target = next(
-                (bucket for bucket in buckets if _compatible(_bundle_of(bucket[0]), _bundle_of(candidate))),
-                buckets[0],
-            )
-            target.append(candidate)
-        groups.extend(buckets)
-    return groups
-
-
-def _select_cobs(items: list[Candidate], unmatched: list[dict], project_name: str | None) -> tuple[list[Candidate], str]:
-    """Return the candidate pool and who owns the object list: html or attachment."""
-    html = [item for item in items if item.entity_type == "cob" and item.source.source_type == "html"]
-    attached = []
-    for item in items:
-        if item.entity_type != "cob" or item.source.source_type == "html":
-            continue
-        if _tender(item):
-            unmatched.append({"candidate_id": item.candidate_id, "reason": "招标需求不能新增标的"})
-            continue
-        attached.append(item)
-    named = [item for item in html if _html_detail(item) and _value(item, "object_name")]
-    project_rows = [item for item in named if is_project_name(_value(item, "object_name"), project_name)]
-    others = [item for item in named if item not in project_rows]
-    if project_rows and others:
-        named = others
-        _move_project_price(project_rows, others, unmatched)
-    priced = [item for item in named if _line_item(item)]
-    names = {_norm_name(_value(item, "object_name")) for item in (priced or named)}
-    open_single = not priced and len(names) == 1 and any(_points_line(item) for item in named)
-    if names and not open_single:
-        pool = list(priced or named)
-        for candidate in attached:
-            if _norm_name(_value(candidate, "object_name")) in names:
-                pool.append(candidate)
-            else:
-                unmatched.append({"candidate_id": candidate.candidate_id, "reason": "HTML 明细清单已封闭，附件名称未匹配"})
-        for candidate in html:
-            if candidate not in pool and candidate not in project_rows:
-                unmatched.append({"candidate_id": candidate.candidate_id, "reason": "HTML 汇总行不进入封闭清单"})
-        return pool, "html"
-    pool = list(attached)
-    if open_single and any(_line_item(item) for item in pool):
-        for candidate in named:
-            unmatched.append({"candidate_id": candidate.candidate_id, "reason": "HTML 汇总行已由附件明细替换"})
-        return pool, "attachment"
-    pool.extend(named)
-    if any("summary_row" not in item.issues and _value(item, "object_name") for item in pool):
-        kept = []
-        for candidate in pool:
-            if "summary_row" in candidate.issues:
-                unmatched.append({"candidate_id": candidate.candidate_id, "reason": "HTML 汇总行已由明细替换"})
-                continue
-            kept.append(candidate)
-        pool = kept
-    owner = "attachment" if any(item.source.source_type != "html" for item in pool) else "html"
-    return pool, owner
-
-
-def _move_project_price(project_rows: list[Candidate], others: list[Candidate], unmatched: list[dict]) -> None:
-    """A row named after the whole project is not an object; its price goes to the only real object."""
-    target_names = {_norm_name(_value(item, "object_name")) for item in others}
-    single_target = len(target_names) == 1 and not any(_has_price(item) for item in others)
-    for row in project_rows:
-        moved = False
-        if single_target and _has_price(row):
-            for target in others:
-                for key in PRICE_BUNDLE:
-                    value = _value(row, key)
-                    if value not in (None, "") and _value(target, key) in (None, ""):
-                        _copy_field(target, key, value)
-                        target.fields[key].normalization = {"filled_from": "project_row"} if key == "total_price" else None
-            moved = True
-        reason = "项目全称行，价格并入唯一标的" if moved else "项目全称行不作为标的"
-        unmatched.append({"candidate_id": row.candidate_id, "reason": reason})
+            conflicts.append({"field": key, "candidate_ids": [base.candidate_id, extra.candidate_id],
+                              "values": [left, right]})
+    readings, options = _readings(group, ctx, by_id, decisions)
+    reading = None
+    if group.price_from:
+        reading = next((item for item in readings if item.label == group.price_from), None)
+    if reading is None and readings:
+        reading = readings[0]
+    chosen = None
+    if reading is not None and reading.kind == "single":
+        chosen = next((item for item in options if item.candidate_id == reading.label), None)
+    name_override = None
+    if group.name_from and group.name_from in by_id:
+        name_override = _value(by_id[group.name_from], "object_name")
+    return _Cluster(base=base, members=list(group.members), options=options, chosen=chosen,
+                    readings=readings, reading=reading,
+                    bundle={} if reading is None else dict(reading.bundle),
+                    derived=bool(reading is not None and reading.derived),
+                    name_override=name_override)
 
 
 def _package_total(clusters: list[_Cluster]) -> float | None:
@@ -313,95 +729,195 @@ def _package_total(clusters: list[_Cluster]) -> float | None:
     return sum(totals) if totals else None
 
 
-def _deviation(total: float | None, amount: float | None) -> float | None:
-    if total is None or not amount:
-        return None
-    return (total - amount) / abs(amount)
+def _arbitrate(clusters: list[_Cluster], amount: float, package_no: str, repairs: list[dict],
+               decisions: list[dict]) -> None:
+    """Give the package amount a say wherever a row has more than one reading.
 
-
-def _swap_by_amount(clusters: list[_Cluster], amount: float | None, list_owner: str) -> list[dict]:
-    """Change the fewest bundles that bring the line total closer to the package amount."""
-    swaps: list[dict] = []
+    There is no dead zone. The old code consulted the amount only once the line total was more
+    than 8% off, which is how a package whose amount was 1239629.63 kept a line reading of
+    1241056.19: 0.1% apart, so the one independent number available was never asked. Only a
+    strict improvement is taken, one reading at a time, so a row already as close as it can get is
+    left alone and the result does not depend on the order clusters are visited.
+    """
     for _ in range(len(clusters) + 1):
         total = _package_total(clusters)
-        deviation = _deviation(total, amount)
-        if deviation is None:
-            return swaps
-        overflow = deviation > AMOUNT_TOLERANCE
-        underflow = deviation < -AMOUNT_TOLERANCE and list_owner != "html"
-        if not overflow and not underflow:
-            return swaps
+        if total is None:
+            return
+        gap = abs(total - amount)
         best = None
         for cluster in clusters:
-            current = _number(cluster.bundle.get("total_price")) or 0
-            for option in cluster.options:
-                if option is cluster.chosen or _row_bad(_bundle_of(option)):
+            current = _number(cluster.bundle.get("total_price"))
+            if current is None or len(cluster.readings) < 2:
+                continue
+            for reading in cluster.readings:
+                if cluster.reading is not None and reading.label == cluster.reading.label:
                     continue
-                bundle, derived = _fill_bundle(option, cluster.options)
-                value = _number(bundle.get("total_price"))
+                value = _number(reading.bundle.get("total_price"))
                 if value is None:
                     continue
                 new_gap = abs(total - current + value - amount)
-                if new_gap + 1e-6 < abs(total - amount) and (best is None or new_gap < best[0]):
-                    best = (new_gap, cluster, option, bundle, derived)
+                if new_gap + 1e-9 < gap and (best is None or new_gap < best[0]):
+                    best = (new_gap, cluster, reading)
         if best is None:
-            return swaps
-        _, cluster, option, bundle, derived = best
-        swaps.append(
-            {
-                "action": "price_bundle_by_amount",
-                "from": None if cluster.chosen is None else cluster.chosen.candidate_id,
-                "to": option.candidate_id,
-            }
-        )
-        cluster.chosen, cluster.bundle, cluster.derived = option, bundle, derived
-    return swaps
+            _log_unchosen_sums(clusters, package_no, decisions)
+            return
+        new_gap, cluster, reading = best
+        previous = cluster.reading
+        cluster.reading = reading
+        cluster.bundle = dict(reading.bundle)
+        cluster.derived = reading.derived
+        cluster.chosen = (next((item for item in cluster.options if item.candidate_id == reading.label), None)
+                          if reading.kind == "single" else None)
+        repairs.append({"package_no": package_no, "action": "price_bundle_by_amount",
+                        "from": None if previous is None else previous.label, "to": reading.label,
+                        "gap_before": round(gap, 2), "gap_after": round(new_gap, 2)})
+
+
+def _log_unchosen_sums(clusters: list[_Cluster], package_no: str, decisions: list[dict],
+                       reason: str = "sum_not_chosen_by_amount") -> None:
+    """A sum the model asked for and the rules did not apply. The rows stay one object either way.
+
+    Without a package amount there is nothing to check a sum against, so the object is kept but its
+    numbers stay as the most authoritative single row wrote them: a wrong-but-observed quantity
+    rather than an invented one. The log says which of the two happened.
+    """
+    for cluster in clusters:
+        summed = next((item for item in cluster.readings if item.kind == "sum"), None)
+        if summed is None or (cluster.reading is not None and cluster.reading.label == summed.label):
+            continue
+        decisions.append({"package_no": package_no, "op": "sum", "accepted": False,
+                          "reject": reason, "members": summed.sources,
+                          "chosen": None if cluster.reading is None else cluster.reading.label})
+
+
+def _suspect_amount(amount: float | None, raw: str | None) -> str | None:
+    """The arbitrator has to be sound itself before it can arbitrate.
+
+    Both tests are about the amount alone. A percentage is not money - `parse_amount` refuses one
+    now, and this is the belt. A total that is not positive cannot be an award amount; that is how
+    折扣率：96.60% once became a package total of 96.6 yuan.
+
+    Comparing the amount against the lines was tried and dropped: one spurious object is enough to
+    make a sound amount look impossible, and quarantining it removes the very signal that would
+    have exposed the object. A line that does not fit is amount_overflow's job, not this one's.
+    """
+    if amount is None:
+        return "missing"
+    if raw and re.search(r"[%％]", str(raw)):
+        return "percent"
+    if amount <= 0:
+        return "non_positive"
+    return None
 
 
 def _alternatives(clusters: list[_Cluster]) -> list[dict]:
+    """Groups with more than one reading, handed to step 8b to choose between."""
     found = []
     for index, cluster in enumerate(clusters):
-        distinct: list[Candidate] = []
-        seen: set[tuple] = set()
-        for option in cluster.options:
-            key = tuple(_number(_value(option, name)) for name in ("unit_price", "quantity", "total_price"))
-            if key in seen:
-                continue
-            seen.add(key)
-            distinct.append(option)
-        if len(distinct) < 2:
+        if len(cluster.readings) < 2:
             continue
-        found.append(
-            {
-                "cluster_id": index,
-                "cob_index": index,
-                "object_name": str(_value(cluster.base, "object_name")),
-                "chosen": None if cluster.chosen is None else cluster.chosen.candidate_id,
-                "options": [
-                    {
-                        "candidate_id": option.candidate_id,
-                        "source_type": option.source.source_type,
-                        "file_id": option.source.file_id,
-                        "file_class": option.source_class,
-                        "source_priority": option.source_priority,
-                        **_printable(_bundle_of(option)),
-                        "total_is_derived": _derived_total(option),
-                    }
-                    for option in distinct
-                ],
-            }
-        )
+        found.append({
+            "cluster_id": index,
+            "cob_index": index,
+            "object_name": str(_value(cluster.base, "object_name")),
+            "chosen": None if cluster.reading is None else cluster.reading.label,
+            "options": [
+                {
+                    "candidate_id": reading.label,
+                    "reading_kind": reading.kind,
+                    "sources": reading.sources,
+                    "source_type": "html" if reading.kind == "sum" else
+                    (next((item.source.source_type for item in cluster.options
+                           if item.candidate_id == reading.label), None)),
+                    "file_id": None if reading.kind == "sum" else
+                    (next((item.source.file_id for item in cluster.options
+                           if item.candidate_id == reading.label), None)),
+                    "source_priority": None if reading.kind == "sum" else
+                    (next((item.source_priority for item in cluster.options
+                           if item.candidate_id == reading.label), None)),
+                    **_printable(reading.bundle),
+                    "total_is_derived": reading.derived,
+                }
+                for reading in cluster.readings
+            ],
+        })
     return found
 
 
-def merge_projects(run_id: str, understanding: AnnouncementUnderstanding, candidates: list[Candidate]) -> MergedProjects:
+# --------------------------------------------------------------------------- package amount
+
+def _package_amount(package, single: bool, understanding: AnnouncementUnderstanding,
+                    observed: dict[str, list], repairs: list[dict]) -> tuple[float | None, str | None, str | None]:
+    """One amount per package, from a fixed priority chain. Never derived from the lines.
+
+    The announcement wins. Only where it says nothing does the attachment's own observation get a
+    turn, and only when every observer copied the same text - values that disagree are left
+    unfilled and stay in the log. An attachment-sourced amount is then excluded from
+    reconciliation: a file that supplies both the lines and the total would only confirm itself.
+    """
+    if package.package_amount and package.package_amount.amount_yuan is not None:
+        return package.package_amount.amount_yuan, "announcement", package.package_amount.raw_text
+    if single and understanding.summary_amount and understanding.summary_amount.amount_yuan is not None:
+        return understanding.summary_amount.amount_yuan, "announcement", understanding.summary_amount.raw_text
+    values = [str(item.raw_text) for item in observed.get(package.package_no, []) if item.amount_yuan is not None]
+    distinct = list(dict.fromkeys(values))
+    if len(distinct) == 1:
+        picked = next(item for item in observed[package.package_no] if str(item.raw_text) == distinct[0])
+        repairs.append({"package_no": package.package_no, "action": "package_amount_from_attachment",
+                        "value": picked.amount_yuan, "raw_text": picked.raw_text, "file_id": picked.file_id,
+                        "file_name": picked.file_name, "page_no": picked.page_no})
+        return picked.amount_yuan, "attachment", picked.raw_text
+    if len(distinct) > 1:
+        repairs.append({"package_no": package.package_no, "action": "package_amount_conflict",
+                        "values": distinct, "files": [item.file_id for item in observed[package.package_no]]})
+        return None, "conflict", None
+    return None, None, None
+
+
+def _move_project_price(project_rows: list[Candidate], others: list[Candidate],
+                        unmatched: list[dict], ctx: _Context) -> None:
+    """A row named after the whole project is not an object; its price goes to the only real one.
+
+    Only the highest-ranked project row supplies the price. Letting every project row fill in turn
+    made the result depend on the order candidates arrived in, so a losing bidder's project-named
+    row could get there first and donate a bid price instead of the award amount.
+    """
+    target_names = {_norm_name(_value(item, "object_name")) for item in others}
+    single_target = len(target_names) == 1 and not any(_has_price(item) for item in others)
+    ranked = sorted(project_rows, key=lambda item: _rank(item, ctx))
+    donor = ranked[0] if single_target and _has_price(ranked[0]) else None
+    for row in ranked:
+        if row is not donor:
+            unmatched.append({"candidate_id": row.candidate_id, "reason": "项目全称行不作为标的"})
+            continue
+        for target in others:
+            for key in PRICE_BUNDLE:
+                value = _value(row, key)
+                if value not in (None, "") and _value(target, key) in (None, ""):
+                    _copy_field(target, key, value)
+                    target.fields[key].normalization = (
+                        {"filled_from": "project_row"} if key == "total_price" else None)
+        unmatched.append({"candidate_id": row.candidate_id, "reason": "项目全称行，价格并入唯一标的"})
+
+
+# --------------------------------------------------------------------------- step entry
+
+def merge_projects(run_id: str, understanding: AnnouncementUnderstanding, candidates: list[Candidate],
+                   package_amounts: list | None = None, evidence: MergeEvidence | None = None,
+                   llm: LLMClient | None = None, counter=None) -> MergedProjects:
     known = {package.package_no: package for package in understanding.packages}
     conflicts: list[dict] = []
     unassigned: list[dict] = []
     unmatched: list[dict] = []
     repairs: list[dict] = []
+    decisions: list[dict] = []
     alternatives: dict[str, list[dict]] = {}
     list_sources: dict[str, str] = {}
+    amount_origins: dict[str, str] = {}
+    amount_audit: dict[str, dict] = {}
+    observed: dict[str, list] = {}
+    for item in package_amounts or []:
+        observed.setdefault(str(item.package_no), []).append(item)
     grouped: dict[str, list[Candidate]] = {package.project_id: [] for package in understanding.packages}
     for candidate in candidates:
         if candidate.project_id not in grouped:
@@ -412,67 +928,137 @@ def merge_projects(run_id: str, understanding: AnnouncementUnderstanding, candid
             unassigned.append({"candidate_id": candidate.candidate_id, "reason": "包号不在公告包列表"})
             continue
         grouped[candidate.project_id].append(candidate)
+
     projects: list[Project] = []
     single = understanding.package_mode == "single"
     for package in understanding.packages:
         items = grouped.get(package.project_id, [])
-        amount = None
-        if package.package_amount and package.package_amount.amount_yuan is not None:
-            amount = package.package_amount.amount_yuan
-        elif single and understanding.summary_amount and understanding.summary_amount.amount_yuan is not None:
-            amount = understanding.summary_amount.amount_yuan
-        pool, owner = _select_cobs(items, unmatched, understanding.project_name)
-        list_sources[package.package_no] = owner
-        clusters = [_reconcile(group, conflicts, owner) for group in _clusters(pool, closed=owner == "html")]
+        amount, origin, raw = _package_amount(package, single, understanding, observed, repairs)
+        amount_origins[package.package_no] = origin
+        ctx = _Context(package_no=package.package_no, project_name=understanding.project_name,
+                       winners=_winner_names(items, evidence, package.package_no),
+                       detail_ids=_detail_ids(items, evidence))
+
+        cobs = [item for item in items if item.entity_type == "cob"]
+        pointers = [item for item in cobs if _pointer_row(item)]
+        if pointers and any(_ownership(item, ctx)[1] and _priced(item)
+                            for item in cobs if item not in pointers):
+            # t20260202_26140146: the HTML says one object exists and points every field into the
+            # attachment, where seven priced rows are waiting. Keeping both gives eight objects.
+            for item in pointers:
+                unmatched.append({"candidate_id": item.candidate_id, "reason": "html_pointer_row"})
+            cobs = [item for item in cobs if item not in pointers]
+        project_rows = [item for item in cobs if is_project_name(_value(item, "object_name"), ctx.project_name)]
+        others = [item for item in cobs if item not in project_rows]
+        itemized = [item for item in others
+                    if item.source.source_type == "html" and _ownership(item, ctx)[1]]
+        if project_rows and itemized:
+            # Dropped only when the announcement itself itemizes something else. A single-object
+            # service contract is very often named after its own object, and treating that name as
+            # a summary row empties the package - t20260806_27088832 and t20260804_27066672 both do.
+            _move_project_price(project_rows, others, unmatched, ctx)
+            cobs = others
+        by_id = {item.candidate_id: item for item in cobs}
+        groups, nameless = _baseline(cobs, ctx)
+        for candidate in nameless:
+            unmatched.append({"candidate_id": candidate.candidate_id, "reason": "missing_object_name"})
+
+        deltas: list[dict] = []
+        if llm is not None and _needs_model(cobs):
+            suspect_hint = None if amount is None or amount > 0 else "non_positive"
+            deltas, fallback = _ask_merge(ctx, groups, cobs, amount, raw, suspect_hint, evidence, llm, counter)
+            if fallback:
+                repairs.append({"package_no": package.package_no, "action": "merge_model_fallback",
+                                "reason": fallback})
+        else:
+            decisions.append({"package_no": package.package_no, "op": "model", "accepted": False,
+                              "reject": "no_model" if llm is None else "nothing_to_disambiguate"})
+        groups, excluded = _apply_deltas(groups, deltas, by_id, ctx, decisions)
+        for candidate, kind in excluded:
+            unmatched.append({"candidate_id": candidate.candidate_id, "reason": kind})
+
+        kept: list[Group] = []
+        for group in groups:
+            if any(_ownership(item, ctx)[1] for item in group.members):
+                kept.append(group)
+                continue
+            for candidate in group.members:
+                unmatched.append({"candidate_id": candidate.candidate_id,
+                                  "reason": _ownership(candidate, ctx)[2] or "cannot_own_object"})
+        groups = kept
+
+        html_groups = sum(1 for group in groups if any(item.source.source_type == "html" for item in group.members))
+        clusters = [_reconcile(group, ctx, by_id, conflicts, decisions) for group in groups]
         clusters = [item for item in clusters if _value(item.base, "object_name")]
-        for swap in _swap_by_amount(clusters, amount, owner):
-            repairs.append({"package_no": package.package_no, **swap})
+        suspect = _suspect_amount(amount, raw)
+        reconciling = None if (origin == "attachment" or suspect is not None) else amount
+        if reconciling is not None:
+            _arbitrate(clusters, reconciling, package.package_no, repairs, decisions)
+        else:
+            _log_unchosen_sums(clusters, package.package_no, decisions,
+                               "sum_unverified_no_package_amount" if amount is None
+                               else "sum_unverified_suspect_package_amount")
         alternatives[package.project_id] = _alternatives(clusters)
-        cobs = [_to_cob(item) for item in clusters]
-        if len(cobs) == 1 and cobs[0].total_price is None and cobs[0].unit_price is None and amount is not None:
-            cobs[0].total_price = amount
-            repairs.append({"package_no": package.package_no, "action": "total_from_package_amount", "value": amount})
+        list_sources[package.package_no] = ("none" if not clusters else
+                                            "html" if html_groups == len(clusters) else
+                                            "attachment" if html_groups == 0 else "mixed")
+        amount_audit[package.package_no] = {
+            "amount_yuan": amount, "raw_text": raw, "origin": origin, "suspect": suspect,
+            "reconciled": reconciling is not None,
+            "observations": ((evidence.amount_observations or {}).get(package.package_no, [])
+                             if evidence is not None else []),
+        }
+
+        cobs_out = [_to_cob(cluster) for cluster in clusters]
+        if (len(cobs_out) == 1 and cobs_out[0].total_price is None and cobs_out[0].unit_price is None
+                and reconciling is not None):
+            cobs_out[0].total_price = reconciling
+            repairs.append({"package_no": package.package_no, "action": "total_from_package_amount",
+                            "value": reconciling})
+
         subs, sub_ids, sub_conflicts, _ = _merge_entity(items, "sub")
         conflicts.extend(sub_conflicts)
-        unique_products = list(dict.fromkeys(cob.product_supplier for cob in cobs if cob.product_supplier))
+        unique_products = list(dict.fromkeys(cob.product_supplier for cob in cobs_out if cob.product_supplier))
         suppliers = [
-            Sub(
-                supplier_name=sub.supplier_name,
-                score=sub.score,
-                is_winner=bool(sub.is_winner),
-                cooperative_product_suppliers=unique_products if sub.is_winner else [],
-            )
+            Sub(supplier_name=sub.supplier_name, score=sub.score, is_winner=bool(sub.is_winner),
+                cooperative_product_suppliers=unique_products if sub.is_winner else [])
             for sub in subs
         ]
-        projects.append(
-            Project(
-                project_id=package.project_id,
-                source_project_no=understanding.source_project_no,
-                project_name=understanding.project_name or "",
-                package_no=package.package_no,
-                purchaser=understanding.purchaser,
-                package_total_amount=amount,
-                cobs=cobs,
-                subs=suppliers,
-                provenance={
-                    "cob_candidate_ids": [item.base.candidate_id for item in clusters],
-                    "price_candidate_ids": [None if item.chosen is None else item.chosen.candidate_id for item in clusters],
-                    "sub_candidate_ids": sub_ids,
-                },
-            )
-        )
+        projects.append(Project(
+            project_id=package.project_id,
+            source_project_no=understanding.source_project_no,
+            project_name=understanding.project_name or "",
+            package_no=package.package_no,
+            purchaser=understanding.purchaser,
+            package_total_amount=None if suspect is not None else amount,
+            cobs=cobs_out,
+            subs=suppliers,
+            provenance={
+                "cob_candidate_ids": [item.base.candidate_id for item in clusters],
+                "price_candidate_ids": [None if item.reading is None else item.reading.label for item in clusters],
+                # A summed reading has no single source, so its members are joined rather than
+                # nested: provenance stays a flat map of ids, as the contract defines it.
+                "price_source_ids": [None if item.reading is None else "+".join(item.reading.sources)
+                                     for item in clusters],
+                "sub_candidate_ids": sub_ids,
+            },
+        ))
+
     open_conflicts = [item for item in conflicts if item["field"] != "price_bundle"]
     status = "partial" if open_conflicts or unassigned else "success"
     return MergedProjects(
         run_id=run_id,
         status=status,
         projects=projects,
+        amount_origins={key: value for key, value in amount_origins.items() if value},
+        amount_audit=amount_audit,
         conflicts=conflicts,
         unmatched_summary_rows=unmatched,
         unassigned_candidates=unassigned,
         list_sources=list_sources,
         alternatives={key: value for key, value in alternatives.items() if value},
         repairs=repairs,
+        merge_decisions=decisions,
         failures=[],
     )
 
@@ -481,7 +1067,7 @@ def _to_cob(cluster: _Cluster) -> Cob:
     base = cluster.base
     bundle = cluster.bundle
     return Cob(
-        object_name=str(_value(base, "object_name")),
+        object_name=str(cluster.name_override or _value(base, "object_name")),
         category_code=_value(base, "category_code"),
         category_name=_value(base, "category_name"),
         category_type=_value(base, "category_type"),
@@ -554,43 +1140,57 @@ def _merge_entity(items: list[Candidate], entity_type: str):
     return merged, ids, conflicts, unmatched
 
 
-def package_checks(project: Project, list_source: str | None) -> list[dict]:
-    """Hard checks go to repair. Medium checks need review. Soft checks are only recorded."""
+# --------------------------------------------------------------------------- checks
+
+def package_checks(project: Project, amount_checked: bool = True) -> list[dict]:
+    """Hard checks go to repair, medium checks need review.
+
+    amount_checked is off when the package total itself came from an attachment: checking line
+    prices against an amount read from the same file would only confirm itself.
+
+    The old version compared the line sum to the package amount only when at least one row carried
+    a total, so a package of six objects with no prices at all reported success. It also allowed 8%
+    of slack in both directions and 5% inside a row; those tolerances had no basis, and amounts are
+    copied verbatim, so a cent is the only slack left.
+    """
     checks: list[dict] = []
     package_no = project.package_no
     if not project.cobs:
         checks.append({"package_no": package_no, "check": "missing_cob", "level": "hard"})
     if not any(sub.is_winner for sub in project.subs):
         checks.append({"package_no": package_no, "check": "missing_winner", "level": "hard"})
-    for index, cob in enumerate(project.cobs):
-        if _row_bad({"unit_price": cob.unit_price, "quantity": cob.quantity, "total_price": cob.total_price}):
-            checks.append({"package_no": package_no, "check": "row_mismatch", "level": "hard", "cob_index": index})
+    unpriced = [index for index, cob in enumerate(project.cobs)
+                if cob.total_price is None and cob.unit_price is None]
+    if unpriced:
+        checks.append({"package_no": package_no, "check": "missing_line_price", "level": "medium",
+                       "cob_indexes": unpriced})
     totals = [cob.total_price for cob in project.cobs if isinstance(cob.total_price, (int, float))]
-    amount = project.package_total_amount
+    amount = project.package_total_amount if amount_checked else None
     if amount and totals:
         summed = sum(totals)
-        deviation = (summed - amount) / abs(amount)
-        if deviation > AMOUNT_TOLERANCE:
-            checks.append(
-                {"package_no": package_no, "check": "amount_overflow", "level": "hard", "line_sum": summed, "package_total": amount}
-            )
-        elif deviation < -AMOUNT_TOLERANCE:
-            checks.append(
-                {
-                    "package_no": package_no,
-                    "check": "amount_underflow",
-                    "level": "soft" if list_source == "html" else "medium",
-                    "line_sum": summed,
-                    "package_total": amount,
-                }
-            )
+        if summed - amount > CENT:
+            # Adding the rows that carry no price can only push this further up, so a shortfall of
+            # evidence does not excuse an overflow.
+            checks.append({"package_no": package_no, "check": "amount_overflow", "level": "hard",
+                           "line_sum": summed, "package_total": amount})
+        elif amount - summed > CENT:
+            # A shortfall is never a defect on its own. t20260202_26139731 package 3 is gold at a
+            # line sum of 1579600 against an amount of 2431310: the announcement's object list
+            # simply does not cover the whole award. What is actionable is a row with no price at
+            # all, and missing_line_price already reports that, so this stays information only.
+            checks.append({"package_no": package_no, "check": "amount_underflow", "level": "soft",
+                           "line_sum": summed, "package_total": amount})
     return checks
+
+
+def amount_checked(merged: MergedProjects, project: Project) -> bool:
+    return merged.amount_origins.get(project.package_no) != "attachment"
 
 
 def consistency_checks(merged: MergedProjects) -> list[Failure]:
     checks: list[dict] = []
     for project in merged.projects:
-        checks.extend(package_checks(project, merged.list_sources.get(project.package_no)))
+        checks.extend(package_checks(project, amount_checked=amount_checked(merged, project)))
     merged.checks = checks
     blocking = [item for item in checks if item["level"] in {"hard", "medium"}]
     if not blocking:

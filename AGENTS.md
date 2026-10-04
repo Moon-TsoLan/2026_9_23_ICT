@@ -18,6 +18,7 @@
 - 减少开支靠**切分**：一页一次、一段一次、按包一次；去重靠 `digest`；上限靠页数预算——不靠猜内容。
 - 模型不确定时**保守放行**（低置信一律继续处理），并把这类事件计数（如 `low_confidence_keep`、`probe_escalation`），用来体检阈值而不是偷偷收紧。
 - 需要新增过滤时，先问：它判断的是"结构事实"还是"内容价值"？后者一律改为模型判定 + 计数观察。
+- 告诉模型"我们在找什么"属于提供信息，不属于替它判断；但needs 只能来自缺口计算，不得硬编码字段清单。
 - 阈值与词表的最终取舍等留出集全量结果出来再定（`eval/holdout25.json`）。
 
 
@@ -42,16 +43,96 @@
 `page_is_item_table()` 与结构性页强制并入、`search_queries`→`context_terms` 改名、`locate-pages-v2.md` 新建、
 `peek.py` 的结构化抽样改写（含其遗留 NameError）。回退后 `pytest tests` 为 40 passed。
 
-**仍存在的未经指示改动，等用户处置**：
+**用户明确指示新增的规则（2026-10-03，唯一允许的名字直判负）**：
 
-- `src/ict/parse/screen.py`：原第 4b 步的**文件名词表否决分支**（`rule_name_averse*`、`rule_name_junk*` 一类
-  「按名字判负」的 `if`）被我删除了。这同样是一次未经指示的**规则删除**，且没有被回退。
-  当前 4b 只有：容器能力判断（读不动就交归一化）、模型 `kind` 三类保留、`confidence < 0.6` 保守保留。
-  若要恢复名字否决，需要用户指示（恢复它也与本文件第 1、2 条原则冲突，请先决策再动手）。
+- `src/ict/parse/screen.py:33` `NAME_IGNORE = 中小企业声明函|残疾人福利`
+- 命中这两个字面词的文件在第 4b 步**直接判负**：不目检、不版面解析、不问模型；决策记
+  `method=rule_name_ignore`、`reason=rule_name_ignore:<命中词>`，写进 `05_file_decisions.json` 可审计。
+- **仅此两条，不得自行增加任何词**。之前被我删除的宽泛"文件名词表判负"分支（`rule_name_averse*`/
+- **取消第 4b 的文件数截断**（同日指示）：原 `MAX_SELECTED_FILES_PER_ANNOUNCEMENT=6` 与
+  `over_file_cap` 分支已删除。附件多属正常，成本只按**页**控制：每文件解析上限
+  `PARSE_MAX_PAGES_PER_FILE=40`、第 5 步每文件 30 页、每则 100 页保持不变。
+  `rule_name_junk*`）经此指示后确认为**正式废弃**，不恢复：除上述两个字面词外，名字一律只作为模型输入特征。
 
-**经用户批准新增的规则**（属实时解析集成的一部分，非违规）：4b 的 `KIND_PARSE` 三类保留集、
-`SCREEN_CONF_MIN=0.6`、`MAX_SELECTED_FILES_PER_ANNOUNCEMENT=6`、`PARSE_MAX_PAGES_PER_FILE=40`、
-`PAGE_TEXT_HEAD` 沿用、`structural` 相关的旧 `page_context_truncated` 改为 `page_context_split` 计数。
+**目检判定式已切换（2026-10-03，用户指示）**：`confidence` 阈值与 `low_confidence_keep` **全部删除**
+（`SCREEN_CONF_MIN` 已从 config 移除）。现在第 4b 步只看一件事——模型有没有**发现**缺口字段：
+`needs_hit` 非空 → 版面解析；为空 → 判负。`needs` 本身为空时无从判断，一律保留
+（`*_no_needs_keep`）。`kind`、`confidence` 继续输出并留痕，但不再参与判定。
+第 3 步的 `ProjectPlan.needs` 与目检的 `found_fields`/`needs_hit` 同批落地。
 
-排查用的完整规则清单见 `eval/规则清单.md`；主流程实现细则（模型输入输出 + 每条规则的依据）见
+**已撤案（用户判断，不再讨论）**：附件包金额的"只填补不校验"（needs 已保证不会冲突，多余）、
+放行集排序键改命中数（取消文件数上限后排序不再丢弃任何文件，无意义）。跨公告 digest 复用亦按指示不动。
+
+`needs` 贯穿 4b/5/6 的改造已实施完毕，设计过程稿归档在 `doc/archive/需求字段驱动的附件链路可行性-已实施.md`。
+未做完的事（含「附件里的包金额没有承载位」这一条流程断点）统一记在 `eval/待优化清单.md`，那是唯一的待办出口。
+
+**A 组信息传递改造（2026-10-03，用户指示「A 你可以全量修改」）**：第 5 步 payload 删 `search_queries`
+（第 3 步仍生成该字段留档，但不再进任何模型调用）；`needs` 定义写全四种 `reason` 含义（含
+`maybe_more_objects`＝公告标清单可能不全），`missing_fields` 定义写明只针对已知标的；目检的
+`found_fields` 随文件送到第 5、6 步；`possible_packages` 填文件名唯一包号且必须在公告包集内（只喂既有分支，
+不新增判定）；删 `SCREEN_EXPECTED`，`FileDecision.expected_fields` 改存目检结果；第 6 步的成本旋钮具名进
+`config.py`（值不变）。判定分支、词表、阈值未增减。B 组按用户裁定保持：`is_winner` 缺失与其他写法一律 False，
+白名单里的 `1` 暂不动，等实测。
+
+**A1 包级金额承载位（2026-10-03，用户指示"增添包级结构"）**：第 6 步抽取输出新增 `package_amounts`
+（模型只抄原文包号与原文金额；公告没有的包号原样留痕，第 8 步按包号查表用不上）；第 8 步在包金额缺失且观测值唯一时填一次，
+记 `amount_origins=attachment`；该来源金额不参与对账换组、不触发金额检查、不作为单标的总价；
+观测值不一致时记 `package_amount_conflict` 并且不填。其余第 8 步判定未动。
+
+**字段语义单一来源（2026-10-03，用户批准的方案，非规则改动）**：`src/ict/fields.py` 是唯一字段定义处，
+`llm.load_prompt()` 在每份提示词后追加该步「输入字段 + 输出字段」的含义块（步骤专属取值表在
+`STEP_FIELD_OVERRIDES`）。为此从 9 份 `.md` 里删掉了手抄的字段定义行（枚举取值、格式要求、子字段清单
+一律移进 fields.py，判定文字保持原样），`tests/test_parse.py` 加两个守卫测试防重复与防悬空字段名。
+判定分支、词表、阈值未做任何增减。
+
+**第 8 步重写与跨步证据传递（2026-10-04，用户指示「可以开始全量修改了」）**：这是规则冻结以来
+经用户明确指示的一次规则增删，范围只限第 8 步与"把已抽取的信息传到第 8 步"。
+
+同一性是内容判断，按本文件第 1 条交给模型：每包一次 `merge-objects-v1`，模型看到的是本包全部候选
+加证据，输出的是对**基线分组**（名称完全相同）的修改 `deltas`（merge/split/sum/exclude/name_from/price_from），
+不是重画的划分。规则逐条校验、逐条否决、逐条留痕；调用失败或两次不合法就退回基线，记 `merge_model_fallback`。
+`merge_projects(..., llm=None)` 是纯确定性路径，`tests/test_rules.py` 全在这条路径上跑。
+
+模型不能写数字（求和由规则重算）、不能引用没给它的编号、不能让没有供价资格的来源供价。
+`confidence` 只留痕，不参与任何取舍。
+
+**删掉的规则**（都是用户点名"毫无依据的历史遗留"或参照物已消失的）：封闭清单（附件名称必须与 HTML
+逐字相等）、`open_single` 与用 `source_priority >= 70` 判 HTML 明细、`ROW_TOLERANCE=0.05` 与 `row_mismatch` 检查、
+`AMOUNT_TOLERANCE=0.08` 死区、项目全称行的 0.8 包含度、`product_supplier` 的跨标的封锁、
+`amount_underflow` 的 soft/medium 分档。
+
+**新增的判定点**（每条都是结构事实，不是词表或阈值）：报价归属资格（`tender_requirement` 与
+"归属明确且不是中标人"不供价、不新增标的，仍可补描述字段）；指针行排除（只读 `points_to_attachment`
+状态与 2B 已盖的 issue）；项目全称行只在公告自己分项列出过别的标的时才剔；`parse_amount` 拒绝百分号；
+包金额体检只看金额本身（百分号、非正数），不与标的清单比较；容差只剩一分钱 `CENT=0.01`，
+那是浮点与取整精度。
+
+**跨步传递**：候选加 `evidence`（`table_index`、`row_text`、`quote_supplier`、`bidder_supplier`、
+`winner_supplier`），4b 加 `quote_supplier` 与 `is_award_notice`，第 1 步加 `amount_alternatives` 留痕。
+第 8 步另有一条只读证据通道 `MergeEvidence`，在 pipeline 里用已在作用域内的东西组装，落
+`08b_merge_evidence.json`（不注册为步骤）。选"定向补传递"而不是"统一 state"，是因为第 8 步的消费者是
+模型，非结构化证据可以直接透传，不必先结构化；也因为统一 state 要重写 9 个 payload builder，
+任何行为漂移都会让跑不动的 benchmark10 基线失效。**步骤划分未动。**
+
+规范见 `doc/第8步标的合并规范.md`（v5，v3/v4 已归档）；契约已同步到 v0.8。
+用旧的 `08_normalized_candidates.json` 回放新第 8 步（无模型的确定性基线）：35 则里 14 则结果变化，
+无崩溃。真实效果等服务器起来跑 B1/B4。
+
+**第 7 步文本归一化与第 4c 步页数预算（2026-10-04，用户批准）**：
+
+第 7 步新增 `norm_text`，只作用于 COB 的文本字段，写进 `normalized_value` 而 `raw_value` 原样保留。
+去的是全角圆括号、紧挨汉字的空格、重复空白；**大小写不动、拉丁与数字之间的空格不动、顿号逗号冒号
+分号不动**（实测全删空格会破坏 11% 的 `spec_model`，多是多词型号；`、` 若转成 `,` 会毁掉一整类用顿号
+分隔的名称）。供应商名不在此列——全角括号常是登记名的一部分，且 SUB 合并键早已做同等归一化。分组用的
+键仍比归一化值激进，因为键只管召回、是否同一标的由模型判。这样 `t20260202_26140620` 那类"两份文件、
+一个产品、差一个空格"的假冲突自动消失，它此前把一则与金标完全一致的包拖进 `partial`。
+
+第 4c 步不再从第 1 页盲切 40 页：超过预算的 PDF 先在本地读逐页结构信号（pymupdf 检出的表格数、既有
+`PRICE_HINT` 命中数），按 `(有表格, 价格用词数, 页号)` 字典序取预算内页，交给 `pages=` 由服务端分连续段
+解析，跨页表不被切断；`contiguous_runs` 与 `PARSE_PAGE_PAD` 从此不再是死代码。**没有新增词表、没有阈值、
+不判内容价值**：字数刻意不参与排序，所以无表格、无价格用词的扫描件排名退化为页序，与旧行为逐页相同；
+短文件、非 PDF 容器、排名恰好等于前 40 页的一律走原路径。实测三份长文件，有原生表格的页覆盖从
+10/12/19 页升到各 40 页，预算不变。截断从静默变可审计（`05b` 摘要记 `table_pages_missed`）。
+
+排查用的完整规则清单见 `eval/archive/规则清单.md`；主流程实现细则（模型输入输出 + 每条规则的依据）见
 `eval/主路线实现细则.md`。

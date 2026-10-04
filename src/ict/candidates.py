@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from ict.config import COB_FIELDS, SUB_FIELDS
-from ict.schemas import Candidate, FieldObservation, Source
+from ict.schemas import Candidate, CandidateEvidence, FieldObservation, Source
 
 POINTING = ("详见附件", "见附件")
 FIELD_ALIASES = {
@@ -104,6 +104,12 @@ def seal_candidate(
     confidence: float | None = 0.8,
     source_class: str | None = None,
     page_no: int | None = None,
+    table_index: int | None = None,
+    row_text: str | None = None,
+    column_units: dict | None = None,
+    quote_supplier: str | None = None,
+    bidder_supplier: str | None = None,
+    winner_supplier: str | None = None,
 ) -> Candidate:
     fields = blank_fields(entity_type)
     raw_fields = align_fields(entity_type, raw_fields)
@@ -113,6 +119,19 @@ def seal_candidate(
                 fields[key] = FieldObservation(**raw)
             else:
                 fields[key] = observe(raw, confidence)
+    units = {str(k): str(v).strip()[:60] for k, v in (column_units or {}).items()
+             if v not in (None, "") and str(v).strip()}
+    evidence_values = {
+        "table_index": table_index,
+        "row_text": None if not row_text else str(row_text).strip()[:400] or None,
+        "column_units": units,
+        "quote_supplier": _clean(quote_supplier),
+        "bidder_supplier": _clean(bidder_supplier),
+        "winner_supplier": _clean(winner_supplier),
+    }
+    has_evidence = any(key != "column_units" and value is not None for key, value in evidence_values.items()) \
+        or bool(evidence_values["column_units"])
+    evidence = CandidateEvidence(**evidence_values) if has_evidence else None
     return Candidate(
         candidate_id=candidate_id,
         entity_type=entity_type,
@@ -123,4 +142,10 @@ def seal_candidate(
         fields=fields,
         issues=issues or [],
         source_class=source_class,
+        evidence=evidence,
     )
+
+
+def _clean(value) -> str | None:
+    text = "" if value is None else str(value).strip()
+    return text[:120] or None

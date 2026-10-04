@@ -64,4 +64,4 @@ def yuan(x: Any) -> str:
         return f"{v / 1e8:.2f} 亿"
     if v >= 1e4:
         return f"{v / 1e4:.1f} 万"
-    return f"{v:,.0f} 元"
+    return f"{v:,.2f} 元" if round(v, 2) != round(v) else f"{v:,.0f} 元"

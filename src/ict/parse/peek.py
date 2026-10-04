@@ -147,3 +147,31 @@ def peek_entry(entry: FileEntry, view_chars: int = 3000) -> Peek:
         if not peek.readable:
             peek.reason = "thin_text_%d" % peek.full_chars
     return peek
+
+
+def page_profiles(path, cap: int = 0) -> list[dict]:
+    """Per-page structural facts, read natively. Only ever used to spend the page budget.
+
+    Two signals, and no vocabulary of its own: whether pymupdf finds a table on the page, and how
+    often the existing PRICE_HINT words appear there. Character count is deliberately left out - a
+    scanned page sitting under a watermark has plenty of characters and no content. Leaving it out
+    also means a tableless, wordless file ranks in plain page order, so it is parsed exactly where
+    it always was and nothing about a scan changes here.
+    """
+    import pymupdf
+
+    profiles: list[dict] = []
+    document = pymupdf.open(str(path))
+    try:
+        stop = document.page_count if not cap else min(document.page_count, cap)
+        for index in range(stop):
+            page = document[index]
+            try:
+                tables = len(page.find_tables().tables)
+            except Exception:  # noqa: BLE001 - a broken table finder is not a reason to lose the page
+                tables = 0
+            profiles.append({"page_no": index + 1, "tables": tables,
+                             "price_hits": len(PRICE_HINT.findall(page.get_text() or ""))})
+    finally:
+        document.close()
+    return profiles

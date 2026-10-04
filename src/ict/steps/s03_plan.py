@@ -99,6 +99,25 @@ def plan_projects(
         ][:5]
         queries = [f"第{package.package_no}包 分项报价"]
         queries.extend(names)
+        targets: list[dict[str, str]] = []
+        for key in missing:
+            targets.append({"field": key,
+                          "reason": "points_to_attachment" if stats[key].points_to_attachment else "coverage_low",
+                          "package_no": package.package_no})
+        has_package_amount = bool(package.package_amount and package.package_amount.amount_yuan is not None)
+        has_summary_amount = bool(understanding.summary_amount and understanding.summary_amount.amount_yuan is not None)
+        if not has_package_amount and not (understanding.package_mode == "single" and has_summary_amount):
+            targets.append({"field": "package_total_amount", "reason": "absent", "package_no": package.package_no})
+        if not any(item.fields["is_winner"].raw_value not in (None, "", False) or item.fields["is_winner"].normalized_value
+                   for item in subs):
+            targets.append({"field": "is_winner", "reason": "absent", "package_no": package.package_no})
+        if not any(item.fields["score"].normalized_value is not None or item.fields["score"].raw_value not in (None, "")
+                   for item in subs):
+            targets.append({"field": "score", "reason": "absent", "package_no": package.package_no})
+        # Standing target: the announcement's own object list is often one summary row plus
+        # 详见附件, so attachments may still hold objects the announcement never named.
+        targets.append({"field": "object_name", "reason": "maybe_more_objects",
+                        "package_no": package.package_no})
         projects.append(
             ProjectPlan(
                 project_id=package.project_id,
@@ -107,6 +126,7 @@ def plan_projects(
                 sub_candidate_ids=[item.candidate_id for item in subs],
                 field_stats=stats,
                 missing_fields=missing,
+                needs=targets,
                 suspects=suspects,
                 has_attachment=has_attachment,
                 needs_attachment=needs,

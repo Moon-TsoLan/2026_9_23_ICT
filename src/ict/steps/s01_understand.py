@@ -11,6 +11,15 @@ from ict.schemas import Amount, AnnouncementUnderstanding, Failure, ModelMetadat
 PROMPT = "announcement-v1"
 
 
+def _confidence(value, default: float = 0.9) -> float:
+    """The model may write confidence as a word; it is an audit field, so never let it throw."""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return default
+    return number if 0 <= number <= 1 else default
+
+
 def _amount(raw: str | None, scope: str, confidence: float | None = 0.9) -> Amount | None:
     if not raw:
         return None
@@ -34,6 +43,17 @@ def seal(run_id: str, proposed: dict, metadata: ModelMetadata | None, failures: 
         seen.add(package_no)
         evidence = item.get("package_evidence_text") or item.get("title") or package_no
         raw_amount = item.get("raw_amount") or (item.get("package_amount") or {}).get("raw_text")
+        # Every other amount the model saw for this package, kept verbatim. Step 8 still receives
+        # one package_amount; this only makes the choice it inherited visible. 22 of 49 packages
+        # in the corpus state the amount in more than one place.
+        alternatives: list[Amount] = []
+        for entry in item.get("amount_alternatives") or []:
+            if not isinstance(entry, dict):
+                continue
+            alt = _amount(entry.get("raw_text") or entry.get("raw_amount"), "package",
+                          _confidence(entry.get("confidence")))
+            if alt is not None:
+                alternatives.append(alt)
         packages.append(
             PackageUnderstanding(
                 package_no=package_no,
@@ -41,6 +61,7 @@ def seal(run_id: str, proposed: dict, metadata: ModelMetadata | None, failures: 
                 project_id=make_project_id(name, package_no) if name else "",
                 package_evidence_text=evidence,
                 package_amount=_amount(raw_amount, "package"),
+                amount_alternatives=alternatives,
             )
         )
     if mode == "single" and not packages and name:

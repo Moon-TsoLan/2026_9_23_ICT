@@ -6,7 +6,7 @@ import json
 import re
 from collections import Counter
 
-from ict.candidates import seal_candidate
+from ict.candidates import align_fields, seal_candidate
 from ict.config import SOURCE_PRIORITY
 from ict.html_context import ParsedNotice, ParsedTable, bidder_body_sections, step2a_payload
 from ict.ids import make_project_id
@@ -176,6 +176,9 @@ def extract_html_candidates(
             priority,
             seq,
             known_packages,
+            table=table,
+            table_index=understood.table_index,
+            column_mapping=understood.column_mapping,
         )
         pointer = entity == "cob" and _line_fields_point(table, understood.column_mapping)
         cells = {_compact(cell) for row in table.rows for cell in row} if understood.table_role == "winner" else set()
@@ -245,7 +248,37 @@ def _line_fields_point(table: ParsedTable, mapping: dict[str, str]) -> bool:
     return any(LINE_POINTER_RE.search(cell or "") for row in table.rows for cell in row)
 
 
-def _append_candidates(candidates, items, entity, package_no, project_name, priority, seq, known_packages=None) -> int:
+def _column_units(mapping: dict) -> dict:
+    """The header text behind each amount field, straight out of step 2A's column mapping.
+
+    Only the two price fields matter: a quantity or a unit never carries a 万元.
+    """
+    return {key: str(mapping[key]).strip() for key in ("unit_price", "total_price")
+            if mapping.get(key) not in (None, "")}
+
+
+def _row_text(table: ParsedTable | None, raw_fields: dict) -> str | None:
+    """The source line, and only when exactly one row of the table carries these values.
+
+    Step 8 needs the line a value came from and cannot recover it later: a candidate does not
+    know its own row. The lookup is mechanical, and an ambiguous match is left empty rather
+    than guessed at.
+    """
+    if table is None:
+        return None
+    wanted = _compact(raw_fields.get("object_name") or raw_fields.get("supplier_name") or "")
+    if not wanted:
+        return None
+    hits = [row for row in table.rows if any(wanted in _compact(cell) for cell in row)]
+    if len(hits) != 1:
+        return None
+    cells = [str(cell) for cell in hits[0] if str(cell).strip()]
+    return " | ".join(cells)[:400] or None
+
+
+def _append_candidates(candidates, items, entity, package_no, project_name, priority, seq, known_packages=None,
+                       table: ParsedTable | None = None, table_index: int | None = None,
+                       column_mapping: dict | None = None) -> int:
     for item in items:
         item_type = item.get("entity_type") or entity
         if item_type not in {"cob", "sub"}:
@@ -267,6 +300,9 @@ def _append_candidates(candidates, items, entity, package_no, project_name, prio
                 source_priority=priority,
                 raw_fields=item.get("fields") or {},
                 issues=item.get("issues") or [],
+                table_index=table_index,
+                row_text=_row_text(table, align_fields(item_type, item.get("fields") or {})),
+                column_units=_column_units(column_mapping or {}) if item_type == "cob" else None,
             )
         )
         seq += 1

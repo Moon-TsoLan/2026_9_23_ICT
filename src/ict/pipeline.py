@@ -11,7 +11,7 @@ from ict.config import ATTACHMENTS_ROOT, DATA_HTML
 from ict.html_context import parse_notice, winner_hints
 from ict.index.build import build_index, load_index
 from ict.llm import LLMClient, build_client
-from ict.schemas import CandidateFile, Failure, RunReport
+from ict.schemas import CandidateFile, Failure, MergeEvidence, RunReport
 from ict.state import RunStore, write_json
 from ict.steps.s01_understand import understand
 from ict.steps.s02_html import extract_html_candidates, understand_tables
@@ -57,6 +57,8 @@ def run_announcement(announcement_id: str, llm: LLMClient | None = None, html_di
         return _finish(store, calls, all_failures, started)
 
     package_nos = [package.package_no for package in understanding.packages]
+    # Needed by step 6 (so it copies the winner instead of re-deriving it) and by step 8b.
+    award_hints = winner_hints(notice, package_nos)
     store.begin("understand_html_tables")
     tables = understand_tables(store.run_id, notice, package_nos, client, calls)
     store.write_output("understand_html_tables", tables)
@@ -90,7 +92,11 @@ def run_announcement(announcement_id: str, llm: LLMClient | None = None, html_di
     store.state.counts["projects"] = len(plans.projects)
     all_failures.extend(plans.failures)
 
-    attachment_candidates = []
+    attachment_candidates: list = []
+    package_amounts: list = []
+    file_decisions = None
+    page_decisions = None
+    parsed: dict[str, list[dict]] = {}
     if index is None:
         store.begin("triage_files")
         skipped = triage_files(store.run_id, plans, None, client)
@@ -139,6 +145,13 @@ def run_announcement(announcement_id: str, llm: LLMClient | None = None, html_di
             counter=calls,
             file_classes={item.file_id: item.file_class for item in file_decisions.file_decisions},
             file_names=file_names_of(index),
+            file_found_fields={item.file_id: item.expected_fields for item in file_decisions.file_decisions},
+            package_amounts=package_amounts,
+            file_quote_suppliers={item.file_id: item.quote_supplier
+                                  for item in file_decisions.file_decisions if item.quote_supplier},
+            winner_suppliers=award_hints,
+            file_award_notices={item.file_id: True for item in file_decisions.file_decisions
+                                if item.is_award_notice},
         )
         attach_file = CandidateFile(
             run_id=store.run_id,
@@ -146,6 +159,7 @@ def run_announcement(announcement_id: str, llm: LLMClient | None = None, html_di
             candidates=attachment_candidates,
             failures=attach_failures,
             page_quality=quality,
+            package_amounts=package_amounts,
         )
         store.write_output("extract_attachment_candidates", attach_file)
         store.finish("extract_attachment_candidates", attach_file.status)
@@ -161,12 +175,16 @@ def run_announcement(announcement_id: str, llm: LLMClient | None = None, html_di
     all_failures.extend(normalized.failures)
 
     store.begin("merge_candidates")
-    merged = merge_projects(store.run_id, understanding, normalized.candidates)
+    evidence = _merge_evidence(notice, tables, understanding, index, file_decisions, page_decisions,
+                               parsed, package_amounts, award_hints)
+    store.write_output("merge_evidence", evidence)
+    merged = merge_projects(store.run_id, understanding, normalized.candidates, package_amounts,
+                            evidence=evidence, llm=client, counter=calls)
     store.write_output("merge_candidates", merged)
     store.finish("merge_candidates", merged.status)
 
     store.begin("repair_packages")
-    check_failures = repair_packages(merged, winner_hints(notice, package_nos), client, calls)
+    check_failures = repair_packages(merged, award_hints, client, calls)
     all_failures.extend(check_failures)
     merged.failures.extend(check_failures)
     store.write_output("repair_packages", merged)
@@ -190,6 +208,77 @@ def run_announcement(announcement_id: str, llm: LLMClient | None = None, html_di
 
 def _first_code(failures: list[Failure]) -> str | None:
     return failures[0].failure_code if failures else None
+
+
+def _merge_evidence(notice, tables, understanding, index, file_decisions, page_decisions,
+                    parsed: dict[str, list[dict]], package_amounts: list,
+                    award_hints: dict[str, list[str]]) -> MergeEvidence:
+    """Assemble what step 8 needs but cannot recover from candidates alone.
+
+    Every value here is already in scope inside `run_announcement`; this only carries it forward.
+    Nothing is judged: file names, table roles, page text and amount observations are handed over
+    as they are, and step 8 decides what they mean.
+    """
+    html_tables: dict[str, dict] = {}
+    by_index = {table.table_index: table for table in notice.tables}
+    for understood in (tables.tables if tables is not None else []):
+        table = by_index.get(understood.table_index)
+        html_tables[str(understood.table_index)] = {
+            "table_role": understood.table_role,
+            "row_grain": understood.row_grain,
+            "package_scope": understood.package_scope,
+            "section": (table.section if table is not None else None) or "",
+            "headers": (table.headers if table is not None else []) or [],
+            "issues": list(understood.issues or []),
+        }
+    names = file_names_of(index)
+    attachment_pages: dict[str, dict] = {}
+    selected = {(item.file_id, item.page_no) for item in (page_decisions.page_decisions if page_decisions else [])}
+    for file_id, pages in (parsed or {}).items():
+        for page in pages:
+            if selected and (file_id, page["page_no"]) not in selected:
+                continue
+            attachment_pages["%s:%s" % (file_id, page["page_no"])] = {
+                "file_name": names.get(file_id, file_id),
+                "text_head": (page.get("text") or "")[:400],
+                "table_headers": [table.get("headers") for table in (page.get("tables") or [])],
+            }
+    observations: dict[str, list[dict]] = {}
+
+    def _observe(package_no: str, raw, yuan, origin: str, location: dict | None = None) -> None:
+        if raw in (None, "") and yuan is None:
+            return
+        observations.setdefault(str(package_no), []).append(
+            {"raw_text": raw, "amount_yuan": yuan, "origin": origin, **(location or {})})
+
+    single = understanding.package_mode == "single"
+    for package in understanding.packages:
+        amount = package.package_amount
+        if amount is not None:
+            _observe(package.package_no, amount.raw_text, amount.amount_yuan, "announcement_package")
+        for extra in package.amount_alternatives or []:
+            _observe(package.package_no, extra.raw_text, extra.amount_yuan, "announcement_alternative")
+        if single and understanding.summary_amount is not None:
+            _observe(package.package_no, understanding.summary_amount.raw_text,
+                     understanding.summary_amount.amount_yuan, "announcement_summary")
+    for item in package_amounts or []:
+        _observe(item.package_no, item.raw_text, item.amount_yuan, "attachment",
+                 {"file_id": item.file_id, "file_name": item.file_name, "page_no": item.page_no,
+                  "file_class": item.file_class})
+    return MergeEvidence(
+        file_names=names,
+        file_classes={item.file_id: item.file_class for item in (file_decisions.file_decisions if file_decisions else [])},
+        file_quote_suppliers={item.file_id: item.quote_supplier
+                              for item in (file_decisions.file_decisions if file_decisions else [])
+                              if item.quote_supplier},
+        file_award_notices={item.file_id: True
+                            for item in (file_decisions.file_decisions if file_decisions else [])
+                            if item.is_award_notice},
+        html_tables=html_tables,
+        attachment_pages=attachment_pages,
+        winner_hints={key: list(value) for key, value in (award_hints or {}).items()},
+        amount_observations=observations,
+    )
 
 
 def _first_message(failures: list[Failure]) -> str | None:

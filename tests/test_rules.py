@@ -14,6 +14,63 @@ from ict.steps.s08_merge import merge_projects
 HTML = Path(r"D:\all_contest\2026_9_23_ICT\data\赛题五基准测试数据\赛题五.基准测试数据_html\t20260202_26139731.html")
 
 
+def test_norm_text_strips_typesetting_noise_and_keeps_content():
+    """Half-width brackets and CJK padding go; case, latin spaces and enumeration marks stay."""
+    from ict.steps.s07_normalize import norm_text
+
+    assert norm_text("遥测心电监护系统（1 拖 40）") == "遥测心电监护系统(1拖40)"
+    assert norm_text("规格：外形尺寸（mm） 长5645、宽2220") == "规格：外形尺寸(mm)长5645、宽2220"
+    for kept in ("BeneVision TMS30A", "SOMATOM go.Up", "NGFC FRAME", "触控一体机6台、教师办公电脑14台"):
+        assert norm_text(kept) == kept
+
+
+def test_a_spelling_variant_is_not_reported_as_a_merge_conflict():
+    """t20260202_26140620: two documents, one product, one with a typed space inside the brackets.
+
+    The pair already landed in one baseline group, so the only thing the difference proved was that
+    grouping and comparison disagreed; it used to drag a gold-correct package into review.
+    """
+    merged = _merge(
+        [
+            _cob("cand_000006", "pdf", 90, {"object_name": "遥测心电监护系统（1 拖 40）", "quantity": "1",
+                                            "unit_price": "440000", "total_price": "440000"},
+                 source_class="bid_quote"),
+            _cob("cand_000009", "pdf", 40, {"object_name": "遥测心电监护系统（1拖40）", "quantity": "1"},
+                 source_class="tender_requirement"),
+        ],
+        amount=440000,
+    )
+    assert merged.conflicts == []
+    assert merged.projects[0].cobs[0].object_name == "遥测心电监护系统(1拖40)"
+    assert merged.status == "success"
+
+
+def test_the_page_budget_follows_native_tables_not_page_order():
+    from ict.steps.s04_attach import rank_budget
+
+    profiles = [{"page_no": page, "tables": 0, "price_hits": 0} for page in range(1, 11)]
+    profiles[7]["tables"] = 3
+    profiles[7]["price_hits"] = 9
+    profiles[8]["tables"] = 1
+    profiles[8]["price_hits"] = 4
+    # The two table pages lead the budget; whatever is left over is filled in page order.
+    assert rank_budget(profiles, 3) == [1, 8, 9]
+
+
+def test_a_scan_with_no_tables_and_no_price_words_keeps_the_old_front_slice():
+    """Nothing about a scanned file changes: the ranking falls back to page order."""
+    from ict.steps.s04_attach import _budget_pages, rank_budget
+    from ict.parse.census import FileEntry
+
+    profiles = [{"page_no": page, "tables": 0, "price_hits": 0} for page in range(1, 90)]
+    assert rank_budget(profiles, 40) == list(range(1, 41))
+
+    entry = FileEntry(file_id="a001", name="not a pdf.doc", relative_path="x.doc",
+                      path=Path("x.doc"), size_bytes=1, declared_ext=".doc", fmt="ole",
+                      note="", digest="", pages=90)
+    assert _budget_pages(entry, 40, []) == (None, [])
+
+
 def test_alias_field_names_keep_object_name():
     candidate = seal_candidate(
         candidate_id="cand_000001",
@@ -122,7 +179,12 @@ def test_normalize_fills_total_and_catalog_name():
     assert fields["category_code"].normalized_value == "A01010100"
 
 
-def test_merge_keeps_html_price_and_list_owner_product_supplier():
+def test_merge_keeps_html_price_and_takes_the_manufacturer_html_left_empty():
+    """The HTML row still wins the price; the attachment now fills what the HTML did not say.
+
+    Refusing a manufacturer from every attachment whenever the list was HTML-owned only made sense
+    while the closed list decided who owned the list. Rank decides that per object now.
+    """
     low = seal_candidate(
         candidate_id="cand_000001",
         entity_type="cob",
@@ -173,15 +235,15 @@ def test_merge_keeps_html_price_and_list_owner_product_supplier():
                 package_evidence_text="单包",
             )
         ],
-        summary_amount={"raw_text": "10元", "amount_yuan": 10, "scope": "announcement", "confidence": 1},
+        summary_amount={"raw_text": "100元", "amount_yuan": 100, "scope": "announcement", "confidence": 1},
     )
     merged = merge_projects("run_x", understanding, [low, high, winner])
     project = merged.projects[0]
-    assert project.package_total_amount == 10
+    assert project.package_total_amount == 100
     assert project.cobs[0].brand == "创维"
     assert project.cobs[0].unit_price == 100
-    assert project.cobs[0].product_supplier is None
-    assert project.subs[0].cooperative_product_suppliers == []
+    assert project.cobs[0].product_supplier == "厂商甲"
+    assert project.subs[0].cooperative_product_suppliers == ["厂商甲"]
 
 
 def test_parenthetical_wan_and_requirement_text():
@@ -281,7 +343,7 @@ def test_plan_needs_attachment_when_brand_missing():
     assert json.loads(plans.model_dump_json())["projects"][0]["has_attachment"] is True
 
 
-def _cob(cid, source, priority, fields, package="1", source_class=None, issues=None):
+def _cob(cid, source, priority, fields, package="1", source_class=None, issues=None, **evidence):
     return seal_candidate(
         candidate_id=cid,
         entity_type="cob",
@@ -293,6 +355,7 @@ def _cob(cid, source, priority, fields, package="1", source_class=None, issues=N
         raw_fields=fields,
         issues=issues,
         source_class=source_class,
+        **evidence,
     )
 
 
@@ -331,11 +394,92 @@ def _understanding(amount=None, packages=("1",), project_name="项目"):
     )
 
 
-def _merge(candidates, amount=None, project_name="项目"):
+def _merge(candidates, amount=None, project_name="项目", observations=None, evidence=None, llm=None):
     for candidate in candidates:
         candidate.project_id = f"{project_name}|{candidate.package_no}"
     normalized = normalize_candidates("run_x", candidates, Catalog()).candidates
-    return merge_projects("run_x", _understanding(amount, project_name=project_name), normalized)
+    return merge_projects("run_x", _understanding(amount, project_name=project_name), normalized,
+                          observations, evidence=evidence, llm=llm)
+
+
+def _merged_with_deltas(candidates, deltas, amount=None, project_name="项目", evidence=None):
+    """Run step 8 with a fixed model answer, the way the real step 8 sees one package."""
+    from ict.llm import FakeLLMClient
+
+    return _merge(candidates, amount=amount, project_name=project_name, evidence=evidence,
+                  llm=FakeLLMClient({"merge_candidates": json.dumps({"deltas": deltas})}))
+
+
+def _obs(package_no, raw_text, file_id="a004", page_no=1):
+    from ict.schemas import PackageAmountObservation
+
+    return PackageAmountObservation(package_no=package_no, raw_text=raw_text,
+                                    amount_yuan=parse_amount(raw_text)[0], file_id=file_id,
+                                    file_name="开标记录表.pdf", page_no=page_no, file_class="award_detail")
+
+
+def test_attachment_package_amount_fills_only_an_empty_package():
+    """A1: 公告没写包金额时，附件原文里的那一句补进去，并且不参与对账换组。"""
+    merged = _merge(
+        [_cob("c1", "pdf", 100, {"object_name": "服务器", "unit_price": "480000.00", "quantity": "1",
+                                 "unit": "台", "total_price": "480000.00"}, source_class="award_detail")],
+        observations=[_obs("1", "1,486,000.00元")],
+    )
+    project = merged.projects[0]
+    assert project.package_total_amount == 1486000.0
+    assert merged.amount_origins["1"] == "attachment"
+    action = [item["action"] for item in merged.repairs]
+    assert "package_amount_from_attachment" in action
+    filled = next(item for item in merged.repairs if item["action"] == "package_amount_from_attachment")
+    assert filled["raw_text"] == "1,486,000.00元" and filled["file_id"] == "a004" and filled["page_no"] == 1
+    # 行和 48 万对 148.6 万：这笔包金额按公告来源会报 underflow，按附件来源必须不报。
+    from ict.steps.s08_merge import package_checks
+
+    strict = [item["check"] for item in package_checks(project, amount_checked=True)]
+    loose = [item["check"] for item in package_checks(project, amount_checked=False)]
+    assert "amount_underflow" in strict and "amount_underflow" not in loose
+    assert not [item for item in merged.checks if item["check"].startswith("amount_")]
+
+
+def test_attachment_package_amount_never_overrides_the_announcement():
+    merged = _merge(
+        [_cob("c1", "pdf", 100, {"object_name": "服务器", "total_price": "999999"}, source_class="award_detail")],
+        amount=1000000,
+        observations=[_obs("1", "888888")],
+    )
+    assert merged.projects[0].package_total_amount == 1000000
+    assert merged.amount_origins["1"] == "announcement"
+    assert "package_amount_from_attachment" not in [item["action"] for item in merged.repairs]
+
+
+def test_conflicting_attachment_amounts_are_left_unfilled():
+    merged = _merge(
+        [_cob("c1", "pdf", 100, {"object_name": "服务器", "total_price": "100"}, source_class="award_detail")],
+        observations=[_obs("1", "1930000元", file_id="a004"), _obs("1", "1940000元", file_id="a006")],
+    )
+    assert merged.projects[0].package_total_amount is None
+    assert merged.amount_origins["1"] == "conflict"
+    assert "package_amount_conflict" in [item["action"] for item in merged.repairs]
+
+
+def test_attachment_amount_is_not_coped_onto_a_lone_object():
+    """单标的补包金额那条规则只能用公告金额，不能用同一份附件来的数。"""
+    merged = _merge(
+        [_cob("c1", "pdf", 100, {"object_name": "服务器"}, source_class="award_detail")],
+        observations=[_obs("1", "1486000")],
+    )
+    assert merged.projects[0].package_total_amount == 1486000.0
+    assert merged.projects[0].cobs[0].total_price is None
+    assert "total_from_package_amount" not in [item["action"] for item in merged.repairs]
+
+
+def test_observation_for_an_unknown_package_never_fills():
+    merged = _merge(
+        [_cob("c1", "pdf", 100, {"object_name": "服务器", "total_price": "100"}, source_class="award_detail")],
+        observations=[_obs("Z", "100万")],
+    )
+    assert merged.projects[0].package_total_amount is None
+    assert "package_amount_from_attachment" not in [item["action"] for item in merged.repairs]
 
 
 def test_amount_picks_attachment_bundle_over_headcount_quantity():
@@ -355,7 +499,13 @@ def test_amount_picks_attachment_bundle_over_headcount_quantity():
     assert [item["action"] for item in merged.repairs] == ["price_bundle_by_amount", "price_bundle_by_amount"]
 
 
-def test_row_mismatch_bundle_does_not_win():
+def test_html_detail_still_outranks_a_self_contradictory_attachment_row():
+    """The 5% row tolerance is gone, so rank decides, and both readings stay on the record.
+
+    The attachment row says 1500 x 6 = 90000. Nothing demotes it for that any more; the HTML detail
+    row simply outranks it. The contradiction is not hidden - it is written into alternatives, which
+    is what step 8b and a reviewer look at.
+    """
     merged = _merge(
         [
             _cob("cand_000001", "html", 100, {"object_name": "触控笔", "brand": "极倍", "unit_price": "1,500.0000", "quantity": "6", "unit": "个", "total_price": "9,000.00"}),
@@ -366,17 +516,17 @@ def test_row_mismatch_bundle_does_not_win():
     cobs = merged.projects[0].cobs
     assert len(cobs) == 1
     assert cobs[0].total_price == 9000
-    assert cobs[0].product_supplier is None
+    assert cobs[0].product_supplier == "极倍信息科技"
+    totals = sorted(option["total_price"] for option in merged.alternatives["项目|1"][0]["options"])
+    assert totals == [9000, 90000]
 
 
-def test_project_row_price_moves_to_single_object():
+def test_project_row_price_moves_to_the_only_object():
     merged = _merge(
         [
             _cob("cand_000001", "html", 100, {"object_name": "水库运行维护"}),
             _cob("cand_000002", "html", 100, {"object_name": "水库运行维护"}),
             _cob("cand_000003", "html", 100, {"object_name": "济南市莱芜区2026年度中型水库运行维护项目", "total_price": "376600"}),
-            _cob("cand_000004", "pdf", 90, {"object_name": "库区巡查", "quantity": "1", "unit_price": "1000"}, source_class="bid_quote"),
-            _cob("cand_000005", "pdf", 40, {"object_name": "电缆更换", "quantity": "1"}, source_class="tender_requirement"),
         ],
         amount=376600,
         project_name="济南市莱芜区2026年度中型水库运行维护项目",
@@ -386,34 +536,106 @@ def test_project_row_price_moves_to_single_object():
     assert merged.list_sources["1"] == "html"
 
 
+def test_a_project_named_row_is_not_an_object_whichever_side_it_came_from():
+    """t20260508_26523336: the attachment repeats the project name and carries a bid price.
+
+    The closed list used to stop this by demanding the name match an HTML row. The project-row rule
+    stops it on both sides now, and the bid price of 379207.16 never reaches the list.
+    """
+    merged = _merge(
+        [
+            _cob("cand_000001", "html", 100, {"object_name": "水库运行维护"}),
+            _cob("cand_000002", "html", 100, {"object_name": "济南市莱芜区2026年度中型水库运行维护项目", "total_price": "376600"}),
+            _cob("cand_000003", "pdf", 90, {"object_name": "济南市莱芜区2026年度中型水库运行维护项目", "total_price": "379207.16"}, source_class="bid_quote"),
+        ],
+        amount=376600,
+        project_name="济南市莱芜区2026年度中型水库运行维护项目",
+    )
+    cobs = merged.projects[0].cobs
+    assert [(cob.object_name, cob.total_price) for cob in cobs] == [("水库运行维护", 376600)]
+    reasons = [item["reason"] for item in merged.unmatched_summary_rows]
+    assert reasons.count("项目全称行，价格并入唯一标的") == 1
+    assert reasons.count("项目全称行不作为标的") == 1
+
+
+def test_an_attachment_object_is_no_longer_barred_by_its_name():
+    merged = _merge(
+        [
+            _cob("cand_000001", "html", 100, {"object_name": "水库运行维护", "total_price": "376600"}),
+            _cob("cand_000002", "pdf", 90, {"object_name": "库区巡查", "quantity": "1", "unit_price": "1000"}, source_class="bid_quote"),
+            _cob("cand_000003", "pdf", 40, {"object_name": "电缆更换", "quantity": "1"}, source_class="tender_requirement"),
+        ],
+        amount=376600,
+    )
+    assert [cob.object_name for cob in merged.projects[0].cobs] == ["水库运行维护", "库区巡查"]
+    reasons = {item["candidate_id"]: item["reason"] for item in merged.unmatched_summary_rows}
+    assert reasons["cand_000003"] == "tender_requirement"
+    assert merged.list_sources["1"] == "mixed"
+
+
 def test_single_object_takes_package_amount():
     merged = _merge([_cob("cand_000001", "html", 100, {"object_name": "系统运维"})], amount=998000)
     assert merged.projects[0].cobs[0].total_price == 998000
     assert merged.repairs[0]["action"] == "total_from_package_amount"
 
 
-def test_open_list_only_when_line_fields_point_to_attachment():
-    pointed = _merge(
+def test_attachment_rows_join_the_list_without_a_rule_deciding_who_owns_it():
+    """t20260202_26140146 in shape: the HTML names one object and points every field elsewhere."""
+    merged = _merge(
         [
             _cob("cand_000001", "html", 100, {"object_name": "护理信息化系统", "brand": "详见附件", "quantity": "详见附件"}),
             _cob("cand_000002", "pdf", 90, {"object_name": "HIS子系统升级", "brand": "新蓝海", "quantity": "1", "unit_price": "400000", "制造商": "新蓝海"}, source_class="bid_quote"),
             _cob("cand_000003", "pdf", 90, {"object_name": "经济核算", "quantity": "1", "unit_price": "100000"}, source_class="bid_quote"),
         ]
     )
-    names = [cob.object_name for cob in pointed.projects[0].cobs]
-    assert names == ["HIS子系统升级", "经济核算"]
-    assert pointed.projects[0].cobs[0].product_supplier == "新蓝海"
-    assert pointed.list_sources["1"] == "attachment"
-    described = _merge(
+    cobs = merged.projects[0].cobs
+    assert [cob.object_name for cob in cobs] == ["HIS子系统升级", "经济核算"]
+    assert cobs[0].product_supplier == "新蓝海"
+    assert [item["reason"] for item in merged.unmatched_summary_rows] == ["html_pointer_row"]
+
+
+def test_a_losing_bidder_quote_fills_fields_but_neither_prices_nor_objects():
+    from ict.schemas import MergeEvidence
+
+    evidence = MergeEvidence(winner_hints={"1": ["甲公司"]}, file_names={"a001": "乙公司分项报价表.pdf"})
+    merged = _merge(
         [
-            _cob("cand_000001", "html", 100, {"object_name": "水库运行维护"}),
-            _cob("cand_000002", "pdf", 90, {"object_name": "库区巡查", "quantity": "1", "unit_price": "1000"}, source_class="bid_quote"),
-        ]
+            _cob("cand_000001", "html", 100, {"object_name": "服务器"}),
+            _cob("cand_000002", "pdf", 90, {"object_name": "服务器", "brand": "浪潮", "unit_price": "88888", "total_price": "88888"},
+                 source_class="bid_quote", quote_supplier="乙公司"),
+            _cob("cand_000003", "pdf", 90, {"object_name": "交换机", "unit_price": "5000", "total_price": "5000"},
+                 source_class="bid_quote", quote_supplier="乙公司"),
+        ],
+        evidence=evidence,
     )
-    assert [cob.object_name for cob in described.projects[0].cobs] == ["水库运行维护"]
+    cobs = merged.projects[0].cobs
+    assert [cob.object_name for cob in cobs] == ["服务器"]
+    assert cobs[0].brand == "浪潮"
+    assert cobs[0].total_price is None
+    reasons = {item["candidate_id"]: item["reason"] for item in merged.unmatched_summary_rows}
+    assert reasons["cand_000003"] == "non_winner_quote"
 
 
-def test_underflow_on_html_list_is_soft():
+def test_the_winners_own_quote_may_supply_the_whole_list():
+    """The award detail often *is* the winner's itemized quote; barring bid_quote loses the list."""
+    from ict.schemas import MergeEvidence
+
+    evidence = MergeEvidence(winner_hints={"1": ["甲公司"]})
+    merged = _merge(
+        [
+            _cob("cand_000001", "html", 100, {"object_name": "护理信息化系统", "quantity": "详见附件"}),
+            _cob("cand_000002", "pdf", 90, {"object_name": "HIS子系统升级", "quantity": "1", "unit_price": "400000", "total_price": "400000"},
+                 source_class="bid_quote", quote_supplier="甲公司"),
+        ],
+        amount=400000,
+        evidence=evidence,
+    )
+    cobs = merged.projects[0].cobs
+    assert [cob.object_name for cob in cobs] == ["HIS子系统升级"]
+    assert cobs[0].total_price == 400000
+
+
+def test_underflow_is_information_not_a_defect():
     from ict.steps.s08_merge import consistency_checks
 
     merged = _merge(
@@ -425,9 +647,30 @@ def test_underflow_on_html_list_is_soft():
     merged.projects[0].subs = []
     failures = consistency_checks(merged)
     levels = {item["check"]: item["level"] for item in merged.checks}
+    # Gold for t20260202_26139731 package 3 is a line sum 35% under the amount, so a shortfall
+    # cannot block a run. missing_winner is what blocks this one.
     assert levels["amount_underflow"] == "soft"
     assert levels["missing_winner"] == "hard"
     assert failures and "amount_underflow" not in failures[0].failure_message
+
+
+def test_unpriced_rows_are_reported_instead_of_passing_silently():
+    """t20260812_27119852: six objects, no price on any of them, and the run reported success."""
+    from ict.steps.s08_merge import consistency_checks
+
+    merged = _merge(
+        [
+            _cob("cand_000001", "html", 100, {"object_name": "景区日常维护"}),
+            _cob("cand_000002", "html", 100, {"object_name": "景区环境整治"}),
+        ],
+        amount=3225000,
+    )
+    failures = consistency_checks(merged)
+    levels = {item["check"]: item["level"] for item in merged.checks}
+    assert levels["missing_line_price"] == "medium"
+    assert [item["cob_indexes"] for item in merged.checks if item["check"] == "missing_line_price"] == [[0, 1]]
+    assert "amount_underflow" not in levels
+    assert failures
 
 
 def test_winner_table_marks_is_winner():
@@ -596,3 +839,206 @@ def test_bidder_column_is_not_product_supplier():
     candidates, _, _ = extract_html_candidates("run", notice, tables, "项目", llm, known_packages=["1"])
     assert candidates[0].fields["product_supplier"].raw_value is None
     assert "product_supplier_from_bidder_column" in candidates[0].issues
+
+# --------------------------------------------------------------------------------------
+# Step 8: the model proposes deltas, rules own the arithmetic and the veto.
+# --------------------------------------------------------------------------------------
+
+def test_a_percentage_is_never_an_amount():
+    """t20260812_27119852 wrote 折扣率：96.60% into package_amount and it became 96.6 yuan."""
+    assert parse_amount("折扣率：96.60%")[0] is None
+    assert parse_amount("下浮率3%")[0] is None
+    assert parse_amount("945000元")[0] == 945000
+
+
+def test_a_percentage_never_becomes_a_package_amount():
+    """t20260812_27119852: the model copied 折扣率：96.60% and it was used as the package total.
+
+    The guard sits where the number is made, in step 1, not where it is spent. Step 8 only refuses
+    to arbitrate with an amount that is not positive.
+    """
+    from ict.steps.s01_understand import seal
+
+    understanding = seal("run_x", {
+        "project_name": "项目",
+        "package_mode": "single",
+        "packages": [{"package_no": "1", "package_amount": {"raw_text": "折扣率：96.60%"}}],
+    }, None, [])
+    assert understanding.packages[0].package_amount.amount_yuan is None
+
+    quarantined = _merge(
+        [_cob("cand_000001", "html", 100, {"object_name": "景区维护", "total_price": "945000"})],
+        amount=0,
+    )
+    assert quarantined.projects[0].package_total_amount is None
+    assert quarantined.amount_audit["1"]["suspect"] == "non_positive"
+    assert "total_from_package_amount" not in [item["action"] for item in quarantined.repairs]
+
+
+def test_the_amount_picks_between_two_bundles_a_tenth_of_a_percent_apart():
+    """t20260401_26346106: 1241056.19 and 1239629.63 for one object, and the amount is the second.
+
+    The 8% dead zone used to skip this entirely, because the two readings are 0.1% apart.
+    """
+    merged = _merge(
+        [
+            _cob("cand_000001", "html", 100, {"object_name": "公务用车运营服务"}),
+            _cob("cand_000002", "pdf", 90, {"object_name": "公务用车运营服务", "total_price": "1241056.19"}),
+            _cob("cand_000003", "pdf", 90, {"object_name": "公务用车运营服务", "total_price": "1239629.63"}),
+        ],
+        amount=1239629.63,
+    )
+    assert merged.projects[0].cobs[0].total_price == 1239629.63
+    swaps = [item for item in merged.repairs if item["action"] == "price_bundle_by_amount"]
+    assert len(swaps) == 1 and swaps[0]["to"] == "cand_000003"
+
+
+def test_a_template_placeholder_never_becomes_a_price():
+    """t20260806_27088832 put '{=响应报价/数量} 元' into alternatives, where 8b could have picked it."""
+    merged = _merge(
+        [
+            _cob("cand_000001", "html", 100, {"object_name": "研讨服务", "quantity": "1", "unit": "项",
+                                              "unit_price": "494850", "total_price": "494850"}),
+            _cob("cand_000002", "pdf", 90, {"object_name": "研讨服务", "quantity": "1", "unit": "项",
+                                            "unit_price": "{=响应报价/数量} 元", "total_price": "{供应商响应} 元"},
+                 source_class="bid_quote"),
+        ],
+        amount=494850,
+    )
+    assert merged.projects[0].cobs[0].total_price == 494850
+    assert not (merged.alternatives.get("项目|1") or [])
+
+
+def test_a_merge_delta_joins_rows_the_baseline_could_not():
+    """t20260812_27119852: an em dash read as the character 一 cost six objects their prices."""
+    merged = _merged_with_deltas(
+        [
+            _cob("cand_000001", "html", 100, {"object_name": "城维计划—景区日常维护"}),
+            _cob("cand_000002", "pdf", 90, {"object_name": "城维计划一景区日常维护", "quantity": "1", "unit": "项",
+                                            "unit_price": "950000", "total_price": "950000"}, source_class="bid_quote"),
+        ],
+        [{"op": "merge", "groups": [0, 1], "reason": "破折号被识别成了一"}],
+        amount=950000,
+    )
+    cobs = merged.projects[0].cobs
+    assert len(cobs) == 1 and cobs[0].total_price == 950000
+    accepted = [item for item in merged.merge_decisions if item["accepted"]]
+    assert [item["op"] for item in accepted] == ["merge"]
+
+
+def test_a_split_delta_separates_rows_that_only_share_a_name():
+    """t20260807_27097806: three different objects, all called 智能建造设备 in the HTML."""
+    merged = _merged_with_deltas(
+        [
+            _cob("cand_000001", "html", 100, {"object_name": "智能建造设备", "spec_model": "3D混凝土打印机",
+                                              "quantity": "1", "unit": "套"}),
+            _cob("cand_000002", "html", 100, {"object_name": "智能建造设备", "spec_model": "机器人实训平台",
+                                              "quantity": "2", "unit": "台"}),
+        ],
+        [{"op": "split", "group_id": 0, "parts": [["cand_000001"], ["cand_000002"]], "reason": "规格不同"}],
+    )
+    cobs = merged.projects[0].cobs
+    assert len(cobs) == 2
+    assert sorted(cob.spec_model for cob in cobs) == ["3D混凝土打印机", "机器人实训平台"]
+
+
+def test_a_delta_that_breaks_a_rule_is_dropped_alone():
+    """One bad edit costs that edit. The rest of the model's answer still stands."""
+    from ict.schemas import MergeEvidence
+
+    evidence = MergeEvidence(winner_hints={"1": ["甲公司"]})
+    merged = _merged_with_deltas(
+        [
+            _cob("cand_000001", "html", 100, {"object_name": "服务器", "total_price": "100"}),
+            _cob("cand_000002", "pdf", 90, {"object_name": "服务器", "total_price": "999"},
+                 source_class="bid_quote", quote_supplier="乙公司"),
+        ],
+        [{"op": "price_from", "group_id": 0, "candidate_id": "cand_000002", "reason": "看起来更细"},
+         {"op": "name_from", "group_id": 0, "candidate_id": "cand_000002", "reason": "写法一样"}],
+        amount=100,
+        evidence=evidence,
+    )
+    by_op = {item["op"]: item for item in merged.merge_decisions if item["op"] in {"price_from", "name_from"}}
+    assert by_op["price_from"]["accepted"] is False
+    assert by_op["price_from"]["reject"] == "source_cannot_own_price"
+    assert by_op["name_from"]["accepted"] is True
+    assert merged.projects[0].cobs[0].total_price == 100
+
+
+def test_an_unknown_id_costs_the_call_and_the_baseline_still_decides():
+    merged = _merged_with_deltas(
+        [
+            _cob("cand_000001", "html", 100, {"object_name": "服务器", "total_price": "100"}),
+            _cob("cand_000002", "pdf", 90, {"object_name": "伺服器", "total_price": "100"}, source_class="bid_quote"),
+        ],
+        [{"op": "merge", "groups": [0, 99], "reason": "编号写错了"}],
+        amount=100,
+    )
+    assert [cob.object_name for cob in merged.projects[0].cobs] == ["服务器", "伺服器"]
+    assert {"package_no": "1", "action": "merge_model_fallback", "reason": "llm_schema_invalid"} in merged.repairs
+
+
+def _split_rows():
+    return [
+        _cob("cand_000001", "pdf", 90, {"object_name": "办公桌", "quantity": "10", "unit": "张",
+                                        "unit_price": "1000", "total_price": "10000"}, source_class="award_detail"),
+        _cob("cand_000002", "pdf", 90, {"object_name": "办公桌", "quantity": "5", "unit": "张",
+                                        "unit_price": "1000", "total_price": "5000"}, source_class="award_detail"),
+    ]
+
+
+def test_a_sum_is_recomputed_by_rules_and_gated_by_the_amount():
+    """The model names the rows; 15 and 15000 are computed here, and only because the amount agrees."""
+    merged = _merged_with_deltas(
+        _split_rows(),
+        [{"op": "sum", "group_id": 0, "members": ["cand_000001", "cand_000002"], "reason": "同一张表拆行"}],
+        amount=15000,
+    )
+    cobs = merged.projects[0].cobs
+    assert len(cobs) == 1
+    assert (cobs[0].quantity, cobs[0].unit_price, cobs[0].total_price) == (15, 1000, 15000)
+    assert any(item["action"] == "price_bundle_by_amount" and item["to"] == "sum:0" for item in merged.repairs)
+
+
+def test_a_sum_is_refused_when_the_units_disagree():
+    """1批 and 20台 cannot be added, whatever the model thinks the rows mean."""
+    merged = _merged_with_deltas(
+        [
+            _cob("cand_000001", "pdf", 90, {"object_name": "运维服务", "quantity": "1", "unit": "批",
+                                            "unit_price": "1000", "total_price": "1000"}, source_class="award_detail"),
+            _cob("cand_000002", "pdf", 90, {"object_name": "运维服务", "quantity": "20", "unit": "台",
+                                            "unit_price": "50", "total_price": "1000"}, source_class="award_detail"),
+        ],
+        [{"op": "sum", "group_id": 0, "members": ["cand_000001", "cand_000002"], "reason": "看起来是拆行"}],
+        amount=2000,
+    )
+    assert len(merged.projects[0].cobs) == 1
+    assert "sum_unit_conflict" in [item.get("reject") for item in merged.merge_decisions if item["op"] == "sum"]
+
+
+def test_a_sum_is_left_alone_without_a_package_amount():
+    """Nothing to check the sum against, so the object stays one row and keeps an observed number."""
+    merged = _merged_with_deltas(
+        _split_rows(),
+        [{"op": "sum", "group_id": 0, "members": ["cand_000001", "cand_000002"], "reason": "同一张表拆行"}],
+    )
+    cobs = merged.projects[0].cobs
+    assert len(cobs) == 1 and cobs[0].quantity == 10
+    rejects = [item.get("reject") for item in merged.merge_decisions if item["op"] == "sum"]
+    assert "sum_unverified_no_package_amount" in rejects
+
+
+def test_the_result_does_not_depend_on_the_order_candidates_arrive_in():
+    def pair():
+        return [
+            _cob("cand_000001", "html", 100, {"object_name": "屏幕", "unit_price": "100", "quantity": "1",
+                                              "unit": "块", "total_price": "100"}),
+            _cob("cand_000002", "pdf", 90, {"object_name": "屏幕", "unit_price": "200", "quantity": "1",
+                                            "unit": "块", "total_price": "200"}, source_class="bid_quote"),
+        ]
+
+    forward = _merge(pair(), amount=200)
+    backward = _merge(list(reversed(pair())), amount=200)
+    assert [cob.model_dump() for cob in forward.projects[0].cobs] == \
+        [cob.model_dump() for cob in backward.projects[0].cobs]
+    assert forward.projects[0].cobs[0].total_price == 200

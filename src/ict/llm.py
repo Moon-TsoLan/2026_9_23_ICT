@@ -15,6 +15,14 @@ from ict.config import llm_settings
 PROMPT_DIR = Path(__file__).resolve().parent / "prompts"
 
 
+def load_prompt(prompt_version: str) -> str:
+    """Prompt text plus the field definitions this step sends and expects."""
+    from ict.fields import field_block
+    base = (PROMPT_DIR / f"{prompt_version}.md").read_text(encoding="utf-8").rstrip()
+    block = field_block(prompt_version)
+    return base + (("\n\n" + block + "\n") if block else "\n")
+
+
 @dataclass
 class LLMResult:
     text: str
@@ -46,7 +54,7 @@ class OpenAICompatibleClient(LLMClient):
         self.timeout = timeout
 
     def complete(self, *, step: str, prompt_version: str, user: str) -> LLMResult:
-        system = (PROMPT_DIR / f"{prompt_version}.md").read_text(encoding="utf-8")
+        system = load_prompt(prompt_version)
         started = time.perf_counter()
         response = httpx.post(
             f"{self.base_url}/chat/completions",
@@ -73,7 +81,7 @@ class OpenAICompatibleClient(LLMClient):
     def complete_with_images(self, *, step: str, prompt_version: str, images: list[str],
                              user_text: str) -> LLMResult:
         """One user turn of page pictures plus the instruction. No conversation state."""
-        system = (PROMPT_DIR / f"{prompt_version}.md").read_text(encoding="utf-8")
+        system = load_prompt(prompt_version)
         content: list[dict] = [{"type": "text", "text": user_text}]
         content += [{"type": "image_url", "image_url": {"url": uri}} for uri in images]
         started = time.perf_counter()
