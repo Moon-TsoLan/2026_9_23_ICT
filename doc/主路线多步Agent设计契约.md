@@ -1,7 +1,7 @@
 # 主路线多步 Agent 设计契约
 
-版本：v0.8  
-日期：2026-10-04  
+版本：v0.9  
+日期：2026-10-05  
 适用范围：任务一主提取流程。本文记录当前主路线的数据契约、状态流转，以及已经落地的调用方式。
 
 ---
@@ -186,6 +186,7 @@ work/runs/<announcement_id>/
 | `present` | 原文或规则中有可识别值 |
 | `missing` | 原文未提供 |
 | `points_to_attachment` | 原文写“详见附件”等，业务值为空但需要查附件 |
+| `unparsable` | 原文确实写了内容，但不是程序能读的数（模板占位符 `{=响应报价/数量}元` 是典型）；`raw_value` 保留原文，业务值为 `null`。第 7 步只标记，不删值也不当作数用；第 8 步把它作为事实告诉模型 |
 | `low_confidence` | 有候选值但证据不足或识别不稳定 |
 | `conflict` | 多来源值冲突 |
 | `unsupported` | 来源类型不支持该字段提取 |
@@ -1458,6 +1459,7 @@ total_price
 | `checks` | array | 第 8b 步结束时的分级检查结果，见 8b.1 |
 | `merge_decisions` | array | 模型每条 delta 一项：`op`、引用的组与候选、`accepted`、`reject`、模型的 `reason` 与 `confidence`；求和被否决时另记一项 |
 | `amount_audit` | object | 包号到该包金额的审计：采用的值、原文、来源、`suspect`、是否参与对账、以及看到过的全部金额观测 |
+| `merge_notes` | object | 包号到该包合并模型思考过程的截断摘录（开思考时才有）。只供人工复核，任何规则都不读它 |
 
 ## 8.2 合并顺序
 
@@ -1466,13 +1468,14 @@ total_price
 1. `package_no` 为空，或包号不在第 1 步包列表中的候选，记入 `unassigned_candidates`，不参与合并，也不把字段补到同名的其它行上。
 2. 包金额按固定优先级取一个：本包 `package_amount` → 单包时的 `summary_amount` → 附件观测（仅在原文写法唯一时填，且该来源不参与对账）。取不到为 `null`。金额永不由行和推导。
 3. 包金额体检：`raw_text` 含百分号，或金额不为正 → 记入 `amount_audit[].suspect`，`package_total_amount` 置 `null`，本包不对账。体检只看金额本身，不与标的清单比较。
-4. 指针行排除：HTML 行自己没有任何数字价格、且带 `line_fields_point_to_attachment` 或某个行字段为 `points_to_attachment`，而本包另有可当标的且写了价格的候选时，该行排除，记 `html_pointer_row`。
-5. 项目全称行排除：名称等于项目名，或包含项目名且余下部分只是括号或标点，**且**公告侧另有非项目名的可当标的的行时排除。价格只由全序最高的那一行转移到唯一无价标的上，记 `项目全称行，价格并入唯一标的`；其余记 `项目全称行不作为标的`。
+4. 指针行标记：HTML 行自己没有任何数字价格、且带 `line_fields_point_to_attachment` 或某个行字段为 `points_to_attachment`，而本包另有可当标的且写了价格的候选时，该行**只打上 `suspect_html_pointer_row`** 并随候选进入模型输入（`rule_suspect`），去留由模型判。没有模型时（离线、回放、退回基线）才按旧语义排除，记 `html_pointer_row`。
+5. 项目全称行标记：名称等于项目名，或包含项目名且余下部分只是括号或标点，**且**公告侧另有非项目名的可当标的的行时，打 `suspect_project_name_row`，同上。没有模型时才排除并由全序最高的一行把价格转移到唯一无价标的上，记 `项目全称行，价格并入唯一标的` / `项目全称行不作为标的`。
 6. 基线分组：按规范化名称（去空白、全角括号转半角）完全相同分组，组号按全序排定。这是模型要修改的基线，也是没有模型时的全部结果。
-7. 模型一次调用（`merge-objects-v1`），输出对基线的修改 `deltas`，六种：`merge`、`split`、`sum`、`exclude`、`name_from`、`price_from`。按 `exclude → split → merge → sum → name_from → price_from` 固定顺序应用，逐条校验、逐条否决、逐条留痕。整个调用失败或两次输出都不合法时退回基线，记 `merge_model_fallback`。本包只有一条 HTML 命名候选时不发起调用。模型不能写任何数字，也不能引用没给它的编号。
+7. 模型一次调用（`merge-objects-v2`，思考开启：`config.MERGE_THINKING`，思考摘录按包存入 `merge_notes`，只供复核不参与判定），输出对基线的修改 `deltas`，七种：`merge`、`split`、`sum`、`exclude(kind ∈ subtotal_row/project_row/index_row/not_an_object)`、`name_from`、`price_from`（可带 `keys` 只取四字段中的若干格）、`fields_from`（把某行写过的指定字段补进某组空缺，目标可以是别组或已被 `exclude` 的行）。按 `exclude → split → merge → sum → name_from → price_from → fields_from` 固定顺序应用，逐条校验、逐条否决、逐条留痕。整个调用失败或两次输出都不合法时退回基线，记 `merge_model_fallback`。本包只有一条 HTML 命名候选且没有任何 suspect 标记时不发起调用。模型不能写任何数字，也不能引用没给它的编号。
+7b. `accepted` 表示这条 delta 合法，`applied` 表示它真的改变了输出，两者分开记录：`price_from` 点名的行给不出数字时当场记 `accepted=false, reject=target_states_no_number_price`；改用了别的读法时记 `used_instead`；`fields_from` 记实际补上的 `filled`；`exclude` 记它捐出的 `donated_keys`。不再存在"接受了但什么都没发生"。
 8. 来源资格（取代封闭清单）：`tender_requirement` 不供价、不新增标的；报价归属明确且不是中标人的，不供价、不新增标的；两者都仍可补描述字段，名称与既有组相同就并入该组。归属不明时放行，交包金额裁决。整组都被资格挡下时记入 `unmatched_summary_rows`，原因为 `tender_requirement` 或 `non_winner_quote`。
-9. 描述字段（名称、品目、规格、品牌、制造商）按全序取最高者为基，其余只补空字段；两边都有且不等记 `conflicts`。品牌冲突且基是 HTML 明细行时不记冲突。
-10. 价格读法：`unit_price`、`quantity`、`unit`、`total_price` 四个字段整组取自同一候选，不逐字段拼。归一化失败的价格不是价格，不构成读法；只写了数量的行不构成读法，但它的数量仍可用来补空。模型指认 `sum` 且通过资格门（成员都有数量、单位不冲突、单价不冲突）时多一种求和读法，**数字由规则重算**。
+9. 描述字段（名称、品目、规格、品牌、制造商）按全序取最高者为基，其余只补空字段；两边都有且不等记 `conflicts`。品牌冲突且基是 HTML 明细行时不记冲突。被 `exclude` 的行不再让字段消失：它写过的字段自动补进它原来那一组，整包只剩一个标的时补进那个标的。
+10. 价格读法：`unit_price`、`quantity`、`unit`、`total_price` 四个字段整组取自同一候选，不逐字段拼。归一化失败（`unparsable`）的价格不是价格，不构成读法；只写了数量的行不构成读法，但它的数量仍可用来补空。整组没有任何可用读法时价格保持未知，但行上已观测到的数量与单位不再一起清空，记 `bundle=no_reading_fields_only`。模型指认 `sum` 且通过资格门（成员都有数量、单位不冲突、单价不冲突）时多一种求和读法，**数字由规则重算**。
 11. 包金额裁决：一个组有 ≥2 种读法时，逐轮换用能让 `|行和 − 包金额|` 严格变小、且改动最小的一种，直到不能再改进。每次记 `price_bundle_by_amount`，带换前换后的偏差。**没有死区**。包金额不可用时不裁决，求和读法也不采纳，记 `sum_unverified_no_package_amount`。
 12. 单个标的、没有单价和总价、包金额可用时，总价取包金额，记 `total_from_package_amount`。
 13. SUB 业务键为 `supplier_name`，去掉含「成员」的括号（联合体成员说明）后比较。高 `source_priority` 优先，低优先级只补空字段，`is_winner` 任一来源为真即为真。同一供应商有 HTML 来源时，名称用 HTML 的写法。

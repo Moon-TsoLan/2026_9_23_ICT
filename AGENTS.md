@@ -134,5 +134,35 @@
 短文件、非 PDF 容器、排名恰好等于前 40 页的一律走原路径。实测三份长文件，有原生表格的页覆盖从
 10/12/19 页升到各 40 页，预算不变。截断从静默变可审计（`05b` 摘要记 `table_pages_missed`）。
 
+**第 8 步 v6：标记不删除、七种 delta、合并开思考（2026-10-05，用户指示「优化 delta 表达能力；
+模型分配 delta 前不再规则直接剔除 cob，而是做上标记；模型分配 delta 时可以开启 think；
+第七步也是只做标记，不再直接丢弃」）**
+
+- 第 7 步新增字段状态 `unparsable`：模板占位符（`{=响应报价/数量}元`、`「汇总引用」 元`）保留
+  `raw_value`、业务值为空、状态说明它不是数；不再留成 `present`，于是第 8 步不会把占位符当价格
+  送给模型（此前 `_value` 的 `present`→`raw_value` 回退正是这个漏洞）。分数解析失败同样改标记。
+- 第 8 步的两条结构性排除改为**打标记**（`suspect_html_pointer_row`、`suspect_project_name_row`），
+  标记随候选进入模型输入；去留由模型的 `exclude` 判。**没有模型的路径（单测、离线回放、退回基线）
+  仍按旧语义删除**，确定性基线不变。
+- delta 由六种增至七种：新增 `fields_from`（把某行写过的指定非金额字段补进某组空缺，目标可以是
+  别组或已被 `exclude` 的行）；`price_from` 可带 `keys` 只取四字段中的若干格；`exclude.kind` 新增
+  `index_row`。应用顺序尾部加 `fields_from`。
+- `exclude` 的行不再让字段消失：自动补进它原来那一组；整包只剩一个标的时补进那个标的
+  （`kind=project_row` 连价格四字段一起补，仍受供价资格约束）。
+- 落地诚实化：`accepted`（合法）与 `applied`（真的改变输出）分开记录；`price_from` 点名的行给不出
+  数时**当场否决**并记 `target_states_no_number_price`，不再静默改用别的读法（改用时记
+  `used_instead`）。整组没有可用读法时价格保持未知，但行上已观测到的**数量与单位不再一起清空**，
+  记 `bundle=no_reading_fields_only`。这是第 8 步规范 §6 早就写了、实现漏掉的一条。
+- 模型输入新增规则可确定的事实：`price_reading`、`price_ineligible`、`owner_suspect`、
+  `unparsable_fields`、`rule_suspect`。
+- 合并调用开思考（`config.MERGE_THINKING`）；开思考时不带 `response_format`，JSON 从正文提取，
+  思考摘录按包写入 `merge_notes`，只供人工复核，任何规则都不读它。其余八步不变。
+- 提示词 `merge-objects-v2`（v1 移入 `src/ict/prompts/archive/`）；`fields.py` 注册新字段语义。
+  规范 `doc/第8步标的合并规范.md` 升到 v6（v5 已归档），契约升到 v0.9，细则同步。
+- 依据：40 则实测里 299 行有 44 行属于"组内写了数量/单位、成品两者皆空"（43 行是整组零读数），
+  四则公告 100% 命中；`price_from` 48 次接受中 10 次指向不可用读数；`exclude` 造成 24 起
+  "字段只存在于被剔行" 的丢失。`pytest tests` 87 passed（含新增 `tests/test_merge_deltas_v2.py` 九条），
+  真实效果待用户跑批验证。
+
 排查用的完整规则清单见 `eval/archive/规则清单.md`；主流程实现细则（模型输入输出 + 每条规则的依据）见
 `eval/主路线实现细则.md`。

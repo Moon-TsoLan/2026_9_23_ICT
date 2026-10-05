@@ -82,6 +82,10 @@ def _normalize_cob(candidate: Candidate, catalog: Catalog, errors: list[str], wa
             obs.status = "low_confidence"
         elif parsed["invalid"]:
             errors.append("invalid_number")
+            # Mark, never discard. The cell text stays where it is and the status says why it is
+            # not a number, so step 8 can show that state to the model instead of handing it a
+            # template string as if it were a price.
+            obs.status = "unparsable"
         elif parsed["value"] is not None and parsed["value"] < 0:
             errors.append("negative_price_unexpected")
             obs.normalized_value = parsed["value"]
@@ -93,6 +97,7 @@ def _normalize_cob(candidate: Candidate, catalog: Catalog, errors: list[str], wa
         number, parsed_unit, ok = parse_quantity(qty.raw_value)
         if not ok:
             errors.append("quantity_unit_parse_failed")
+            qty.status = "unparsable"
         else:
             qty.normalized_value = number
             if parsed_unit and unit.status == "missing":
@@ -168,7 +173,7 @@ def _normalize_sub(candidate: Candidate, errors: list[str]) -> None:
         except ValueError:
             errors.append("invalid_number")
             score.normalized_value = None
-            score.status = "missing"
+            score.status = "unparsable"
     winner = candidate.fields["is_winner"]
     if winner.status == "present":
         raw = winner.raw_value

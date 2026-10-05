@@ -55,10 +55,11 @@ class Recorder:
         self.answer = answer
         self.images_ok = images_ok
         self.seen_images = None
+        self.thinking_seen = None
         self.text_calls = 0
         self.payload = None
 
-    def complete(self, *, step, prompt_version, user):
+    def complete(self, *, step, prompt_version, user, thinking=False):
         self.text_calls += 1
         self.payload = json.loads(user)
         return LLMResult(json.dumps(self.answer, ensure_ascii=False), "recorder", "test", prompt_version, 1)

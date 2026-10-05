@@ -34,7 +34,8 @@ FailureCode = Literal[
 ]
 EntityType = Literal["cob", "sub"]
 FieldStatus = Literal[
-    "present", "missing", "points_to_attachment", "low_confidence", "conflict", "unsupported"
+    "present", "missing", "points_to_attachment", "unparsable", "low_confidence", "conflict",
+    "unsupported"
 ]
 AnnouncementType = Literal["winning_announcement", "deal_announcement", "unknown"]
 PackageMode = Literal["single", "multi", "unclear"]
@@ -346,6 +347,10 @@ class MergedProjects(Model):
     # the rules recomputed. Empty when the merge ran on the deterministic baseline.
     merge_decisions: list[dict[str, Any]] = Field(default_factory=list)
     amount_audit: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    # One merge call per package. When thinking is on, the model's reasoning is kept here as a
+    # truncated audit excerpt keyed by package_no. Nothing branches on it: it exists so a reviewer
+    # can read why a delta was proposed. Empty when the package was not asked.
+    merge_notes: dict[str, str] = Field(default_factory=dict)
 
 
 class MergeEvidence(Model):

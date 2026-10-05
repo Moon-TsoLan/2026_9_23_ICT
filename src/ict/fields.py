@@ -80,14 +80,28 @@ FIELD_SEMANTICS = {
     "group_id": "基线分组编号。",
     "origin": "这条候选来自哪里，取值 html 公告正文、attachment 附件文件。",
     "is_winner_quote": "这条候选是否出自中标（成交）供应商的材料，取值 true、false 或 null（判不出）。",
-    "field_states": "该候选每个字段的状态，取值 present 有实值、missing 这份材料没有这一格、points_to_attachment 属性存在但内容不在这份材料里。",
+    "field_states": "该候选每个字段的状态，取值 present 有实值、missing 这份材料没有这一格、"
+                    "points_to_attachment 属性存在但内容不在这份材料里、unparsable 写了字但不是数、"
+                    "low_confidence 值的单位有歧义、conflict 另有来源写了不同的值。",
+    "price_reading": "规则的事实：这条候选能不能当价格来源，即它的单价或总价是不是真写出了数。",
+    "price_ineligible": "规则不给这条候选供价的原因，取值 tender_requirement 采购需求、"
+                        "quote_not_winner 出自非中标人的报价。没有这个键表示可以给价。",
+    "owner_suspect": "规则不认这条候选能单独成为一个标的的原因；它仍可以给别人补字段。",
+    "unparsable_fields": "这份材料确实写了内容、但解析不出数的价格字段名，多为模板占位符；不要当价格用。",
+    "rule_suspect": "规则对这条候选的怀疑标记，取值 suspect_html_pointer_row 公告把内容指向附件、"
+                    "suspect_project_name_row 名称是项目全称。规则只标记不删除，留不留由你判。",
+    "keys": "这次操作涉及的字段名列表。fields_from 只能取品目、品牌、产品供应商、规格型号、数量、单位；"
+            "price_from 只能取单价、数量、单位、总价的子集，不写就是四字段整组取。",
+    "fields_from": "把某条候选写过的这几个字段补进该组的空缺处；目标可以是别的组或已被 exclude 的行。",
     "deltas": "你对基线分组的修改清单，每项一个操作；不需要修改的组不要输出。",
-    "op": "操作类型，取值 merge 两组合并为同一标的、split 一组拆成多个标的、sum 组内若干行是同一标的的拆行需求和、exclude 该候选不是标的、name_from 该组名称取哪条、price_from 该组价格取哪条。",
+    "op": "操作类型，取值 merge 两组合并为同一标的、split 一组拆成多个标的、sum 组内若干行是同一标的的"
+          "拆行需求和、exclude 该候选不是标的、name_from 该组名称取哪条、price_from 该组价格取哪条、"
+          "fields_from 把某条的指定字段补进该组空缺。",
     "groups": "要合并的基线分组编号列表，至少两个。",
     "parts": "拆分结果，每项是一组 candidate_id；所有 part 合起来必须正好是原组成员，不重不漏。",
     "members": "需求和的那些 candidate_id，至少两个。",
     "name_from": "该组标的名称取自哪条候选的 candidate_id。",
-    "price_from": "该组价格四字段整组取自哪条候选的 candidate_id。",
+    "price_from": "该组价格取自哪条候选的 candidate_id；四字段整组取，只想要数量或单位时用 keys 指明。",
     "reading_kind": "这组价格读法的类型，取值 single 取自某一行、sum 由若干行相加算出。",
     "sources": "组成这组读法的 candidate_id 列表；single 只有一项，sum 含参与相加的全部行。",
 }
@@ -171,9 +185,12 @@ STEP_FIELD_OVERRIDES = {
     "attachment-extract-v1": {
         "candidates": "抽取出的候选对象列表，每项含 entity_type、package_no、file_id、fields、issues。",
     },
-    "merge-objects-v1": {
-        "candidates": "本包全部标的候选，每项含 candidate_id、group_id、origin、来源信息、11 个业务字段与 field_states。",
-        "kind": "exclude 操作的理由，只能取：subtotal_row 合计或小计行、project_row 项目全称行、not_an_object 不是一个标的。",
+    "merge-objects-v2": {
+        "candidates": "本包全部标的候选，每项含 candidate_id、group_id、origin、来源信息、11 个业务字段、"
+                      "field_states，以及规则给出的事实 price_reading 与可能的 rule_suspect、"
+                      "price_ineligible、owner_suspect、unparsable_fields。",
+        "kind": "exclude 操作的理由，只能取：subtotal_row 合计或小计行、project_row 项目全称行、"
+                "index_row 只说明标的存在、内容在附件里的索引行、not_an_object 不是一个标的。",
         "confidence": "你对这条修改的把握，取 0 到 1；只作留痕，规则层不按它取舍。",
     },
     "html-tables-v1": {
@@ -219,15 +236,18 @@ STEP_FIELDS = {
                                "unit_price", "quantity", "unit", "total_price", "supplier_name", "score",
                                "is_winner", "issues", "package_amounts", "raw_text",
                                "row_text", "bidder_supplier", "winner_supplier"]),
-    "merge-objects-v1": (["project_name", "package_no", "package_total_amount", "package_amount_raw",
+    "merge-objects-v2": (["project_name", "package_no", "package_total_amount", "package_amount_raw",
                           "package_amount_suspect", "winner_suppliers", "baseline_groups", "group_id",
                           "candidates", "candidate_id", "origin", "file_name", "file_class", "table_index",
                           "table_role", "table_section", "page_no", "row_text", "quote_supplier",
                           "bidder_supplier", "winner_supplier", "is_winner_quote", "object_name",
                           "category_code", "category_name", "category_type", "brand", "product_supplier",
-                          "spec_model", "unit_price", "quantity", "unit", "total_price", "field_states"],
+                          "spec_model", "unit_price", "quantity", "unit", "total_price", "field_states",
+                          "price_reading", "price_ineligible", "owner_suspect", "unparsable_fields",
+                          "rule_suspect"],
                          ["deltas", "op", "groups", "parts", "members", "group_id", "candidate_id",
-                          "name_from", "price_from", "kind", "reason", "confidence"]),
+                          "name_from", "price_from", "fields_from", "keys", "kind", "reason",
+                          "confidence"]),
     "repair-package-v1": (["package_no", "package_total_amount", "violations", "clusters", "cluster_id",
                            "object_name", "current_candidate_id", "options", "candidate_id", "file_id",
                            "file_class", "source_type", "source_priority", "unit_price", "quantity",

@@ -70,6 +70,7 @@ PAGE_CONTEXT_TABLES = 6            # 第 6 步每页送进模型的表格张数�
 PAGE_LOCATE_LIMIT = 80             # 第 5 步每个文件送进模型的页数上限
 DEFAULT_FILE_CLASS = "bid_quote"   # 4b 没能给出文件类型时的兜底类
 DEFAULT_SOURCE_PRIORITY = 90       # 兜底类对应的来源优先级
+MERGE_THINKING = True              # 第 8 步的同一性判断开思考：内容由模型判，就给它推理空间
 
 
 def load_local_env() -> None:
