@@ -7,6 +7,7 @@ import re
 from collections import Counter
 
 from ict.candidates import align_fields, seal_candidate
+from ict.concurrency import parallel_map
 from ict.config import SOURCE_PRIORITY
 from ict.html_context import ParsedNotice, ParsedTable, bidder_body_sections, step2a_payload
 from ict.ids import make_project_id
@@ -57,7 +58,9 @@ def understand_tables(
     if llm is None:
         failures.append(Failure(failure_code="llm_call_failed", failure_message="未配置 DeepSeek"))
         return HtmlTables(run_id=run_id, status="failed", tables=[], failures=failures)
-    for table in notice.tables:
+
+    def understand_one(table: ParsedTable) -> tuple[HtmlTable, Failure | None]:
+        """One table in, one role out. Nothing here reads another table's result."""
         siblings = [
             {
                 "table_index": other.table_index,
@@ -85,7 +88,7 @@ def understand_tables(
                 for key, value in (parsed.get("column_mapping") or {}).items()
                 if value in table.headers
             }
-            tables.append(
+            return (
                 HtmlTable(
                     table_index=table.table_index,
                     table_role=role,
@@ -96,20 +99,28 @@ def understand_tables(
                     confidence=parsed.get("confidence"),
                     issues=parsed.get("issues") or [],
                     status="success",
-                )
+                ),
+                None,
             )
         except (LLMError, ValueError) as exc:
             code = "llm_call_failed" if isinstance(exc, LLMError) else "llm_schema_invalid"
-            failures.append(Failure(failure_code=code, failure_message=str(exc), location=str(table.table_index)))
-            tables.append(
+            return (
                 HtmlTable(
                     table_index=table.table_index,
                     table_role="other",
                     package_scope="unknown",
                     row_grain="other",
                     status="failed",
-                )
+                ),
+                Failure(failure_code=code, failure_message=str(exc), location=str(table.table_index)),
             )
+
+    # One independent call per table. Results come back in table order, so the table list and the
+    # failure list read exactly as the serial loop wrote them.
+    for understood, failure in parallel_map(understand_one, notice.tables):
+        tables.append(understood)
+        if failure is not None:
+            failures.append(failure)
     promote_object_tables(notice, HtmlTables(run_id=run_id, status="success", tables=tables))
     resolve_table_packages(notice, HtmlTables(run_id=run_id, status="success", tables=tables), package_nos, llm, counter)
     status = "failed" if not tables else ("partial" if failures else "success")
@@ -133,12 +144,10 @@ def extract_html_candidates(
         failures.append(Failure(failure_code="llm_call_failed", failure_message="未配置 DeepSeek"))
         return candidates, failures, seq
     by_index = {table.table_index: table for table in notice.tables}
-    for understood in tables.tables:
-        if understood.table_role in {"other", "agency_fee"} or understood.status == "failed":
-            continue
-        table = by_index.get(understood.table_index)
-        if table is None:
-            continue
+
+    def ask(understood: HtmlTable) -> dict:
+        """One table's model call and the read-only facts its candidates need. No shared writes."""
+        table = by_index[understood.table_index]
         entity = "sub" if understood.table_role in {"sub_score", "winner"} else "cob"
         package_no = None if understood.package_scope in {"unknown", "announcement"} else understood.package_scope
         project_id = make_project_id(project_name, package_no) if package_no and project_name else None
@@ -164,25 +173,50 @@ def extract_html_candidates(
             )
         except (LLMError, ValueError) as exc:
             code = "llm_call_failed" if isinstance(exc, LLMError) else "llm_schema_invalid"
-            failures.append(Failure(failure_code=code, failure_message=str(exc), location=str(understood.table_index)))
+            return {"understood": understood, "failure": Failure(
+                failure_code=code, failure_message=str(exc), location=str(understood.table_index))}
+        return {
+            "understood": understood,
+            "table": table,
+            "entity": entity,
+            "package_no": package_no,
+            "priority": priority,
+            "parsed": parsed,
+            "pointer": entity == "cob" and _line_fields_point(table, understood.column_mapping),
+            "cells": ({_compact(cell) for row in table.rows for cell in row}
+                      if understood.table_role == "winner" else set()),
+            "bidders": _bidder_cells(table, understood.column_mapping) if entity == "cob" else [],
+            "failure": None,
+        }
+
+    asked_tables = [understood for understood in tables.tables
+                    if understood.table_role not in {"other", "agency_fee"}
+                    and understood.status != "failed"
+                    and understood.table_index in by_index]
+    # One independent call per table; the sealing below stays in the parent so candidate ids keep
+    # the order the serial loop gave them.
+    for asked in parallel_map(ask, asked_tables):
+        if asked["failure"] is not None:
+            failures.append(asked["failure"])
             continue
+        understood = asked["understood"]
         start = len(candidates)
         seq = _append_candidates(
             candidates,
-            parsed.get("candidates") or [],
-            entity,
-            package_no,
+            asked["parsed"].get("candidates") or [],
+            asked["entity"],
+            asked["package_no"],
             project_name,
-            priority,
+            asked["priority"],
             seq,
             known_packages,
-            table=table,
+            table=asked["table"],
             table_index=understood.table_index,
             column_mapping=understood.column_mapping,
         )
-        pointer = entity == "cob" and _line_fields_point(table, understood.column_mapping)
-        cells = {_compact(cell) for row in table.rows for cell in row} if understood.table_role == "winner" else set()
-        bidders = _bidder_cells(table, understood.column_mapping) if entity == "cob" else []
+        pointer = asked["pointer"]
+        cells = asked["cells"]
+        bidders = asked["bidders"]
         for candidate in candidates[start:]:
             name = candidate.fields.get("supplier_name")
             if candidate.entity_type == "sub" and name and _compact(name.raw_value) in cells:

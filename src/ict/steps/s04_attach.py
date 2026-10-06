@@ -16,6 +16,7 @@ import re
 from pathlib import Path
 
 from ict.candidates import seal_candidate
+from ict.concurrency import PARSE_QUEUE, parallel_map
 from ict.config import (
     ATTACHMENTS_ROOT,
     CLASS_PRIORITY,
@@ -117,7 +118,9 @@ def _entry(index: AttachmentIndex, item: IndexedFile):
 
 def _client() -> ParseClient:
     settings = parse_settings()
-    return ParseClient(settings["url"], settings.get("token", ""), float(settings.get("timeout", 600)))
+    return ParseClient(settings["url"], settings.get("token", ""),
+                       float(settings.get("timeout", 600)),
+                       float(settings.get("connect_timeout", 10)))
 
 
 def triage_files(run_id: str, plans: ProjectPlans, index: AttachmentIndex | None, llm: LLMClient | None,
@@ -133,15 +136,16 @@ def triage_files(run_id: str, plans: ProjectPlans, index: AttachmentIndex | None
     needs = [entry for project in plans.projects for entry in (project.needs or [])]
     package_set = {project.package_no for project in plans.projects}
     decisions: list[FileDecision] = []
-    for item in index.files:
+
+    def screen_one(item: IndexedFile) -> tuple[FileDecision, Failure | None]:
+        """One file in, one keep-or-drop decision out. Reads nothing another file owns."""
         entry = _entry(index, item)
         if not entry.path.exists():
-            decisions.append(FileDecision(file_id=item.file_id, file_class="unknown", priority=0,
-                                          read_strategy="unsupported", reason="file_missing",
-                                          failure_code="document_parse_failed", failure_message="附件文件不存在"))
-            failures.append(Failure(failure_code="document_parse_failed", failure_message=item.display_name,
-                                    location=item.file_id))
-            continue
+            return (FileDecision(file_id=item.file_id, file_class="unknown", priority=0,
+                                 read_strategy="unsupported", reason="file_missing",
+                                 failure_code="document_parse_failed", failure_message="附件文件不存在"),
+                    Failure(failure_code="document_parse_failed", failure_message=item.display_name,
+                            location=item.file_id))
         peek = peek_entry(entry)
         decision: ScreenDecision = gate_file(entry, peek, llm, counter=counter, needs=needs)
         file_class = KIND_TO_CLASS.get(decision.kind, "unknown")
@@ -154,7 +158,7 @@ def triage_files(run_id: str, plans: ProjectPlans, index: AttachmentIndex | None
         # downstream; no new branch decides anything.
         hint = _package_from_filename(entry.name)
         possible = [hint] if hint and hint in package_set else []
-        decisions.append(
+        return (
             FileDecision(
                 file_id=item.file_id,
                 file_class=file_class,
@@ -167,8 +171,16 @@ def triage_files(run_id: str, plans: ProjectPlans, index: AttachmentIndex | None
                                            "pages": entry.pages, "view_chars": peek.full_chars},
                 quote_supplier=decision.quote_supplier or None,
                 is_award_notice=decision.is_award_notice,
-            )
+            ),
+            None,
         )
+
+    # One independent call per file. Decisions come back in index order, so the sort below and the
+    # file id sequence read exactly as the serial loop wrote them.
+    for decision, failure in parallel_map(screen_one, index.files):
+        decisions.append(decision)
+        if failure is not None:
+            failures.append(failure)
     # No file-count cap (user instruction 2026-10-03): everything the gate keeps is parsed.
     # Cost is bounded per page instead, in parse_pages and in the step 5 limits.
     decisions.sort(key=lambda item: (item.read_strategy != "target_pages", -item.priority))
@@ -210,26 +222,46 @@ def rank_budget(profiles: list[dict], cap: int) -> list[int]:
 
 
 def parse_pages(run_id: str, files: FileDecisions, index: AttachmentIndex, failures: list[Failure]):
-    """Step 4b. One parsing call per kept file; pages stay in memory for steps 5 and 6."""
+    """Step 4b. One parsing call per kept file; pages stay in memory for steps 5 and 6.
+
+    Every request is handed to the shared single-worker parse queue, so the GPU box sees one
+    document at a time and the next request is already waiting when the current one ends. The
+    files are still collected in the order they were chosen, so the summary and the failure list
+    read exactly as the serial loop wrote them.
+    """
     chosen = [item for item in files.file_decisions if item.read_strategy == "target_pages"]
     parsed: dict[str, list[dict]] = {}
     summary: list[dict] = []
     if not chosen:
         return parsed, summary
     client = _client()
+
+    jobs: list[dict] = []
     for decision in chosen:
         item = next((entry for entry in index.files if entry.file_id == decision.file_id), None)
         if item is None:
             continue
         entry = _entry(index, item)
-        profiles: list[dict] = []
+        if entry.fmt in {"docx", "xlsx", "xlsm"} and not entry.needs_normalisation:
+            jobs.append({"decision": decision, "entry": entry, "cap": None, "profiles": [],
+                         "local": True, "future": None})
+            continue
+        cap = min(entry.pages or PARSE_MAX_PAGES_PER_FILE, PARSE_MAX_PAGES_PER_FILE)
+        wanted, profiles = _budget_pages(entry, cap, failures)
+        jobs.append({"decision": decision, "entry": entry, "cap": cap, "profiles": profiles,
+                     "local": False,
+                     "future": PARSE_QUEUE.submit(client.parse, entry.path, pages=wanted,
+                                                  max_pages=cap)})
+
+    for job in jobs:
+        decision, entry = job["decision"], job["entry"]
+        profiles: list[dict] = job["profiles"]
+        cap = job["cap"]
         try:
-            if entry.fmt in {"docx", "xlsx", "xlsm"} and not entry.needs_normalisation:
+            if job["local"]:
                 pages = read_native(entry.path)
             else:
-                cap = min(entry.pages or PARSE_MAX_PAGES_PER_FILE, PARSE_MAX_PAGES_PER_FILE)
-                wanted, profiles = _budget_pages(entry, cap, failures)
-                response = client.parse(entry.path, pages=wanted, max_pages=cap)
+                response = job["future"].result()
                 pages = as_pages(response)
                 decision.parse_meta = (response.get("meta") or {})
         except ParseError as exc:
@@ -407,59 +439,81 @@ def extract_attachment_candidates(run_id: str, project_name: str, plans: Project
         })
 
     plans_by_no = {project.package_no: project for project in plans.projects}
-    for package_no, contexts in by_package.items():
+
+    def ask(job: dict) -> dict:
+        """One package chunk in, one model answer out. Reads only its own chunk and the plan."""
+        package_no, chunk = job["package_no"], job["chunk"]
         plan = plans_by_no.get(package_no)
+        payload = {"current_package": {
+            "project_id": None if plan is None else plan.project_id,
+            "package_no": None if package_no in {"unknown", "announcement"} else package_no,
+            "missing_fields": [] if plan is None else plan.missing_fields,
+            "needs": [] if plan is None else (plan.needs or []),
+            # Already established upstream, so step 6 copies it instead of re-deriving it.
+            # Empty means nobody knows yet and the page is the only place left to look.
+            "winner_supplier": _known_winner(package_no, chunk, winner_suppliers,
+                                             file_quote_suppliers, file_award_notices)},
+            "page_contexts": chunk}
+        try:
+            produced = complete_json(
+                llm, step="extract_attachment_candidates", prompt_version="attachment-extract-v1",
+                user=json.dumps(payload, ensure_ascii=False), validate=_validate_candidates, counter=counter)
+        except (LLMError, ValueError) as exc:
+            code = "llm_call_failed" if isinstance(exc, LLMError) else "llm_schema_invalid"
+            return {**job, "payload": payload, "produced": None,
+                    "failure": Failure(failure_code=code, failure_message=str(exc)[:200],
+                                       location=package_no)}
+        return {**job, "payload": payload, "produced": produced, "failure": None}
+
+    jobs: list[dict] = []
+    for package_no, contexts in by_package.items():
         for chunk_start in range(0, len(contexts), PARSE_RUN_PAGES):
-            chunk = contexts[chunk_start:chunk_start + PARSE_RUN_PAGES]
-            if chunk_start + PARSE_RUN_PAGES < len(contexts):
-                failures.append(Failure(failure_code="page_context_split",
-                                        failure_message="包 %s 页数 %d，拆成多次调用" % (package_no, len(contexts)),
-                                        location=str(package_no)))
-            payload = {"current_package": {
-                "project_id": None if plan is None else plan.project_id,
-                "package_no": None if package_no in {"unknown", "announcement"} else package_no,
-                "missing_fields": [] if plan is None else plan.missing_fields,
-                "needs": [] if plan is None else (plan.needs or []),
-                # Already established upstream, so step 6 copies it instead of re-deriving it.
-                # Empty means nobody knows yet and the page is the only place left to look.
-                "winner_supplier": _known_winner(package_no, chunk, winner_suppliers,
-                                                 file_quote_suppliers, file_award_notices)},
-                "page_contexts": chunk}
-            try:
-                produced = complete_json(
-                    llm, step="extract_attachment_candidates", prompt_version="attachment-extract-v1",
-                    user=json.dumps(payload, ensure_ascii=False), validate=_validate_candidates, counter=counter)
-            except (LLMError, ValueError) as exc:
-                code = "llm_call_failed" if isinstance(exc, LLMError) else "llm_schema_invalid"
-                failures.append(Failure(failure_code=code, failure_message=str(exc)[:200], location=package_no))
+            jobs.append({"package_no": package_no,
+                         "chunk": contexts[chunk_start:chunk_start + PARSE_RUN_PAGES],
+                         "split": chunk_start + PARSE_RUN_PAGES < len(contexts),
+                         "pages": len(contexts)})
+
+    # One independent call per (package, chunk). Candidate ids and the package_amounts order are
+    # assigned below, in the original job order, so nothing downstream can tell this ran in parallel.
+    for asked in parallel_map(ask, jobs):
+        package_no, chunk = asked["package_no"], asked["chunk"]
+        payload = asked["payload"]
+        if asked["split"]:
+            failures.append(Failure(failure_code="page_context_split",
+                                    failure_message="包 %s 页数 %d，拆成多次调用"
+                                                    % (package_no, asked["pages"]),
+                                    location=str(package_no)))
+        produced = asked["produced"]
+        if produced is None:
+            failures.append(asked["failure"])
+            continue
+        for entry in produced.get("candidates") or []:
+            entity = entry.get("entity_type")
+            if entity not in {"cob", "sub"}:
                 continue
-            for entry in produced.get("candidates") or []:
-                entity = entry.get("entity_type")
-                if entity not in {"cob", "sub"}:
-                    continue
-                file_id = entry.get("file_id") or (chunk[0]["file_id"] if chunk else None)
-                context = next((item for item in chunk if item["file_id"] == file_id), chunk[0] if chunk else {})
-                file_class = (file_classes or {}).get(file_id or "", DEFAULT_FILE_CLASS)
-                item_package = entry.get("package_no") or payload["current_package"]["package_no"] or \
-                    _package_from_filename(context.get("file_name", ""))
-                project_id = make_project_id(project_name, str(item_package)) if item_package and project_name else None
-                candidates.append(seal_candidate(
-                    candidate_id="cand_%06d" % seq, entity_type=entity, project_id=project_id,
-                    package_no=None if item_package is None else str(item_package),
-                    source_type=context.get("source_type", "pdf"), file_id=file_id,
-                    source_priority=int(CLASS_PRIORITY.get(file_class, DEFAULT_SOURCE_PRIORITY)),
-                    raw_fields=entry.get("fields") or {}, issues=entry.get("issues") or [],
-                    source_class=file_class, page_no=context.get("page_no"),
-                    table_index=_int_or_none(entry.get("table_index")),
-                    row_text=_row_text_of(entry),
-                    quote_supplier=entry.get("quote_supplier") or context.get("quote_supplier"),
-                    bidder_supplier=entry.get("bidder_supplier"),
-                    winner_supplier=entry.get("winner_supplier")
-                    or payload["current_package"]["winner_supplier"]))
-                seq += 1
-            if package_amounts is not None:
-                package_amounts.extend(_package_amount_records(
-                    produced.get("package_amounts"), chunk, package_no, file_classes, file_names))
+            file_id = entry.get("file_id") or (chunk[0]["file_id"] if chunk else None)
+            context = next((item for item in chunk if item["file_id"] == file_id), chunk[0] if chunk else {})
+            file_class = (file_classes or {}).get(file_id or "", DEFAULT_FILE_CLASS)
+            item_package = entry.get("package_no") or payload["current_package"]["package_no"] or \
+                _package_from_filename(context.get("file_name", ""))
+            project_id = make_project_id(project_name, str(item_package)) if item_package and project_name else None
+            candidates.append(seal_candidate(
+                candidate_id="cand_%06d" % seq, entity_type=entity, project_id=project_id,
+                package_no=None if item_package is None else str(item_package),
+                source_type=context.get("source_type", "pdf"), file_id=file_id,
+                source_priority=int(CLASS_PRIORITY.get(file_class, DEFAULT_SOURCE_PRIORITY)),
+                raw_fields=entry.get("fields") or {}, issues=entry.get("issues") or [],
+                source_class=file_class, page_no=context.get("page_no"),
+                table_index=_int_or_none(entry.get("table_index")),
+                row_text=_row_text_of(entry),
+                quote_supplier=entry.get("quote_supplier") or context.get("quote_supplier"),
+                bidder_supplier=entry.get("bidder_supplier"),
+                winner_supplier=entry.get("winner_supplier")
+                or payload["current_package"]["winner_supplier"]))
+            seq += 1
+        if package_amounts is not None:
+            package_amounts.extend(_package_amount_records(
+                produced.get("package_amounts"), chunk, package_no, file_classes, file_names))
     return candidates, failures, quality, seq
 
 

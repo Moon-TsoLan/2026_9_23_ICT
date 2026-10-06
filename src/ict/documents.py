@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from ict.concurrency import LOCAL_GATE
+
 
 def read_docx(path: Path) -> list[dict]:
     import docx
@@ -45,8 +47,11 @@ def read_xlsx(path: Path) -> list[dict]:
 def read_native(path: Path) -> list[dict]:
     """docx and spreadsheets keep their own structure; no rasterising, no model."""
     suffix = path.suffix.lower()
-    if suffix == ".docx":
-        return read_docx(path)
-    if suffix in {".xlsx", ".xlsm"}:
-        return read_xlsx(path)
+    # Reading a whole spreadsheet or tender document is CPU work, so it queues behind the same
+    # gate as the other native readers.
+    with LOCAL_GATE:
+        if suffix == ".docx":
+            return read_docx(path)
+        if suffix in {".xlsx", ".xlsm"}:
+            return read_xlsx(path)
     raise ValueError("unsupported native document " + suffix)

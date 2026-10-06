@@ -20,6 +20,7 @@ import re
 from dataclasses import dataclass, field
 
 from ict.config import COB_FIELDS, MERGE_THINKING, SUB_FIELDS
+from ict.concurrency import parallel_map
 from ict.llm import LLMClient, LLMError, complete_json
 from ict.schemas import (AnnouncementUnderstanding, Candidate, Cob, Failure, MergeEvidence,
                          MergedProjects, Project, Sub)
@@ -1126,6 +1127,21 @@ def _move_project_price(project_rows: list[Candidate], others: list[Candidate],
 
 # --------------------------------------------------------------------------- step entry
 
+class _PackageTrace:
+    """The shared audit lists, buffered per package.
+
+    Each package writes into its own buffers; the parent flushes them in package order once every
+    package is done. That keeps `merge_decisions`, `repairs`, `conflicts` and
+    `unmatched_summary_rows` in exactly the order the serial loop produced them.
+    """
+
+    def __init__(self) -> None:
+        self.repairs: list[dict] = []
+        self.decisions: list[dict] = []
+        self.conflicts: list[dict] = []
+        self.unmatched: list[dict] = []
+
+
 def merge_projects(run_id: str, understanding: AnnouncementUnderstanding, candidates: list[Candidate],
                    package_amounts: list | None = None, evidence: MergeEvidence | None = None,
                    llm: LLMClient | None = None, counter=None) -> MergedProjects:
@@ -1156,9 +1172,14 @@ def merge_projects(run_id: str, understanding: AnnouncementUnderstanding, candid
 
     projects: list[Project] = []
     single = understanding.package_mode == "single"
+
+    # Phase 1, in package order: everything a package needs before the model sees it. The local
+    # decision rules write into that package's own buffers, never into the shared lists.
+    prepared: list[dict] = []
     for package in understanding.packages:
         items = grouped.get(package.project_id, [])
-        amount, origin, raw = _package_amount(package, single, understanding, observed, repairs)
+        trace = _PackageTrace()
+        amount, origin, raw = _package_amount(package, single, understanding, observed, trace.repairs)
         amount_origins[package.package_no] = origin
         ctx = _Context(package_no=package.package_no, project_name=understanding.project_name,
                        winners=_winner_names(items, evidence, package.package_no),
@@ -1178,7 +1199,8 @@ def merge_projects(run_id: str, understanding: AnnouncementUnderstanding, candid
                     item.warnings.append(SUSPECT_POINTER)
             if llm is None:
                 for item in pointers:
-                    unmatched.append({"candidate_id": item.candidate_id, "reason": "html_pointer_row"})
+                    trace.unmatched.append({"candidate_id": item.candidate_id,
+                                            "reason": "html_pointer_row"})
                 cobs = [item for item in cobs if item not in pointers]
         project_rows = [item for item in cobs if is_project_name(_value(item, "object_name"), ctx.project_name)]
         others = [item for item in cobs if item not in project_rows]
@@ -1192,26 +1214,57 @@ def merge_projects(run_id: str, understanding: AnnouncementUnderstanding, candid
                 # Dropped only when the announcement itself itemizes something else. A single-object
                 # service contract is very often named after its own object, and treating that name
                 # as a summary row empties the package - 27088832 and 27066672 both do.
-                _move_project_price(project_rows, others, unmatched, ctx)
+                _move_project_price(project_rows, others, trace.unmatched, ctx)
                 cobs = others
         by_id = {item.candidate_id: item for item in cobs}
         groups, nameless = _baseline(cobs, ctx)
         for candidate in nameless:
-            unmatched.append({"candidate_id": candidate.candidate_id, "reason": "missing_object_name"})
+            trace.unmatched.append({"candidate_id": candidate.candidate_id,
+                                    "reason": "missing_object_name"})
 
-        deltas: list[dict] = []
-        if llm is not None and _needs_model(cobs):
-            suspect_hint = None if amount is None or amount > 0 else "non_positive"
-            deltas, fallback, note = _ask_merge(ctx, groups, cobs, amount, raw, suspect_hint,
-                                                 evidence, llm, counter)
+        wanted = llm is not None and _needs_model(cobs)
+        if not wanted:
+            trace.decisions.append({"package_no": package.package_no, "op": "model", "accepted": False,
+                                    "reject": "no_model" if llm is None else "nothing_to_disambiguate"})
+        prepared.append({
+            "package": package, "items": items, "amount": amount, "origin": origin, "raw": raw,
+            "ctx": ctx, "cobs": cobs, "by_id": by_id, "groups": groups, "trace": trace,
+            "wanted": wanted,
+            # Only a non-positive amount is suspicious; the hint itself is not a judgement.
+            "suspect_hint": None if amount is None or amount > 0 else "non_positive",
+        })
+
+    # Phase 2: the per-package identity call, for the packages that asked for one. The requests are
+    # independent - each sees only its own groups and the read-only evidence - so they may overlap.
+    asked: dict[str, list[dict]] = {}
+    if llm is not None:
+        todo = [entry for entry in prepared if entry["wanted"]]
+        for entry, produced in zip(todo, parallel_map(
+                lambda item: _ask_merge(item["ctx"], item["groups"], item["cobs"], item["amount"],
+                                        item["raw"], item["suspect_hint"], evidence, llm, counter),
+                todo)):
+            deltas, fallback, note = produced
+            asked[entry["package"].package_no] = deltas
             if note:
-                notes[package.package_no] = note
+                notes[entry["package"].package_no] = note
             if fallback:
-                repairs.append({"package_no": package.package_no, "action": "merge_model_fallback",
-                                "reason": fallback})
-        else:
-            decisions.append({"package_no": package.package_no, "op": "model", "accepted": False,
-                              "reject": "no_model" if llm is None else "nothing_to_disambiguate"})
+                entry["trace"].repairs.append({"package_no": entry["package"].package_no,
+                                               "action": "merge_model_fallback", "reason": fallback})
+
+    def finish_one(entry: dict, deltas: list[dict]) -> Project:
+        """Phase 3 for one package: apply the model's answer and build the project.
+
+        Everything this writes goes into the package's own buffers, which the parent flushes in
+        package order, so the audit arrays read exactly as the serial loop wrote them.
+        """
+        package = entry["package"]
+        items, ctx = entry["items"], entry["ctx"]
+        by_id, groups = entry["by_id"], entry["groups"]
+        amount, origin, raw = entry["amount"], entry["origin"], entry["raw"]
+        trace = entry["trace"]
+        repairs, decisions = trace.repairs, trace.decisions
+        conflicts, unmatched = trace.conflicts, trace.unmatched
+
         groups, excluded = _apply_deltas(groups, deltas, by_id, ctx, decisions)
         _donate_excluded(excluded, groups, ctx, decisions)
         for candidate, kind in excluded:
@@ -1264,7 +1317,7 @@ def merge_projects(run_id: str, understanding: AnnouncementUnderstanding, candid
                 cooperative_product_suppliers=unique_products if sub.is_winner else [])
             for sub in subs
         ]
-        projects.append(Project(
+        return Project(
             project_id=package.project_id,
             source_project_no=understanding.source_project_no,
             project_name=understanding.project_name or "",
@@ -1282,7 +1335,15 @@ def merge_projects(run_id: str, understanding: AnnouncementUnderstanding, candid
                                      for item in clusters],
                 "sub_candidate_ids": sub_ids,
             },
-        ))
+        )
+
+    for entry in prepared:
+        projects.append(finish_one(entry, asked.get(entry["package"].package_no, [])))
+        trace = entry["trace"]
+        repairs.extend(trace.repairs)
+        decisions.extend(trace.decisions)
+        conflicts.extend(trace.conflicts)
+        unmatched.extend(trace.unmatched)
 
     open_conflicts = [item for item in conflicts if item["field"] != "price_bundle"]
     status = "partial" if open_conflicts or unassigned else "success"

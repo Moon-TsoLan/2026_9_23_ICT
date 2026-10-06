@@ -10,6 +10,7 @@ import json
 from collections import Counter
 
 from ict.llm import LLMClient, LLMError, complete_json
+from ict.concurrency import parallel_map
 from ict.schemas import Failure, MergedProjects, Project, Sub
 from ict.steps.s08_merge import _norm_name, amount_checked, consistency_checks, package_checks
 
@@ -111,36 +112,52 @@ def repair_packages(
     llm: LLMClient | None,
     counter: Counter | None = None,
 ) -> list[Failure]:
-    failures: list[Failure] = []
-    for position, project in enumerate(merged.projects):
+    def repair_one(project: Project) -> tuple[Project, list[dict], list[Failure]]:
+        """One package's repair, with every write buffered so the caller can apply it in order.
+
+        A package only reads its own project, its own alternatives and the read-only amount
+        origin, so several of these can run at once without ever meeting each other.
+        """
+        repairs: list[dict] = []
+        failures: list[Failure] = []
         amount_ok = amount_checked(merged, project)
         checks = [item for item in package_checks(project, amount_checked=amount_ok)
                   if item["level"] in {"hard", "medium"}]
         if not checks:
-            continue
+            return project, repairs, failures
         if any(item["check"] == "missing_winner" for item in checks):
-            _mark_winners(project, winner_hints.get(project.package_no, []), merged.repairs)
+            _mark_winners(project, winner_hints.get(project.package_no, []), repairs)
         # Only an overflow can be repaired by picking another reading. A shortfall is not a defect
         # (the object list may simply be partial) and a row with no price has no reading to pick,
         # so both go to review instead of to the model.
         price_checks = [item for item in checks if item["check"] == "amount_overflow"]
         alternatives = merged.alternatives.get(project.project_id) or []
         if not price_checks or not alternatives or llm is None:
-            continue
+            return project, repairs, failures
         try:
             choices = _ask_model(project, alternatives, price_checks, llm, counter)
         except (LLMError, ValueError) as exc:
             code = "llm_call_failed" if isinstance(exc, LLMError) else "llm_schema_invalid"
             failures.append(Failure(failure_code=code, failure_message=str(exc), location=project.package_no))
-            continue
+            return project, repairs, failures
         if not choices:
-            merged.repairs.append({"package_no": project.package_no, "action": "model_no_choice"})
-            continue
+            repairs.append({"package_no": project.package_no, "action": "model_no_choice"})
+            return project, repairs, failures
         trial = _apply(project, alternatives, choices)
         if _score(trial, amount_ok) < _score(project, amount_ok):
-            merged.projects[position] = trial
-            merged.repairs.append({"package_no": project.package_no, "action": "price_bundle_by_model", "choices": choices})
-        else:
-            merged.repairs.append({"package_no": project.package_no, "action": "model_choice_rejected", "choices": choices})
+            repairs.append({"package_no": project.package_no, "action": "price_bundle_by_model",
+                            "choices": choices})
+            return trial, repairs, failures
+        repairs.append({"package_no": project.package_no, "action": "model_choice_rejected",
+                        "choices": choices})
+        return project, repairs, failures
+
+    failures: list[Failure] = []
+    # One independent call per package; results come back in package order and are applied there.
+    results = parallel_map(repair_one, list(merged.projects))
+    for position, (project, repairs, package_failures) in enumerate(results):
+        merged.projects[position] = project
+        merged.repairs.extend(repairs)
+        failures.extend(package_failures)
     failures.extend(consistency_checks(merged))
     return failures

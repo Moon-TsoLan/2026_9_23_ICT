@@ -22,6 +22,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from ict.concurrency import LOCAL_GATE
 from ict.config import SCREEN_TEXT_CHARS
 from ict.llm import LLMError, complete_json
 from ict.parse.census import FileEntry
@@ -95,6 +96,13 @@ def picture_to_uri(raw: bytes, max_width: int = 1400, quality: int = 75) -> str:
 
 def thumbnails(entry: FileEntry, pages: int = 2, dpi: int = 130, quality: int = 75) -> list[str]:
     """Pictures for the image gate: PDF page renders, or the media inside a thin docx."""
+    # Rasterising pages and JPEG-encoding them is real CPU work on a two-core box, so it queues
+    # behind the same local gate as the other native readers.
+    with LOCAL_GATE:
+        return _render_thumbnails(entry, pages, dpi, quality)
+
+
+def _render_thumbnails(entry: FileEntry, pages: int, dpi: int, quality: int) -> list[str]:
     out: list[str] = []
     path = Path(entry.path)
     if entry.fmt == "docx":

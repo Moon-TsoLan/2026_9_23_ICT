@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import time
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from ict.catalog import Catalog
-from ict.config import ATTACHMENTS_ROOT, DATA_HTML
+from ict.concurrency import CallCounter, counts_snapshot
+from ict.config import ATTACHMENTS_ROOT, DATA_HTML, concurrency_settings
 from ict.html_context import parse_notice, winner_hints
 from ict.index.build import build_index, load_index
 from ict.llm import LLMClient, build_client
@@ -44,7 +46,7 @@ def run_announcement(announcement_id: str, llm: LLMClient | None = None, html_di
     client = build_client() if llm is None else llm
     store = RunStore(announcement_id, persist=persist)
     catalog = Catalog()
-    calls: Counter[str] = Counter()
+    calls = CallCounter()
     all_failures: list[Failure] = []
 
     store.begin("understand_announcement")
@@ -210,6 +212,31 @@ def _first_code(failures: list[Failure]) -> str | None:
     return failures[0].failure_code if failures else None
 
 
+def run_batch(announcement_ids: list[str], workers: int | None = None,
+              **kwargs) -> dict[str, RunReport]:
+    """Run several announcements at once, one thread each.
+
+    Announcements share nothing but the gates in `ict.concurrency`: each keeps its own run
+    directory, its own parsed pages and its own candidates. A repeated id runs once, because two
+    threads writing into the same run directory could only corrupt it.
+
+    `workers=1` is the plain sequential loop, which is what a deployment that wants no
+    announcement-level concurrency should pass.
+    """
+    ids = list(dict.fromkeys(announcement_ids))
+    if not ids:
+        return {}
+    default = int(concurrency_settings()["announcement_workers"])
+    limit = max(1, int(workers) if workers is not None else default)
+    if limit == 1 or len(ids) == 1:
+        return {announcement_id: run_announcement(announcement_id, **kwargs)
+                for announcement_id in ids}
+    with ThreadPoolExecutor(max_workers=min(limit, len(ids)), thread_name_prefix="ict-run") as pool:
+        futures = {announcement_id: pool.submit(run_announcement, announcement_id, **kwargs)
+                   for announcement_id in ids}
+        return {announcement_id: future.result() for announcement_id, future in futures.items()}
+
+
 def _merge_evidence(notice, tables, understanding, index, file_decisions, page_decisions,
                     parsed: dict[str, list[dict]], package_amounts: list,
                     award_hints: dict[str, list[str]]) -> MergeEvidence:
@@ -285,7 +312,7 @@ def _first_message(failures: list[Failure]) -> str | None:
     return failures[0].failure_message if failures else None
 
 
-def _finish(store: RunStore, calls: Counter, failures: list[Failure], started: float) -> RunReport:
+def _finish(store: RunStore, calls: CallCounter, failures: list[Failure], started: float) -> RunReport:
     summary = Counter(item.failure_code for item in failures)
     report = RunReport(
         run_id=store.run_id,
@@ -293,7 +320,7 @@ def _finish(store: RunStore, calls: Counter, failures: list[Failure], started: f
         status=store.state.status,
         duration_ms=int((time.perf_counter() - started) * 1000),
         counts=store.state.counts,
-        llm_calls=dict(calls),
+        llm_calls=counts_snapshot(calls),
         failure_summary=[{"failure_code": code, "count": count} for code, count in sorted(summary.items())],
         review_required=store.state.review_required or store.state.status != "success",
     )

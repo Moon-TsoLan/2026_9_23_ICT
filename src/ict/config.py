@@ -91,6 +91,10 @@ def llm_settings() -> dict[str, str]:
         "base_url": os.environ.get("ICT_LLM_BASE_URL", "https://api.deepseek.com").rstrip("/"),
         "api_key": os.environ.get("ICT_LLM_API_KEY") or os.environ.get("DEEPSEEK_API_KEY", ""),
         "model": os.environ.get("ICT_LLM_MODEL", "deepseek-flash"),
+        "timeout": os.environ.get("ICT_LLM_TIMEOUT", "180"),
+        # Connecting is a different failure from waiting for an answer: a dead endpoint must not
+        # hold a worker (or the GPU queue) for the whole read timeout.
+        "connect_timeout": os.environ.get("ICT_LLM_CONNECT_TIMEOUT", "15"),
     }
 
 
@@ -101,7 +105,32 @@ def parse_settings() -> dict:
         "url": os.environ.get("ICT_PARSE_URL", "http://127.0.0.1:6008").rstrip("/"),
         "token": os.environ.get("ICT_PARSE_TOKEN", ""),
         "timeout": float(os.environ.get("ICT_PARSE_TIMEOUT", "600")),
+        # 600s is how long one document may take to parse; it is not how long we wait to reach the
+        # box. A dead or hung endpoint must fail in seconds, or it blocks the single-document queue.
+        "connect_timeout": float(os.environ.get("ICT_PARSE_CONNECT_TIMEOUT", "10")),
         "run_workers": int(os.environ.get("ICT_PARSE_RUN_WORKERS", "3")),
+    }
+
+
+def concurrency_settings() -> dict:
+    """Concurrency knobs, defaulted for the 2-core / 4 GB deployment box.
+
+    These bound how many calls may be in flight at once; no judgement reads them. Every one of
+    them has the same effect when set to 1 as the serial pipeline had before them.
+    """
+    load_local_env()
+    return {
+        # Announcements processed at the same time. Memory, not CPU, is what limits this: each one
+        # in flight holds its own parsed pages.
+        "announcement_workers": int(os.environ.get("ICT_ANNOUNCEMENT_WORKERS", "2")),
+        # Chat calls in flight across every step and every announcement.
+        "llm_max_concurrency": int(os.environ.get("ICT_LLM_MAX_CONCURRENCY", "8")),
+        "llm_retry_attempts": int(os.environ.get("ICT_LLM_RETRY_ATTEMPTS", "3")),
+        "llm_retry_wait": float(os.environ.get("ICT_LLM_RETRY_WAIT", "1")),
+        # Work the two cores actually spend time on: sha256, page profiling, thumbnails.
+        "local_workers": int(os.environ.get("ICT_LOCAL_HEAVY_WORKERS", "2")),
+        # Documents in flight on the GPU box. 1 is the contract: one document at a time.
+        "parse_max_inflight": int(os.environ.get("ICT_PARSE_MAX_INFLIGHT", "1")),
     }
 
 

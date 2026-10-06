@@ -14,6 +14,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
+from ict.concurrency import LOCAL_GATE
 from ict.parse.census import FileEntry
 
 PRICE_HINT = re.compile("单价|数量|总价|中标金额|成交金额|规格型号|品牌|制造商")
@@ -129,7 +130,9 @@ def peek_entry(entry: FileEntry, view_chars: int = 3000) -> Peek:
         peek.reason = "no_text_reader:" + entry.fmt
         return peek
     try:
-        text, headers = loader(entry.path)
+        # Reading a native document is the CPU work the two cores actually pay for.
+        with LOCAL_GATE:
+            text, headers = loader(entry.path)
     except Exception as exc:  # noqa: BLE001 - a broken file must not stop the run
         peek.reason = "peek_failed:" + type(exc).__name__
         return peek
@@ -164,14 +167,15 @@ def page_profiles(path, cap: int = 0) -> list[dict]:
     document = pymupdf.open(str(path))
     try:
         stop = document.page_count if not cap else min(document.page_count, cap)
-        for index in range(stop):
-            page = document[index]
-            try:
-                tables = len(page.find_tables().tables)
-            except Exception:  # noqa: BLE001 - a broken table finder is not a reason to lose the page
-                tables = 0
-            profiles.append({"page_no": index + 1, "tables": tables,
-                             "price_hits": len(PRICE_HINT.findall(page.get_text() or ""))})
+        with LOCAL_GATE:
+            for index in range(stop):
+                page = document[index]
+                try:
+                    tables = len(page.find_tables().tables)
+                except Exception:  # noqa: BLE001 - a broken table finder is not a reason to lose the page
+                    tables = 0
+                profiles.append({"page_no": index + 1, "tables": tables,
+                                 "price_hits": len(PRICE_HINT.findall(page.get_text() or ""))})
     finally:
         document.close()
     return profiles

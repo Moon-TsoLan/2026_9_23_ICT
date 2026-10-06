@@ -15,7 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from ict.index.build import build_index
-from ict.pipeline import run_announcement
+from ict.pipeline import run_batch
 
 REPO = Path(__file__).resolve().parents[1]
 PUNCT = re.compile(r"[（）()\[\]【】\s，,。．.、;；:：/\\\-—_]")
@@ -55,19 +55,30 @@ def score(announcement_id: str, run_dir: Path) -> dict:
 
 
 def main() -> None:
-    ids = sys.argv[1:] or ["t20260905_27275031"]
+    argv = sys.argv[1:]
+    workers = None
+    if "--workers" in argv:
+        position = argv.index("--workers")
+        workers = int(argv[position + 1])
+        del argv[position:position + 2]
+    ids = argv or ["t20260905_27275031"]
+    for announcement_id in ids:
+        try:
+            build_index(announcement_id)
+        except Exception:
+            traceback.print_exc()
+    started = time.perf_counter()
+    reports = run_batch(ids, workers=workers)
+    batch_wall = time.perf_counter() - started
     for announcement_id in ids:
         print("=" * 90, flush=True)
         print(announcement_id, flush=True)
-        started = time.perf_counter()
-        try:
-            build_index(announcement_id)
-            report = run_announcement(announcement_id)
-        except Exception:
-            traceback.print_exc()
+        report = reports.get(announcement_id)
+        if report is None:
+            print("no report", flush=True)
             continue
-        elapsed = time.perf_counter() - started
-        print("status=%s wall=%.1fs counts=%s" % (report.status, elapsed, report.counts), flush=True)
+        print("status=%s wall=%.1fs counts=%s" % (report.status, report.duration_ms / 1000.0,
+                                                  report.counts), flush=True)
         print("llm_calls=%s" % (report.llm_calls,), flush=True)
         print("failures=%s" % (report.failure_summary,), flush=True)
         run_dir = REPO / "work" / "runs" / announcement_id
@@ -92,6 +103,7 @@ def main() -> None:
             pages = sorted({(cand.get("source") or {}).get("page_no") for cand in produced.get("candidates") or []})
             print("attachment cobs=%d pages_used=%s" % (len([n for n in names if n]), pages), flush=True)
         print("score:", json.dumps(score(announcement_id, run_dir), ensure_ascii=False), flush=True)
+    print("batch wall=%.1fs (workers=%s)" % (batch_wall, workers or "default"), flush=True)
 
 
 if __name__ == "__main__":

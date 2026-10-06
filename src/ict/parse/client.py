@@ -13,6 +13,10 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
+import httpx
+
+from ict.http import shared_client
+
 TABLE_BLOCK = re.compile(r"<table[\s\S]*?</table>", re.IGNORECASE)
 
 
@@ -23,22 +27,23 @@ class ParseError(RuntimeError):
 
 
 class ParseClient:
-    def __init__(self, base_url: str, token: str = "", timeout: float = 600.0) -> None:
+    def __init__(self, base_url: str, token: str = "", timeout: float = 600.0,
+                 connect_timeout: float = 10.0) -> None:
         self.base_url = base_url.rstrip("/")
         self.token = token
         self.timeout = timeout
+        # How long one document may take is `timeout`; how long we wait to reach the box at all is
+        # this. Keeping them equal let one unreachable endpoint block the whole parse queue for
+        # ten minutes per file.
+        self.connect_timeout = connect_timeout
 
     def health(self) -> dict:
-        import httpx
-
-        response = httpx.get(self.base_url + "/health", timeout=20)
+        response = shared_client("parse").get(self.base_url + "/health", timeout=20)
         response.raise_for_status()
         return response.json()
 
     def parse(self, path: Path, pages: list[int] | None = None, merge_tables: bool = True,
               return_blocks: bool = True, max_pages: int = 40) -> dict:
-        import httpx
-
         path = Path(path)
         spec = pages_to_spec(pages)
         data = {"merge_tables": str(merge_tables).lower(), "return_blocks": str(return_blocks).lower(),
@@ -50,7 +55,10 @@ class ParseClient:
         with path.open("rb") as handle:
             files = {"file": (path.name, handle, "application/octet-stream")}
             try:
-                response = httpx.post(self.base_url + "/parse", files=files, data=data, timeout=self.timeout)
+                response = shared_client("parse").post(self.base_url + "/parse", files=files,
+                                                       data=data,
+                                                       timeout=httpx.Timeout(self.timeout,
+                                                                             connect=self.connect_timeout))
             except Exception as exc:  # noqa: BLE001
                 raise ParseError("parse_unreachable:" + type(exc).__name__) from exc
         if response.status_code >= 400:
