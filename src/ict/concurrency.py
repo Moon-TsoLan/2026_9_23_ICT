@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import threading
 from collections import Counter
-from concurrent.futures import ThreadPoolExecutor
+from collections import deque
+from concurrent.futures import Future, ThreadPoolExecutor
 
 from ict.config import concurrency_settings
 
@@ -22,10 +23,90 @@ LLM_GATE = threading.BoundedSemaphore(max(1, int(_settings["llm_max_concurrency"
 # sha256, page rendering, docx/xlsx reading: the work the two cores actually spend time on.
 LOCAL_GATE = threading.BoundedSemaphore(max(1, int(_settings["local_workers"])))
 
-# One worker is a FIFO queue with exactly one document in flight, which is what the GPU box wants.
-# The queue, not the caller, does the waiting; when one document finishes the next starts at once.
-PARSE_QUEUE = ThreadPoolExecutor(max_workers=max(1, int(_settings["parse_max_inflight"])),
-                                 thread_name_prefix="ict-parse")
+class ParseQueue:
+    """One document on the GPU at a time, rotated fairly between the announcements wanting it.
+
+    The GPU box parses one document at a time - that is the contract - so this queue is where a
+    run's waiting happens. A plain FIFO lets whichever announcement submitted first hold the box
+    for its whole batch: with ten files ahead of it, a one-file announcement waits for all ten.
+    This dispatcher keeps each owner's own submission order and rotates between owners, so every
+    announcement gets a turn.
+
+    The total GPU work is unchanged, so the big announcement still finishes when it would have;
+    the small one no longer waits for it. The queue, not the caller, does the waiting, and the
+    next job is already picked when the current one ends, so the box is never idle while work is
+    pending.
+
+    `workers` is `ICT_PARSE_MAX_INFLIGHT`: 1 is the contract, and raising it is an experiment.
+    """
+
+    def __init__(self, workers: int = 1) -> None:
+        self.workers = max(1, int(workers))
+        self._lock = threading.Condition()
+        self._pending: dict[str, deque] = {}
+        self._rotation: list[str] = []
+        self._closed = False
+        self._threads = [threading.Thread(target=self._dispatch, daemon=True,
+                                          name="ict-parse-%d" % index)
+                         for index in range(self.workers)]
+        for thread in self._threads:
+            thread.start()
+
+    # -- producer side -------------------------------------------------------
+
+    def submit(self, owner: str, func, *args, **kwargs) -> Future:
+        """Queue one call for `owner`. Owners take turns; within an owner it stays first-in-first-out."""
+        future: Future = Future()
+        with self._lock:
+            if self._closed:
+                raise RuntimeError("parse queue is closed")
+            if owner not in self._pending:
+                self._pending[owner] = deque()
+                self._rotation.append(owner)
+            self._pending[owner].append((future, func, args, kwargs))
+            self._lock.notify()
+        return future
+
+    def shutdown(self, wait: bool = True) -> None:
+        """Stop accepting work and let the queued jobs finish."""
+        with self._lock:
+            self._closed = True
+            self._lock.notify_all()
+        if wait:
+            for thread in self._threads:
+                thread.join(timeout=5)
+
+    # -- consumer side -------------------------------------------------------
+
+    def _take(self) -> tuple:
+        """Pop the next job from the front owner, and send that owner to the back if it has more."""
+        owner = self._rotation.pop(0)
+        pending = self._pending[owner]
+        job = pending.popleft()
+        if pending:
+            self._rotation.append(owner)
+        else:
+            del self._pending[owner]
+        return job
+
+    def _dispatch(self) -> None:
+        while True:
+            with self._lock:
+                while not self._rotation and not self._closed:
+                    self._lock.wait()
+                if not self._rotation:
+                    return
+                future, func, args, kwargs = self._take()
+            if future.set_running_or_notify_cancel():
+                try:
+                    result = func(*args, **kwargs)
+                except BaseException as exc:  # noqa: BLE001 - the caller must see the real error
+                    future.set_exception(exc)
+                else:
+                    future.set_result(result)
+
+
+PARSE_QUEUE = ParseQueue(int(_settings["parse_max_inflight"]))
 
 # The pool every per-unit step submits into. One pool for the whole process, so two announcements
 # in flight cannot create two thread budgets; the gate above still bounds the endpoint itself.

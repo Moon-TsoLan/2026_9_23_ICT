@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import os
+
 import pytest
 
 from ict import replay
+from ict import config
 from ict.llm import LLMClient, LLMResult
 
 
@@ -102,3 +105,18 @@ def test_live_mode_is_the_default(monkeypatch):
     assert replay.mode() == "replay"
     monkeypatch.setenv("ICT_LLM_MODE", "nonsense")
     assert replay.mode() == "live"
+
+
+def test_the_env_file_cannot_switch_on_replay(monkeypatch, tmp_path):
+    """A stale line left in `.env` must not be able to fake every model answer."""
+    (tmp_path / ".env").write_text(
+        "ICT_LLM_MODE=replay\nICT_CASSETTE=/tmp/stale.jsonl\nICT_REPLAY_LATENCY_MS=500\n"
+        "ICT_LLM_BASE_URL=https://example.invalid\n", encoding="utf-8")
+    monkeypatch.setattr(config, "REPO_ROOT", tmp_path)
+    for key in ("ICT_LLM_MODE", "ICT_CASSETTE", "ICT_REPLAY_LATENCY_MS", "ICT_LLM_BASE_URL"):
+        monkeypatch.delenv(key, raising=False)
+    config.load_local_env()
+    assert "ICT_LLM_MODE" not in os.environ
+    assert "ICT_CASSETTE" not in os.environ
+    assert "ICT_REPLAY_LATENCY_MS" not in os.environ
+    assert os.environ["ICT_LLM_BASE_URL"] == "https://example.invalid"

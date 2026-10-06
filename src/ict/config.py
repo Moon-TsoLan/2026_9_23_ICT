@@ -82,7 +82,17 @@ def load_local_env() -> None:
         if not text or text.startswith("#") or "=" not in text:
             continue
         key, value = text.split("=", 1)
+        # `.env` carries endpoints, keys and the tunnel. It must not be able to put the model layer
+        # into record/replay, or leave a cassette path behind: those are runtime modes of a test
+        # harness, and a stale line in a file would silently fake every answer. Process environment
+        # only, so it cannot persist by accident.
+        if key.strip() in ENV_FILE_EXCLUDED:
+            continue
         os.environ.setdefault(key.strip(), value.strip())
+
+
+# Read only from the process environment, never from `.env`.
+ENV_FILE_EXCLUDED = {"ICT_LLM_MODE", "ICT_CASSETTE", "ICT_REPLAY_LATENCY_MS"}
 
 
 def llm_settings() -> dict[str, str]:

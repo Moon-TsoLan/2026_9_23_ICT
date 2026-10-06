@@ -68,8 +68,10 @@ def main() -> None:
         except Exception:
             traceback.print_exc()
     started = time.perf_counter()
+    cpu_started = time.process_time()
     reports = run_batch(ids, workers=workers)
     batch_wall = time.perf_counter() - started
+    batch_cpu = time.process_time() - cpu_started
     for announcement_id in ids:
         print("=" * 90, flush=True)
         print(announcement_id, flush=True)
@@ -103,7 +105,10 @@ def main() -> None:
             pages = sorted({(cand.get("source") or {}).get("page_no") for cand in produced.get("candidates") or []})
             print("attachment cobs=%d pages_used=%s" % (len([n for n in names if n]), pages), flush=True)
         print("score:", json.dumps(score(announcement_id, run_dir), ensure_ascii=False), flush=True)
-    print("batch wall=%.1fs (workers=%s)" % (batch_wall, workers or "default"), flush=True)
+    # Wall clock and CPU are reported together on purpose: most of this pipeline's wall time is
+    # waiting, and a slow wall clock next to a small CPU number means the endpoint, not the box.
+    print("batch wall=%.1fs cpu=%.1fs (workers=%s)" % (batch_wall, batch_cpu, workers or "default"),
+          flush=True)
 
 
 if __name__ == "__main__":

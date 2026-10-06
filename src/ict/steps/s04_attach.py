@@ -250,7 +250,9 @@ def parse_pages(run_id: str, files: FileDecisions, index: AttachmentIndex, failu
         wanted, profiles = _budget_pages(entry, cap, failures)
         jobs.append({"decision": decision, "entry": entry, "cap": cap, "profiles": profiles,
                      "local": False,
-                     "future": PARSE_QUEUE.submit(client.parse, entry.path, pages=wanted,
+                     # The owner is the announcement: the queue rotates between announcements but
+                     # keeps this one's own file order, which is already sorted by priority.
+                     "future": PARSE_QUEUE.submit(run_id, client.parse, entry.path, pages=wanted,
                                                   max_pages=cap)})
 
     for job in jobs:
