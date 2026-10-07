@@ -26,8 +26,7 @@ LOCAL_GATE = threading.BoundedSemaphore(max(1, int(_settings["local_workers"])))
 class ParseQueue:
     """One document on the GPU at a time, rotated fairly between the announcements wanting it.
 
-    The GPU box parses one document at a time - that is the contract - so this queue is where a
-    run's waiting happens. A plain FIFO lets whichever announcement submitted first hold the box
+    A run's waiting for the GPU happens here. A plain FIFO lets whichever announcement submits first hold the box
     for its whole batch: with ten files ahead of it, a one-file announcement waits for all ten.
     This dispatcher keeps each owner's own submission order and rotates between owners, so every
     announcement gets a turn.
@@ -37,7 +36,9 @@ class ParseQueue:
     next job is already picked when the current one ends, so the box is never idle while work is
     pending.
 
-    `workers` is `ICT_PARSE_MAX_INFLIGHT`: 1 is the contract, and raising it is an experiment.
+    `workers` is `ICT_PARSE_MAX_INFLIGHT`: how many documents the GPU box may hold at once.
+    The original contract was 1; measured on a real 10-announcement set it was the slowest setting,
+    so the default is now 3. Raising it further only queues on the GPU box.
     """
 
     def __init__(self, workers: int = 1) -> None:

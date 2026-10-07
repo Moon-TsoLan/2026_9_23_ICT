@@ -33,7 +33,7 @@ function onPick(hit: { name: string }) {
 <template>
   <div class="scenebar">
     <p class="desc">
-      点一颗星，看它能问什么
+      选中一个节点，查看可提问的关系场景
       <span class="hint">搜索框按全名定位 · 单击选中 · Esc 退出</span>
     </p>
     <div class="row">

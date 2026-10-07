@@ -185,15 +185,15 @@ const subjectActions = computed<Array<{ scene: SceneId; label: string }>>(() => 
   if (!n || mode.value !== 'picked') return []
   if (n.kind === 'buyer')
     return [
-      { scene: 'S1', label: '看它的长期合作供应商' },
-      { scene: 'S2', label: '看它的高频投标圈子' },
+      { scene: 'S1', label: '查它的长期合作供应商（中标/产品）' },
+      { scene: 'S2', label: '查它的高频投标主体与协同组合' },
     ]
   if (n.kind === 'project') return []
   if (!hasWinOf(n)) return []
   return [
-    { scene: 'S3', label: '查它的同场竞标对手' },
-    { scene: 'S4', label: '拿它找交集采购单位' },
-    { scene: 'S5', label: '拿它找交集项目' },
+    { scene: 'S3', label: '查它的高频共同竞标主体' },
+    { scene: 'S4', label: '选多家，查共同合作的采购单位' },
+    { scene: 'S5', label: '选多家，查共同竞标的项目' },
   ]
 })
 
@@ -213,7 +213,7 @@ const stateLine = computed(() => {
     const pick = (r: string) => g.find((x) => x.role === r)?.count ?? 0
     return 'S6 · 项目 ' + (n?.label ?? '') + ' · 采购 ' + pick('buy') + ' · 投标 ' + pick('bid') + ' · 中标 ' + pick('win')
   }
-  if (mode.value === 'overview') return '未提问 · 点一颗星开始'
+  if (mode.value === 'overview') return '未提问 · 选中一个节点开始'
   if (mode.value === 'picked') return 'S0 · 已选中 ' + (n?.label ?? '')
   if (mode.value === 'picking') return 'S4/S5 · 对比篮 ' + subjectCount.value + '/' + MULTI_MAX
   if (mode.value === 'compared') {

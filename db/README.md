@@ -2,6 +2,30 @@
 
 演示库与生产库**结构完全相同**，区别只在库名与数据。换库 = 改 `.env` 里的 `DATABASE_URL` / `PGDATABASE`，代码与查询语句都不用动。
 
+## 现有数据库
+
+| 库名 | 内容 | 用途 |
+|---|---|---|
+| `ict_demo` | 110 则公告（演示数据） | 离线演示 |
+| `ict_batch20261004` | 40 则（2026-10-04 那批，万元修复前） | 旧批次 |
+| `ict_report20261006` | **10 则真实抽取结果**（含建表 + 数据 + 序列归位） | 阶段性汇报 |
+
+切库只改 `.env` 的 `DATABASE_URL` 与 `PGDATABASE`，或者用进程级变量临时覆盖：
+
+```powershell
+$env:DATABASE_URL = "postgresql://ict:ict_dev_pw@localhost:15432/ict_report20261006"
+D:\python\python.exe -m uvicorn server.app:app --port 8000
+```
+
+导入一份自包含的 `.sql`（自带建表）时，先建空库再灌，不要灌进已有库（文件里没有 `DROP`，会主键冲突）：
+
+```powershell
+docker exec ict-pg psql -U ict -d postgres -c "CREATE DATABASE <新库> OWNER ict ENCODING 'UTF8' TEMPLATE template0 LC_COLLATE 'C' LC_CTYPE 'C'"
+docker cp <本机.sql> ict-pg:/tmp/seed.sql
+docker exec ict-pg psql -U ict -d <新库> -v ON_ERROR_STOP=1 -q -f /tmp/seed.sql
+docker exec ict-pg rm -f /tmp/seed.sql
+```
+
 ## 0. 前置：安装 Docker
 
 本机当前**未安装 Docker**。Windows 上安装：
@@ -67,7 +91,7 @@ docker compose exec -T db psql -U ict -d ict_prod < db/001_schema.sql
 然后把 `.env` 改成：
 
 ```
-DATABASE_URL=postgresql://ict:ict_dev_pw@localhost:5432/ict_prod
+DATABASE_URL=postgresql://ict:ict_dev_pw@localhost:15432/ict_prod
 PGDATABASE=ict_prod
 ```
 
@@ -87,7 +111,7 @@ python db/load_runs.py --db ict_batch20261004 --runs work/runs --reset
 只改进程环境变量就能让后端指向批次库，不必动 `.env`：
 
 ```powershell
-$env:DATABASE_URL = "postgresql://ict:ict_dev_pw@localhost:5432/ict_batch20261004"
+$env:DATABASE_URL = "postgresql://ict:ict_dev_pw@localhost:15432/ict_batch20261004"
 D:\python\python.exe -m uvicorn server.app:app --port 8000
 ```
 
@@ -117,4 +141,10 @@ D:\python\python.exe -m uvicorn server.app:app --port 8000
 
 - `db/001_schema.sql` 通过 `docker-entrypoint-initdb.d` 挂载，**只在数据卷为空时执行一次**。改了这个文件不会自动重跑，要 `docker compose down -v` 重建，或手动执行 `-f db/001_schema.sql`。
 - 排序规则用 `--locale=C`：中文按码点排序（不是拼音），但**开发机与服务器结果完全一致**。业务排序都按次数/金额，不依赖 collation。
-- 可选图形界面：用任意 PostgreSQL 客户端（DBeaver / Navicat / pgAdmin）连 `localhost:5432`，库 `ict_demo`，用户 `ict`，密码 `ict_dev_pw`。
+- 主机端口是 **15432**（不是默认的 5432，原因见下）：用任意 PostgreSQL 客户端
+  （DBeaver / Navicat / pgAdmin）连 `localhost:15432`，库 `ict_demo`，用户 `ict`，密码 `ict_dev_pw`。
+- **为什么是 15432**：本机的 Windows 动态端口范围被改成了 1024–15000（默认应为 49152–65535），
+  Hyper-V/WSL 会从这段里切走保留区间；5432 一旦被切进去，容器起得来、数据库也健康，但主机端口
+  永远发布不出来（bind 报 `WSAEACCES`），且重启 Docker 无效——保留区间每次开机重新分配。
+  修法：把 `netsh int ipv4 set dynamicport tcp start=49152 num=16384`（需管理员 + 重启）改回默认，
+  或者像现在这样用一个 15000 以上的主机端口。

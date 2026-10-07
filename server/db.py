@@ -29,7 +29,9 @@ def _load_env() -> None:
 
 _load_env()
 
-DSN = os.environ.get("DATABASE_URL", "postgresql://ict:ict_dev_pw@localhost:5432/ict_demo")
+# 主机端口是 15432，不是 5432：5432 落在本机的 Windows 动态保留区间里，绑不上。
+# 客户端要覆盖时改 .env 的 DATABASE_URL 即可，这里只是兜底默认值。
+DSN = os.environ.get("DATABASE_URL", "postgresql://ict:ict_dev_pw@localhost:15432/ict_demo")
 
 pool = ConnectionPool(
     DSN,

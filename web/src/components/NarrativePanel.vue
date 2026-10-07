@@ -308,7 +308,7 @@ function tableVal(v: string | number | null, key: string): string {
             </button>
             <p v-if="g.count > g.items.length" class="srel-more">等共 {{ g.count }} 家</p>
           </div>
-          <p class="bs-hint">点名字可以把镜头移过去；点星图上的别的星无效，需先退出。</p>
+          <p class="bs-hint">点上方的名字可以把镜头移过去；点星图上的别的星无效，需先退出。</p>
         </section>
 
         <section v-if="focusProfile?.facts.length">
@@ -365,8 +365,8 @@ function tableVal(v: string | number | null, key: string): string {
         <section>
           <h3>五大场景</h3>
           <p class="guide">
-            先点一颗星选中它，右侧会给出"可以问它什么"：采购单位能问 S1 长期合作、S2 高频投标；
-            中标供应商能问 S3 同场对手、S4/S5 与别家的交集。星图上只标短名，悬停看全名，
+            先在星图上选中一个节点，右侧会给出"可以问它什么"：采购单位能问 S1 长期合作、S2 高频投标；
+            中标供应商能问 S3 共同竞标、S4/S5 与别家的交集。星图上只标短名，悬停看全名，
             底部图例可以按角色过滤。按 Esc 随时回总览。
           </p>
         </section>

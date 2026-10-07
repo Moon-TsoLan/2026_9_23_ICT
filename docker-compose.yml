@@ -14,8 +14,12 @@ services:
       # 编码与排序规则跨环境锁定：开发机 == 服务器，避免中文排序不一致
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
       TZ: Asia/Shanghai
+    # 主机端口**必须**避开 Windows 的动态端口范围：本机被改成了 1024-15000（默认应为
+    # 49152-65535），Hyper-V/WSL 会从这段里切走一块块保留区间。5432 一旦被切进去，容器照样
+    # 起得来、数据库也健康，但端口永远发布不出来（主机 bind 报 WSAEACCES），且重启 Docker
+    # 无效——因为保留区间每次开机重新分配。15432 在 15000 以上，不受影响。
     ports:
-      - "5432:5432"
+      - "15432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       # 仅在数据卷为空时执行一次（首次启动初始化 schema）

@@ -132,15 +132,17 @@ def concurrency_settings() -> dict:
     return {
         # Announcements processed at the same time. Memory, not CPU, is what limits this: each one
         # in flight holds its own parsed pages.
-        "announcement_workers": int(os.environ.get("ICT_ANNOUNCEMENT_WORKERS", "2")),
+        "announcement_workers": int(os.environ.get("ICT_ANNOUNCEMENT_WORKERS", "4")),
         # Chat calls in flight across every step and every announcement.
         "llm_max_concurrency": int(os.environ.get("ICT_LLM_MAX_CONCURRENCY", "8")),
         "llm_retry_attempts": int(os.environ.get("ICT_LLM_RETRY_ATTEMPTS", "3")),
         "llm_retry_wait": float(os.environ.get("ICT_LLM_RETRY_WAIT", "1")),
         # Work the two cores actually spend time on: sha256, page profiling, thumbnails.
         "local_workers": int(os.environ.get("ICT_LOCAL_HEAVY_WORKERS", "2")),
-        # Documents in flight on the GPU box. 1 is the contract: one document at a time.
-        "parse_max_inflight": int(os.environ.get("ICT_PARSE_MAX_INFLIGHT", "1")),
+        # Documents in flight on the GPU box. The original contract was 1; measured on a real
+        # 10-announcement set (2026-10-06), 3 is 42% faster end to end than 1, and 3 vs 2 buys
+        # another 8% at the same CPU cost. See eval/主路线实现细则.md §2.1 for the table.
+        "parse_max_inflight": int(os.environ.get("ICT_PARSE_MAX_INFLIGHT", "3")),
     }
 
 

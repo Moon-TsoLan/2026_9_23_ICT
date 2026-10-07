@@ -44,7 +44,8 @@ def dsn(database: str) -> str:
     user = env_value("PGUSER", "ict")
     password = env_value("PGPASSWORD", "ict_dev_pw")
     host = env_value("PGHOST", "localhost")
-    port = env_value("PGPORT", "5432")
+    # 15432 不是笔误：5432 落在本机的 Windows 动态保留区间里，主机绑不上。
+    port = env_value("PGPORT", "15432")
     return f"postgresql://{user}:{password}@{host}:{port}/{database}"
 
 
