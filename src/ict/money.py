@@ -26,6 +26,10 @@ def parse_amount(raw: str | None) -> tuple[float | None, bool]:
     if _PERCENT.search(text):
         return None, wan
     negative = text.startswith("(") or text.startswith("（") or text.startswith("-")
+    # OCR 会把千分位读成「532, 012」—— 逗号后面多一个空格。先把这个形态合上：
+    # 逗号 + 可选空格 + **恰好三位**数字。'1, 2' 这类列表不满足三位，不会被并。
+    # （只认千分位形态；数字之间单纯的空格仍按原样处理。）
+    text = re.sub(r"(?<=\d)[,，]\s*(?=\d{3}(?!\d))", "", text)
     match = _NUMBER.search(text.replace(",", "").replace("，", ""))
     if not match:
         return None, wan

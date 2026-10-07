@@ -151,6 +151,8 @@ D:\python\python.exe db\load_runs.py --db <库名> --runs work\runs --reset
 | `docker-compose.yml` | Postgres 16 容器定义（编码/排序规则锁定，跨环境一致） |
 | `db/001_schema.sql` | 建表 + 索引 + 视图 + 归一化函数（DDL，不含数据） |
 | `db/002_project_round_key.sql` | 迁移：给已存在的库补 `package_key` / `round_no` 并换唯一键（新库不需要） |
+| `db/003_announcement_tenant.sql` | 迁移：给已存在的库补 `announcement.tenant_id`（新库不需要） |
+| `db/004_fk_on_update_cascade.sql` | 迁移：子表外键加 `ON UPDATE CASCADE`，让轮次重排能改主键（新库不需要） |
 | `db/queries.sql` | 只读查询集（检索 + S1–S5 + 星图 + 统计） |
 | `db/load_runs.py` | 把 `work/runs/` 的批次结果导入一个同结构库（只读源、幂等 `--reset`） |
 

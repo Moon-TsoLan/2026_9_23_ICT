@@ -26,6 +26,7 @@ $$;
 -- ---------------------------------------------------------------------
 CREATE TABLE announcement (
   announcement_id     text PRIMARY KEY,              -- t20260202_26139731
+  tenant_id           text NOT NULL DEFAULT 'default', -- 账号/租户；现在只有 default
   title               text,
   source_project_no   text,
   announcement_type   text,                          -- winning_announcement | deal_announcement | unknown
@@ -60,7 +61,9 @@ CREATE TABLE project (
 -- ---------------------------------------------------------------------
 CREATE TABLE cob (
   cob_id           bigserial PRIMARY KEY,
-  project_id       text NOT NULL REFERENCES project(project_id) ON DELETE CASCADE,
+  -- ON UPDATE CASCADE 是给轮次重排用的：同一 (项目编号,包号) 的公告按日期排轮次时，
+  -- project_id 会变，子表要自动跟随，否则改主键就被外键挡住。
+  project_id       text NOT NULL REFERENCES project(project_id) ON DELETE CASCADE ON UPDATE CASCADE,
   object_name      text NOT NULL,
   category_code    text,
   category_name    text,
@@ -89,7 +92,7 @@ CREATE TABLE supplier (
 -- 5) 投标记录（SUB）：项目 × 主体，一次竞标一行
 -- ---------------------------------------------------------------------
 CREATE TABLE bid (
-  project_id  text   NOT NULL REFERENCES project(project_id) ON DELETE CASCADE,
+  project_id  text   NOT NULL REFERENCES project(project_id) ON DELETE CASCADE ON UPDATE CASCADE,
   supplier_id bigint NOT NULL REFERENCES supplier(supplier_id) ON DELETE CASCADE,
   score       numeric(8,3),                           -- 综合得分/评审总得分，可为空
   is_winner   boolean NOT NULL DEFAULT false,
@@ -100,7 +103,7 @@ CREATE TABLE bid (
 -- 6) 合作产品供应商（仅中标供应商填写）
 -- ---------------------------------------------------------------------
 CREATE TABLE winner_coop_supplier (
-  project_id            text   NOT NULL REFERENCES project(project_id) ON DELETE CASCADE,
+  project_id            text   NOT NULL REFERENCES project(project_id) ON DELETE CASCADE ON UPDATE CASCADE,
   supplier_id           bigint NOT NULL REFERENCES supplier(supplier_id) ON DELETE CASCADE,
   product_supplier_name text   NOT NULL,
   PRIMARY KEY (project_id, supplier_id, product_supplier_name)
@@ -122,6 +125,7 @@ CREATE INDEX idx_supplier_norm_trgm   ON supplier USING gin (norm_name gin_trgm_
 CREATE INDEX idx_bid_supplier         ON bid (supplier_id);
 CREATE INDEX idx_bid_winner           ON bid (project_id) WHERE is_winner;
 CREATE INDEX idx_announcement_raw     ON announcement USING gin (raw_json);
+CREATE INDEX idx_announcement_tenant  ON announcement (tenant_id);
 
 -- ---------------------------------------------------------------------
 -- 视图：标的物视图记录（Project + COB + 中标方），直接供应 /api/objects/search

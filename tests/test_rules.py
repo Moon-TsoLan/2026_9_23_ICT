@@ -851,6 +851,18 @@ def test_a_percentage_is_never_an_amount():
     assert parse_amount("945000元")[0] == 945000
 
 
+def test_a_thousands_comma_split_by_ocr_space_still_reads_as_one_number():
+    """t20260401_26350252：OCR 把 532,012 读成「532, 012」，曾静默变成 532（差 1000 倍）。
+
+    只合"逗号 + 可选空格 + 恰好三位"这一种形态；'1, 2' 这类列表不满足三位，按原样处理。
+    """
+    assert parse_amount("532, 012")[0] == 532012
+    assert parse_amount("532, 012.00")[0] == 532012
+    assert parse_amount("1,486,000.00元")[0] == 1486000
+    assert parse_amount("1, 2")[0] == 1          # 列表形态不并
+    assert parse_amount("1, 23")[0] == 1
+
+
 def test_a_percentage_never_becomes_a_package_amount():
     """t20260812_27119852: the model copied 折扣率：96.60% and it was used as the package total.
 

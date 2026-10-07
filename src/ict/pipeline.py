@@ -39,12 +39,13 @@ def _status_from_failures(base: str, failures: list[Failure]) -> str:
 
 
 def run_announcement(announcement_id: str, llm: LLMClient | None = None, html_dir: Path = DATA_HTML,
-                    attachments_root: Path | None = None, persist: bool = True) -> RunReport:
+                    attachments_root: Path | None = None, persist: bool = True,
+                    runs_root: Path | None = None) -> RunReport:
     started = time.perf_counter()
     html_path = html_dir / f"{announcement_id}.html"
     notice = parse_notice(html_path)
     client = build_client() if llm is None else llm
-    store = RunStore(announcement_id, persist=persist)
+    store = RunStore(announcement_id, persist=persist, runs_root=runs_root)
     catalog = Catalog()
     calls = CallCounter()
     all_failures: list[Failure] = []
@@ -104,7 +105,9 @@ def run_announcement(announcement_id: str, llm: LLMClient | None = None, html_di
         skipped = triage_files(store.run_id, plans, None, client)
         store.write_output("triage_files", skipped)
         store.finish("triage_files", "skipped", "attachment_index_miss", "附件索引不存在")
-        for step in ("locate_pages", "extract_attachment_candidates"):
+        # 附件链路整条跳过时也把这几步登记上（状态 skipped）：让每则公告的步骤表
+        # 都是同样的 12 步，01 页的进度分母才一致。只是留痕，不改变任何判定。
+        for step in ("parse_pages", "locate_pages", "extract_attachment_candidates"):
             store.begin(step)
             store.finish(step, "skipped")
         all_failures.extend(skipped.failures)

@@ -6,6 +6,8 @@ import { api } from '@/api/client'
 import CobDetail from '@/components/CobDetail.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import PartyPicker from '@/components/PartyPicker.vue'
+import UpdateNotice from '@/components/UpdateNotice.vue'
+import { useDataVersion } from '@/composables/useDataVersion'
 import type { CobRecord, CobSearchQuery } from '@/types/search'
 import type { RequestState } from '@/types/api'
 import { fmtQty, fmtYuan, orDash } from '@/utils/format'
@@ -38,6 +40,9 @@ const detail = ref<CobRecord | null>(null)
 const detailLoading = ref(false)
 
 const pageCount = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)))
+
+/** 有新结果入库时只给提示；点了「刷新」才按当前筛选与页码重查 */
+const { newCount, show: noticeShow, mark, ack, dismiss, start } = useDataVersion()
 
 /** 已生效的非默认条件（chip 展示用） */
 const chips = computed(() => {
@@ -158,13 +163,29 @@ onMounted(() => {
   if (typeof kw === 'string') query.kw = kw
   if (typeof purchaser === 'string') query.purchaser = purchaser
   if (typeof winner === 'string') query.winner = winner
-  void load()
+  void load().then(() => {
+    void mark()
+    start()
+  })
 })
+
+/** 提示条上的「刷新」：保留筛选与页码，重查一次 */
+async function onNoticeRun() {
+  await load()
+  ack()
+}
 </script>
 
 <template>
   <div class="search-page">
     <section class="main">
+      <UpdateNotice
+        v-if="noticeShow"
+        mode="append"
+        :new-count="newCount"
+        @run="onNoticeRun"
+        @dismiss="dismiss"
+      />
       <header class="head">
         <div>
           <p class="kicker">任务一 · 提取结果</p>

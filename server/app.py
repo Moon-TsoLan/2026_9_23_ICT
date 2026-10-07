@@ -11,19 +11,38 @@ import csv
 import io
 import json
 import re
+import sys
+import tempfile
 from pathlib import Path
 from typing import Any, Literal
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from .db import num, q, q1, yuan
+from . import ingest
 from .scenes import SCENES, overview
 
 ROOT = Path(__file__).resolve().parent.parent
-RUNS_DIR = ROOT / "work" / "runs"
+# 与 db/load_runs.py 同一做法：ict 包在 src/ 下，容器/本机都不装包也能 import。
+sys.path.insert(0, str(ROOT / "src"))
+from ict.config import DATA_ROOT, tenant_paths  # noqa: E402
+
+# 上传的大文件会先落到临时文件（Starlette 的 UploadFile 超过 1MB 就落盘）。
+# 把**这个进程**的临时目录放到 ICT_DATA_ROOT 下，免得 2 核 4G 机器的系统盘被几百 MB 的包顶满。
+# 只在这里设置：ingest 模块被测试导入时不该动全局临时目录。
+TMP_DIR = DATA_ROOT / "tmp"
+TMP_DIR.mkdir(parents=True, exist_ok=True)
+tempfile.tempdir = str(TMP_DIR)
+
+def _run_state_path(announcement_id: str) -> Path | None:
+    """运行记录先看租户目录（上线），再回落到 work/runs（开发与演示数据）。
+
+    查找顺序只有一处定义：`ingest.find_run_state()`。
+    """
+    return ingest.find_run_state(announcement_id)
 
 app = FastAPI(title="ICT 标络 · 数据 API", version="0.1.0")
 app.add_middleware(
@@ -41,8 +60,11 @@ SceneId = Literal["S1", "S2", "S3", "S4", "S5"]
 # ---------------------------------------------------------------------
 @app.get("/api/health")
 def health() -> dict:
-    row = q1("SELECT count(*) AS n FROM announcement")
-    return {"ok": True, "announcements": row["n"] if row else 0}
+    row = q1("SELECT count(*) AS n, max(created_at) AS ts FROM announcement")
+    count = row["n"] if row else 0
+    stamp = row["ts"].isoformat() if row and row["ts"] else ""
+    # data_version 给检索/探索页判断"有新结果入库了"用（只需要变，不需要有意义）。
+    return {"ok": True, "announcements": count, "data_version": f"{count}:{stamp}"}
 
 
 # ---------------------------------------------------------------------
@@ -618,20 +640,160 @@ def announcements() -> dict:
 def run_state(announcement_id: str) -> dict:
     if not re.fullmatch(r"[0-9A-Za-z_]+", announcement_id):
         raise HTTPException(422, "announcement_id 非法")
-    path = RUNS_DIR / announcement_id / "run_state.json"
-    if not path.exists():
-        raise HTTPException(404, "该公告没有处理记录（演示数据直接入库，未经过管线）")
+    path = _run_state_path(announcement_id)
+    if path is None:
+        raise HTTPException(404, "该公告没有处理记录（提取产物只保留在运行目录里）")
     return json.loads(path.read_text(encoding="utf-8"))
 
 
 # ---------------------------------------------------------------------
-# 上传 / 触发处理：本轮不接管线，明确 501
+# 数据接入：上传 → 配对确认 → 建任务 → 落盘
+#
+# 后端只收文件与记状态，**不跑提取**：提取由独立工作进程取 queued 任务执行
+# （见 doc/全链路改造计划.md §6）。任务元数据是文件，全量保留。
 # ---------------------------------------------------------------------
+class PrecheckBody(BaseModel):
+    filenames: list[str] = Field(min_length=1)
+
+
+class JobItem(BaseModel):
+    announcement_id: str
+    has_zip: bool = False
+
+
+class JobBody(BaseModel):
+    items: list[JobItem] = Field(min_length=1)
+    overwrite: list[str] = Field(default_factory=list)
+
+
+def _existing_announcements(ids: list[str]) -> set[str]:
+    if not ids:
+        return set()
+    rows = q("SELECT announcement_id FROM announcement WHERE announcement_id = ANY(%s)", (ids,))
+    return {row["announcement_id"] for row in rows}
+
+
+@app.post("/api/ingest/precheck")
+def ingest_precheck(body: PrecheckBody) -> dict:
+    """只按文件名配对，不落盘。顺带告诉前端哪些公告已经提取过。"""
+    plan = ingest.plan_pairs(body.filenames)
+    ids = [item["announcement_id"] for item in plan.items]
+    return {
+        "items": plan.items,
+        "html_only": [item["announcement_id"] for item in plan.items if not item["has_zip"]],
+        "zip_only": plan.zip_only,
+        "invalid": plan.invalid,
+        "already_extracted": sorted(_existing_announcements(ids)),
+    }
+
+
+@app.post("/api/ingest/jobs")
+def ingest_create_job(body: JobBody) -> dict:
+    items = [{"announcement_id": item.announcement_id, "has_zip": item.has_zip}
+             for item in body.items]
+    for item in items:
+        if not ingest.ID_RE.match(item["announcement_id"]):
+            raise HTTPException(422, "公告号不合法：%s" % item["announcement_id"])
+    overwrite = set(body.overwrite)
+    need = sorted(_existing_announcements([i["announcement_id"] for i in items]) - overwrite)
+    if need:
+        raise HTTPException(409, {"message": "以下公告已提取过，重复提取会覆盖，请先确认",
+                                  "already_extracted": need})
+    try:
+        return ingest.create_job(items, overwrite)
+    except ingest.UploadRejected as exc:
+        raise HTTPException(exc.status, {"message": exc.message, **exc.extra})
+
+
+@app.post("/api/ingest/jobs/{job_id}/files")
+def ingest_upload_file(job_id: str, file: UploadFile = File(...)) -> dict:
+    """逐文件上传（一个文件一个请求）。同名已存在直接跳过。"""
+    job = ingest.load_job(job_id)
+    if job is None:
+        raise HTTPException(404, "任务不存在")
+    try:
+        return ingest.store_upload(job, file.filename, file.file)
+    except ingest.UploadRejected as exc:
+        raise HTTPException(exc.status, {"message": exc.message, **exc.extra})
+
+
+@app.post("/api/ingest/jobs/{job_id}/start")
+def ingest_start_job(job_id: str) -> dict:
+    job = ingest.load_job(job_id)
+    if job is None:
+        raise HTTPException(404, "任务不存在")
+    try:
+        return ingest.start_job(job)
+    except ingest.UploadRejected as exc:
+        raise HTTPException(exc.status, {"message": exc.message, **exc.extra})
+
+
+@app.get("/api/ingest/jobs/{job_id}")
+def ingest_get_job(job_id: str) -> dict:
+    job = ingest.load_job(job_id)
+    if job is None:
+        raise HTTPException(404, "任务不存在")
+    return ingest.job_detail(job)
+
+
+@app.get("/api/ingest/jobs")
+def ingest_list_jobs(page: int = Query(1, ge=1),
+                     page_size: int = Query(20, ge=1, le=100)) -> dict:
+    return ingest.list_jobs(page, page_size)
+
+
+@app.get("/api/ingest/records")
+def ingest_records(page: int = Query(1, ge=1),
+                   page_size: int = Query(20, ge=1, le=100)) -> dict:
+    """01 页那张表：一行一则公告，等待中 / 处理中 / 已完成 / 失败四种状态。
+
+    「进行中」来自任务文件，「已完成」来自数据库，在这里合并、排序、分页。
+    """
+    done_rows = q(
+        """
+        SELECT a.announcement_id, a.title, a.run_status, a.created_at,
+               count(DISTINCT p.project_id) AS projects,
+               (SELECT count(*) FROM cob c JOIN project p2 ON p2.project_id = c.project_id
+                 WHERE p2.announcement_id = a.announcement_id) AS cobs
+          FROM announcement a
+          LEFT JOIN project p ON p.announcement_id = a.announcement_id
+         GROUP BY a.announcement_id
+        """
+    )
+    rows = [
+        {
+            "announcement_id": row["announcement_id"],
+            "title": row["title"],
+            "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+            "projects": row["projects"],
+            "cobs": row["cobs"],
+        }
+        for row in done_rows
+    ]
+    # 不给 roots：走 ingest.runs_roots() 的默认解析（只有租户运行目录）
+    return ingest.merge_records(ingest.load_all_jobs(), rows, page, page_size)
+
+
+@app.delete("/api/ingest/jobs/{job_id}")
+def ingest_delete_job(job_id: str) -> dict:
+    job = ingest.load_job(job_id)
+    if job is None:
+        raise HTTPException(404, "任务不存在")
+    try:
+        ingest.delete_job(job)
+    except ingest.UploadRejected as exc:
+        raise HTTPException(exc.status, {"message": exc.message, **exc.extra})
+    return {"deleted": job_id}
+
+
 @app.post("/api/ingest/upload")
-def ingest_upload() -> None:
-    raise HTTPException(501, "演示环境未接抽取管线：请用 CLI（ict-run）处理后再入库")
+def ingest_upload_legacy() -> None:
+    # 旧前端（web/src/views/IngestView.vue）用的单请求接口，已由上面三个接口取代。
+    raise HTTPException(501, "上传流程已改为：/api/ingest/precheck → /api/ingest/jobs → "
+                             "/api/ingest/jobs/{job_id}/files → .../start")
 
 
 @app.post("/api/runs")
 def start_run() -> None:
-    raise HTTPException(501, "演示环境未接抽取管线：请用 CLI（ict-run）处理后再入库")
+    raise HTTPException(501, "请走上传流程：POST /api/ingest/precheck → /api/ingest/jobs → "
+                             "/api/ingest/jobs/{job_id}/files → /api/ingest/jobs/{job_id}/start")

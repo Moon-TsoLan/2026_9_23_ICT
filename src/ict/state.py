@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -28,6 +29,11 @@ STEP_FILES = {
     "persist_and_report": "10_run_report.json",
 }
 
+# 注册为"步骤"的顺序与总数（merge_evidence 只是只读通道，不注册）。
+# 01 页的进度分母用它：跑到第几步就用这个总数，而不是"已经登记了几步"。
+STEP_ORDER = tuple(name for name in STEP_FILES if name != "merge_evidence")
+STEP_TOTAL = len(STEP_ORDER)
+
 
 def now_iso() -> str:
     return datetime.now(TZ).isoformat(timespec="seconds")
@@ -40,15 +46,25 @@ def dump(model) -> dict:
 
 
 def write_json(path: Path, payload) -> None:
-    path.write_text(json.dumps(dump(payload), ensure_ascii=False, indent=2), encoding="utf-8")
+    """先写同目录临时文件再原子替换。
+
+    01 页会轮询读 `run_state.json`，而工作进程每秒都在重写它 —— 直接覆盖会让
+    读到的那一方拿到半截 JSON。原子替换把这个竞态消掉。
+    """
+    text = json.dumps(dump(payload), ensure_ascii=False, indent=2)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(text, encoding="utf-8")
+    os.replace(tmp, path)
 
 
 class RunStore:
-    def __init__(self, announcement_id: str, persist: bool = True) -> None:
+    def __init__(self, announcement_id: str, persist: bool = True,
+                 runs_root: Path | None = None) -> None:
         self.announcement_id = announcement_id
         self.run_id = f"run_{announcement_id}"
         self.persist = persist
-        self.directory = RUNS_ROOT / announcement_id
+        # 默认写 work/runs（开发与测试）；上线时传租户目录 tenants/<id>/runs。
+        self.directory = (runs_root or RUNS_ROOT) / announcement_id
         if persist:
             self.directory.mkdir(parents=True, exist_ok=True)
         created = now_iso()

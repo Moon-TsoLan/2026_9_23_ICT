@@ -10,10 +10,12 @@ const STATUS_META: Record<StepStatus, { label: string; cls: string }> = {
   pending: { label: '待处理', cls: 'pending' },
   running: { label: '进行中', cls: 'running' },
   success: { label: '完成', cls: 'success' },
-  partial: { label: '部分完成', cls: 'partial' },
+  // partial 是开发期视图：用户侧不显示"部分完成"这种警告，按完成呈现。
+  partial: { label: '完成', cls: 'success' },
   failed: { label: '失败', cls: 'failed' },
   skipped: { label: '跳过', cls: 'skipped' },
 }
+const meta = (status: StepStatus) => STATUS_META[status] ?? STATUS_META.pending
 
 function stepMs(step: RunStep): string {
   if (!step.started_at || !step.ended_at) return ''
@@ -36,26 +38,23 @@ function failureText(step: RunStep): string {
       <MetricCard k="候选合并" :v="String(run.counts.normalized_candidates)" />
     </div>
     <ol class="steps">
-      <li v-for="(step, i) in run.steps" :key="step.step" :class="STATUS_META[step.status]?.cls">
+      <li v-for="(step, i) in run.steps" :key="step.step" :class="meta(step.status).cls">
         <span class="icon">
-          <Check v-if="step.status === 'success'" :size="13" />
-          <TriangleAlert v-else-if="step.status === 'partial'" :size="13" />
-          <X v-else-if="step.status === 'failed'" :size="13" />
-          <LoaderCircle v-else-if="step.status === 'running'" :size="13" class="spin" />
-          <Minus v-else-if="step.status === 'skipped'" :size="13" />
+          <TriangleAlert v-if="meta(step.status).cls === 'failed'" :size="13" />
+          <Check v-else-if="meta(step.status).cls === 'success'" :size="13" />
+          <LoaderCircle v-else-if="meta(step.status).cls === 'running'" :size="13" class="spin" />
+          <Minus v-else-if="meta(step.status).cls === 'skipped'" :size="13" />
           <CircleDashed v-else :size="13" />
         </span>
         <span class="no num">{{ String(i + 1).padStart(2, '0') }}</span>
         <span class="name">{{ STEP_LABEL[step.step] ?? step.step }}</span>
         <span class="ms num">{{ stepMs(step) }}</span>
-        <span class="status">{{ STATUS_META[step.status]?.label }}</span>
-        <p v-if="step.failure_code || step.failure_message" class="fail">{{ failureText(step) }}</p>
+        <span class="status">{{ meta(step.status).label }}</span>
+        <p v-if="step.status === 'failed' && (step.failure_code || step.failure_message)" class="fail">
+          {{ failureText(step) }}
+        </p>
       </li>
     </ol>
-    <p v-if="run.review_required" class="review">
-      <TriangleAlert :size="13" />
-      该公告存在需人工复核的字段
-    </p>
   </div>
 </template>
 
@@ -97,11 +96,6 @@ function failureText(step: RunStep): string {
   color: var(--ok);
 }
 
-.partial .icon {
-  border-color: var(--warn);
-  color: var(--warn);
-}
-
 .failed .icon {
   border-color: var(--bad);
   color: var(--bad);
@@ -138,10 +132,6 @@ function failureText(step: RunStep): string {
   color: var(--ok);
 }
 
-.partial .status {
-  color: var(--warn);
-}
-
 .failed .status {
   color: var(--bad);
 }
@@ -149,16 +139,7 @@ function failureText(step: RunStep): string {
 .fail {
   width: 100%;
   margin: 2px 0 4px 32px;
-  color: var(--warn);
-  font-size: 12px;
-}
-
-.review {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 12px;
-  color: var(--warn);
+  color: var(--bad);
   font-size: 12px;
 }
 

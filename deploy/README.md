@@ -37,7 +37,7 @@ curl -s localhost:6008/health
 | vLLM 识别 | 并发 8→2.06 页/s，16→2.98，32→3.37 页/s | 16 最划算，再高只是排队 |
 | PP-DocLayoutV3 版面 | CPU 约 50～150 ms/页 | 单进程就够喂满 16 并发的识别；CPU 只占一半有余量 |
 | LibreOffice | 转换时 CPU 峰值，秒级到十几秒 | 每次转换独立 `-env:UserInstallation`，避免多进程抢同一把 profile 锁 |
-| 服务并发 | `ICT_PARSE_FILE_WORKERS=2`（同时处理几个文件） | 与识别并发数不是一回事 |
+| 服务并发 | 客户端 `ICT_PARSE_MAX_INFLIGHT=3` × 服务端 `start_parse.sh --workers 4` | 两端相乘，见 `doc/全链路改造计划.md` §10.2 的实测表；每个 worker 进程另有 `ICT_PARSE_FILE_WORKERS` 与 `ICT_PARSE_MAX_CONCURRENCY` |
 
 ## 暴露方式
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from dataclasses import dataclass
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -11,6 +12,38 @@ CATALOG_PATH = REPO_ROOT / "data" / "procurement_catalog_2022.json"
 WORK_ROOT = REPO_ROOT / "work"
 ATTACHMENTS_ROOT = WORK_ROOT / "attachments"
 RUNS_ROOT = WORK_ROOT / "runs"
+
+# 运行数据根目录。开发与测试继续用 work/（上面的常量）；上线由进程环境变量
+# ICT_DATA_ROOT 指到一个独立盘。和 ICT_LLM_MODE 同一原则：运行位置不放进 .env，
+# 免得一份随手改的文件把数据写错地方。
+DATA_ROOT = Path(os.environ.get("ICT_DATA_ROOT") or (REPO_ROOT / "var"))
+TENANTS_ROOT = DATA_ROOT / "tenants"
+JOBS_ROOT = DATA_ROOT / "jobs"
+DEFAULT_TENANT = "default"
+
+
+@dataclass(frozen=True)
+class TenantPaths:
+    """一个租户的全部运行目录。现在只有一个租户，tenant_id 恒为 default。"""
+
+    tenant_id: str
+    root: Path
+    incoming: Path          # 上传原件（html + zip）
+    attachments: Path       # 解压产物，入库成功后删
+    runs: Path              # 提取产物 01–10，保留（01 页要读）
+    jobs: Path              # 任务元数据
+
+
+def tenant_paths(tenant_id: str = DEFAULT_TENANT) -> TenantPaths:
+    root = TENANTS_ROOT / tenant_id
+    return TenantPaths(
+        tenant_id=tenant_id,
+        root=root,
+        incoming=root / "incoming",
+        attachments=root / "attachments",
+        runs=root / "runs",
+        jobs=JOBS_ROOT / tenant_id,
+    )
 
 LOW_TEXT_CHARS_PER_PAGE = 80
 MAX_FILES_PER_PROJECT = 20

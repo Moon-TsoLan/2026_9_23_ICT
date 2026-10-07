@@ -15,6 +15,89 @@ export interface AnnouncementItem {
 export type RunStatus = 'pending' | 'running' | 'success' | 'partial' | 'failed'
 export type StepStatus = 'pending' | 'running' | 'success' | 'partial' | 'failed' | 'skipped'
 
+/** ---- 上传 → 建任务：与 server/ingest.py 的接口对齐 ---- */
+
+export interface PrecheckItem {
+  announcement_id: string
+  has_html: boolean
+  has_zip: boolean
+}
+
+export interface PrecheckResult {
+  items: PrecheckItem[]
+  html_only: string[]
+  zip_only: Array<{ announcement_id: string; filename: string }>
+  invalid: string[]
+  already_extracted: string[]
+}
+
+export type JobStatus = 'draft' | 'queued' | 'running' | 'done' | 'failed'
+export type JobItemStatus = 'waiting' | 'running' | 'done' | 'failed'
+
+export interface JobItem {
+  announcement_id: string
+  has_zip: boolean
+  overwrite: boolean
+  status: JobItemStatus
+  current_step: string | null
+  error: string | null
+  /** 提取进度（读自 run_state.json；只在跑过之后有） */
+  progress?: { done: number; total: number; current_step: string | null; status: string } | null
+}
+
+export interface IngestJob {
+  job_id: string
+  tenant_id: string
+  created_at: string
+  updated_at: string
+  status: JobStatus
+  items: JobItem[]
+}
+
+export interface UploadOutcome {
+  announcement_id: string
+  kind: 'html' | 'zip'
+  /** 同名已存在：服务端直接跳过（等于断点续传） */
+  skipped: boolean
+  size: number
+}
+
+/** 01 页那张表的一行：一则公告，四种用户可见状态 */
+export type RecordStatus = 'waiting' | 'running' | 'done' | 'failed'
+
+export interface IngestRecord {
+  announcement_id: string
+  title: string
+  status: RecordStatus
+  job_id: string | null
+  /** 该任务一共几则公告（丢弃时提示用） */
+  job_total: number | null
+  /** 整条任务都还没开跑 → 允许丢弃 */
+  job_discardable: boolean
+  error: string | null
+  /** 磁盘上那份 run_state 是否属于本次尝试（重新上传后，旧记录还在，不能拿来展示） */
+  run_started: boolean
+  progress: { done: number; total: number; current_step: string | null } | null
+  projects: number | null
+  cobs: number | null
+  updated_at: string | null
+}
+
+export interface IngestRecords {
+  total: number
+  done_total: number
+  page: number
+  page_size: number
+  items: IngestRecord[]
+}
+
+export const RECORD_STATUS_LABEL: Record<RecordStatus, string> = {
+  waiting: '等待中',
+  running: '处理中',
+  done: '已完成',
+  failed: '失败',
+}
+
 export interface RunStep {
   step: string
   status: StepStatus
@@ -54,6 +137,7 @@ export const STEP_LABEL: Record<string, string> = {
   extract_html_candidates: '抽候选',
   plan_project_gaps: '规划缺口',
   triage_files: '筛附件',
+  parse_pages: '解析页面',
   locate_pages: '定页',
   extract_attachment_candidates: '抽附件',
   normalize_candidates: '规范化',

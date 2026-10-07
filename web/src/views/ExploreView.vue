@@ -21,6 +21,8 @@ import { ApiError } from '@/types/api'
 import NarrativePanel from '@/components/NarrativePanel.vue'
 import SceneBar from '@/components/SceneBar.vue'
 import StarMap from '@/components/StarMap.vue'
+import UpdateNotice from '@/components/UpdateNotice.vue'
+import { useDataVersion } from '@/composables/useDataVersion'
 import type {
   Distribution,
   OverviewResult,
@@ -38,6 +40,17 @@ const router = useRouter()
 const route = useRoute()
 
 type Mode = 'overview' | 'picked' | 'scene' | 'picking' | 'compared' | 's6'
+
+/**
+ * 有新结果入库时只提示、不自动刷新。点「刷新」默认**增量追加**（老节点坐标由
+ * placeStars 的缓存钉住，画面不跳）；只有新增超出底图尺度时才改成提示「重建」
+ * —— 重建会走 loadOverview()，那是全量力导重排，必须用户明确点。
+ */
+const APPEND_MAX_NEW = 10
+const APPEND_MAX_TOTAL = 80
+
+const { newCount, show: noticeShow, mark, ack, dismiss, start } = useDataVersion()
+const noticeMode = ref<'append' | 'rebuild'>('append')
 
 /* ======== 1. 底图：只有一张，场景只叠加不替换 ======== */
 const baseNodes = ref<GraphNode[]>([])
@@ -541,8 +554,53 @@ onMounted(async () => {
   } catch {
     distributionError.value = true
   }
+  void mark()
+  start()
 })
 onUnmounted(() => window.removeEventListener('keydown', onKey))
+
+/** 提示条上的按钮：默认增量追加；超限时改成重建 */
+async function onNoticeRun() {
+  if (noticeMode.value === 'rebuild') {
+    await rebuildOverview()
+    return
+  }
+  try {
+    const res = await api.overview()
+    const added = res.graph.nodes.filter((n) => !knownNodeIds.has(n.id)).length
+    if (added > APPEND_MAX_NEW || graphNodes.value.length + added > APPEND_MAX_TOTAL) {
+      // 超出底图尺度：不追加，改成提示重建（会重排，所以要用户明确点）
+      noticeMode.value = 'rebuild'
+      return
+    }
+    absorbSceneGraph(res.graph.nodes, res.graph.edges)
+    overview.value = res
+    sampled.value = res.meta.sampled
+    serverMs.value = res.elapsed_ms
+    await refreshDistribution()
+    noticeMode.value = 'append'
+    ack()
+  } catch {
+    /* 刷新失败就留着提示，下次再点 */
+  }
+}
+
+/** 重建底图：重新采样 + 重新排布（画面会跳，只在用户点「重建」时发生） */
+async function rebuildOverview() {
+  await loadOverview()
+  await refreshDistribution()
+  noticeMode.value = 'append'
+  ack()
+}
+
+async function refreshDistribution() {
+  try {
+    distribution.value = await api.distribution()
+    distributionError.value = false
+  } catch {
+    distributionError.value = true
+  }
+}
 
 watch([focusId, sceneGraph, mode], () => collectSubjectRelations(), { immediate: true })
 </script>
@@ -550,6 +608,13 @@ watch([focusId, sceneGraph, mode], () => collectSubjectRelations(), { immediate:
 <template>
   <div class="explore">
     <SceneBar :loading="sceneLoading" @pick="onSearchPick" @reset="exitToOverview" @reframe="reframeScene" />
+    <UpdateNotice
+      v-if="noticeShow"
+      :mode="noticeMode"
+      :new-count="newCount"
+      @run="onNoticeRun"
+      @dismiss="dismiss"
+    />
 
     <div class="body">
       <div class="sky">

@@ -24,9 +24,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 from collections import Counter
+from dataclasses import dataclass
 from pathlib import Path
 
 import psycopg
@@ -52,6 +54,14 @@ def dsn(database: str) -> str:
     # 15432 不是笔误：5432 落在本机的 Windows 动态保留区间里，主机绑不上。
     port = env_value("PGPORT", "15432")
     return f"postgresql://{user}:{password}@{host}:{port}/{database}"
+
+
+def dsn_default() -> str:
+    """工作进程用：DATABASE_URL 优先，否则 PG* + ICT_DB / PGDATABASE（默认 ict_demo）。"""
+    url = (os.environ.get("DATABASE_URL") or env_value("DATABASE_URL")).strip()
+    if url:
+        return url
+    return dsn(os.environ.get("ICT_DB") or env_value("PGDATABASE", "ict_demo"))
 
 
 def num(value, decimals: int | None = None):
@@ -93,33 +103,78 @@ def _package_base_key(project: dict) -> str:
     return f"{number}|{package_no}" if number else f"{project.get('project_name') or '?'}|{package_no}"
 
 
-def plan_rounds(targets: list[Path]) -> dict[tuple[str, int], tuple[str, int, str]]:
-    """(announcement_id, 项目序号) -> (project_id, round_no, package_key)。
+def _desired_id(package_key: str, round_no: int) -> str:
+    """第 1 轮不带后缀，第 2 轮起写成 `<package_key>|rN`。"""
+    return package_key if round_no == 1 else f"{package_key}|r{round_no}"
 
-    同一个 package_key 被多则公告携带时，按公告日期依次编号；只有第 2 轮起
-    project_id 才带 `|rN`，因此其余 99% 的数据 id 与改造前一致。
-    """
-    entries: list[tuple[str, str, int, str]] = []
+
+def target_entries(targets: list[Path]) -> list[dict]:
+    """规划轮次所需的全部信息：(公告号, 日期, 项目序号, 业务键)。"""
+    entries: list[dict] = []
     for run in targets:
         merged = _load_json(run / "09_merged_projects.json")
         report = _load_json(run / "10_run_report.json")
         understanding = _load_json(run / "01_announcement_understanding.json")
         aid = _announcement_id(run, understanding, report)
         for index, project in enumerate(merged.get("projects") or []):
-            entries.append((_date_key(aid), aid, index, _package_base_key(project)))
-    grouped: dict[str, list[tuple[str, str, int, str]]] = {}
+            entries.append({"aid": aid, "date": _date_key(aid), "index": index,
+                            "package_key": _package_base_key(project)})
+    return entries
+
+
+@dataclass
+class RoundPlan:
+    """本次要写入的新行，以及已有行里需要改名/改轮次的那部分。"""
+
+    inserts: dict[tuple[str, int], tuple[str, int, str]]   # (aid, 序号) -> (project_id, round_no, package_key)
+    renames: list[tuple[str, str, int]]                    # (旧 project_id, 新 project_id, 新 round_no)
+
+
+def plan_rounds(entries: list[dict], existing: list[tuple] = ()) -> RoundPlan:
+    """按 (公告日期, 公告号) 给同一个 package_key 排轮次。
+
+    `existing` 是库内已有行 `(package_key, announcement_id, project_id, round_no)`，
+    **不含**本次要覆盖的那几则公告（它们会被删掉重建，不该参与排序）。
+    新到的公告如果日期更早，已有行会被往后挤一位 —— 这件事靠 `renames` 表达出来。
+    """
+    rows: list[tuple] = []   # (package_key, date, aid, index|None, current_id|None)
     for entry in entries:
-        grouped.setdefault(entry[3], []).append(entry)
-    plan: dict[tuple[str, int], tuple[str, int, str]] = {}
-    for base, group in grouped.items():
-        group.sort(key=lambda item: (item[0], item[1]))
-        for round_no, entry in enumerate(group, start=1):
-            project_id = base if round_no == 1 else f"{base}|r{round_no}"
-            plan[(entry[1], entry[2])] = (project_id, round_no, base)
-    return plan
+        rows.append((entry["package_key"], entry["date"], entry["aid"], entry["index"], None))
+    for package_key, aid, project_id, _round in existing:
+        rows.append((package_key, _date_key(aid), aid, None, project_id))
+
+    grouped: dict[str, list[tuple]] = {}
+    for row in rows:
+        grouped.setdefault(row[0], []).append(row)
+
+    inserts: dict[tuple[str, int], tuple[str, int, str]] = {}
+    renames: list[tuple[str, str, int]] = []
+    for package_key, group in grouped.items():
+        group.sort(key=lambda row: (row[1], row[2]))
+        for round_no, row in enumerate(group, start=1):
+            desired = _desired_id(package_key, round_no)
+            if row[3] is not None:                       # 本次新写入的行
+                inserts[(row[2], row[3])] = (desired, round_no, package_key)
+            elif row[4] != desired:                      # 已有行需要改名
+                renames.append((row[4], desired, round_no))
+    return RoundPlan(inserts, renames)
 
 
-def load_run(cur, run: Path, plan: dict[tuple[str, int], tuple[str, int, str]]) -> dict:
+def fetch_existing(cur, package_keys: list[str], exclude_aids: list[str]) -> list[tuple]:
+    """库内已有的同键行；排除本次要覆盖的公告。"""
+    if not package_keys:
+        return []
+    cur.execute(
+        """SELECT package_key, announcement_id, project_id, round_no
+             FROM project
+            WHERE package_key = ANY(%s) AND NOT (announcement_id = ANY(%s))""",
+        (package_keys, exclude_aids),
+    )
+    return cur.fetchall()
+
+
+def load_run(cur, run: Path, inserts: dict[tuple[str, int], tuple[str, int, str]],
+             tenant: str = "default") -> dict:
     read = lambda name: json.loads((run / name).read_text(encoding="utf-8")) if (run / name).exists() else None
     understanding = read("01_announcement_understanding.json") or {}
     merged = read("09_merged_projects.json") or {}
@@ -129,16 +184,16 @@ def load_run(cur, run: Path, plan: dict[tuple[str, int], tuple[str, int, str]]) 
     summary = understanding.get("summary_amount") or {}
     audit = merged.get("amount_audit") or {}
     cur.execute(
-        """INSERT INTO announcement (announcement_id, title, source_project_no, announcement_type,
+        """INSERT INTO announcement (announcement_id, tenant_id, title, source_project_no, announcement_type,
                                       summary_amount_yuan, run_status, review_required, raw_json)
-           VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
            ON CONFLICT (announcement_id) DO UPDATE
              SET title = EXCLUDED.title, source_project_no = EXCLUDED.source_project_no,
                  announcement_type = EXCLUDED.announcement_type,
                  summary_amount_yuan = EXCLUDED.summary_amount_yuan,
                  run_status = EXCLUDED.run_status, review_required = EXCLUDED.review_required,
-                 raw_json = EXCLUDED.raw_json""",
-        (aid, understanding.get("project_name"), understanding.get("source_project_no"),
+                 raw_json = EXCLUDED.raw_json, tenant_id = EXCLUDED.tenant_id""",
+        (aid, tenant, understanding.get("project_name"), understanding.get("source_project_no"),
          understanding.get("announcement_type"), num(summary.get("amount_yuan"), 2),
          report.get("status"), bool(report.get("review_required")),
          json.dumps({"report": {k: report.get(k) for k in
@@ -152,7 +207,7 @@ def load_run(cur, run: Path, plan: dict[tuple[str, int], tuple[str, int, str]]) 
     stats = Counter()
     rounds = Counter()
     for seq, project in enumerate(merged.get("projects") or []):
-        project_id, round_no, package_key = plan.get(
+        project_id, round_no, package_key = inserts.get(
             (aid, seq), (project["project_id"], 1, _package_base_key(project))
         )
         rounds[round_no] += 1
@@ -162,9 +217,7 @@ def load_run(cur, run: Path, plan: dict[tuple[str, int], tuple[str, int, str]]) 
             """INSERT INTO project (project_id, package_key, package_no, round_no,
                                     source_project_no, announcement_id, project_name,
                                     purchaser, package_total_amount)
-               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
-               ON CONFLICT (project_id) DO UPDATE
-                 SET purchaser = EXCLUDED.purchaser, package_total_amount = EXCLUDED.package_total_amount""",
+               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
             (project_id, package_key, str(project.get("package_no")), round_no,
              project.get("source_project_no"), aid, project.get("project_name"),
              project.get("purchaser"), num(project.get("package_total_amount"), 2)))
@@ -216,6 +269,7 @@ def main() -> None:
     parser.add_argument("--runs", default="work/runs")
     parser.add_argument("--ids", help="optional JSON array of announcement ids to load")
     parser.add_argument("--reset", action="store_true", help="truncate the target tables first")
+    parser.add_argument("--tenant", default="default", help="租户/账号，现在恒为 default")
     args = parser.parse_args()
 
     base = ROOT / args.runs
@@ -226,10 +280,69 @@ def main() -> None:
                if d.is_dir() and (d / "09_merged_projects.json").exists()
                and (wanted is None or d.name in wanted)]
     print("loading %d runs into %s" % (len(targets), args.db))
-    plan = plan_rounds(targets)
-    multi_round = sum(1 for _, (_, round_no, _) in plan.items() if round_no > 1)
-    base_keys: dict[str, int] = Counter()
-    for _, (_, _, base) in plan.items():
+    # 一个事务：覆盖 + 轮次重排必须一起成败，否则中途失败会留下"停到临时 id"的行。
+    with psycopg.connect(dsn(args.db)) as conn:
+        cur = conn.cursor()
+        if args.reset:
+            cur.execute("TRUNCATE winner_coop_supplier, bid, cob, supplier, project, announcement CASCADE")
+        info = load_batch(cur, targets, args.tenant)
+        counts = {table: cur.execute(f"SELECT count(*) FROM {table}").fetchone()[0]
+                  for table in ("announcement", "project", "cob", "supplier", "bid", "winner_coop_supplier")}
+    _print_summary(info, counts)
+
+
+def load_batch(cur, targets: list[Path], tenant: str = "default") -> dict:
+    """把一批 run 写进库：覆盖式入库 + 轮次重排。
+
+    调用方负责事务边界（成功提交、失败回滚）。工作进程每则调一次也用这个函数，
+    所以批量与实时的写库行为完全一致。
+    """
+    entries = target_entries(targets)
+    package_keys = sorted({entry["package_key"] for entry in entries})
+    replace_aids = sorted({entry["aid"] for entry in entries})
+    existing = fetch_existing(cur, package_keys, replace_aids)
+    plan = plan_rounds(entries, existing)
+
+    # ① 覆盖式入库：先删同号公告（级联删 project 与 cob/bid/winner_coop_supplier）
+    if replace_aids:
+        cur.execute("DELETE FROM announcement WHERE announcement_id = ANY(%s)", (replace_aids,))
+    # ② 要改名的已有行先停到临时 id + 负轮次：
+    #    两阶段更新，交换时既不撞 (package_key, round_no)，也不撞主键。
+    for old, _new, _round in plan.renames:
+        cur.execute("UPDATE project SET project_id = %s, round_no = -round_no WHERE project_id = %s",
+                    (old + "~park", old))
+
+    totals: Counter = Counter()
+    source_mix = Counter()
+    round_mix = Counter()
+    per_run: list[dict] = []
+    for run in targets:
+        info = load_run(cur, run, plan.inserts, tenant)
+        totals["announcements"] += 1
+        per_run.append(info)
+        round_mix.update(info["rounds"])
+        for (kind, unpriced), n in info["stats"].items():
+            source_mix[kind] += n
+            if unpriced:
+                source_mix[kind + " (无价)"] += n
+
+    # ③ 已有行落到目标 id 与轮次；子表靠 ON UPDATE CASCADE 自动跟随
+    for old, new, round_no in plan.renames:
+        cur.execute("UPDATE project SET project_id = %s, round_no = %s WHERE project_id = %s",
+                    (new, round_no, old + "~park"))
+    # ④ 清掉不再被任何投标引用的主体（覆盖式入库会留下它们）
+    orphans = cur.execute(
+        "DELETE FROM supplier s WHERE NOT EXISTS (SELECT 1 FROM bid b WHERE b.supplier_id = s.supplier_id)"
+    ).rowcount
+    return {"plan": plan, "per_run": per_run, "totals": totals, "round_mix": round_mix,
+            "source_mix": source_mix, "orphans": orphans, "replace_aids": replace_aids}
+
+
+def _print_summary(info: dict, counts: dict) -> None:
+    plan = info["plan"]
+    multi_round = sum(1 for _, (_, round_no, _) in plan.inserts.items() if round_no > 1)
+    base_keys: Counter = Counter()
+    for _, (_, _, base) in plan.inserts.items():
         base_keys[base] += 1
     repeated = {base: n for base, n in base_keys.items() if n > 1}
     if repeated:
@@ -237,28 +350,17 @@ def main() -> None:
               % (len(repeated), multi_round))
         for base, n in sorted(repeated.items()):
             print("   %s  ×%d" % (base, n))
-
-    with psycopg.connect(dsn(args.db), autocommit=True) as conn:
-        cur = conn.cursor()
-        if args.reset:
-            cur.execute("TRUNCATE winner_coop_supplier, bid, cob, supplier, project, announcement CASCADE")
-        totals = Counter()
-        source_mix = Counter()
-        round_mix = Counter()
-        for run in targets:
-            info = load_run(cur, run, plan)
-            totals["announcements"] += 1
-            print("   %-22s 包=%-3d 标的=%d" % (run.name, info["packages"], info["cobs"]))
-            round_mix.update(info["rounds"])
-            for (kind, unpriced), n in info["stats"].items():
-                source_mix[kind] += n
-                if unpriced:
-                    source_mix[kind + " (无价)"] += n
-        counts = {table: cur.execute(f"SELECT count(*) FROM {table}").fetchone()[0]
-                  for table in ("announcement", "project", "cob", "supplier", "bid", "winner_coop_supplier")}
+    if plan.renames:
+        print("库内已有 %d 个包行要按公告日期重排：" % len(plan.renames))
+        for old, new, round_no in plan.renames:
+            print("   %s -> %s（第 %d 轮）" % (old, new, round_no))
+    for run in info["per_run"]:
+        print("   %-22s 包=%-3d 标的=%d" % (run["aid"], run["packages"], run["cobs"]))
     print("rows:", counts)
-    print("包行按轮次分布:", dict(sorted(round_mix.items())))
-    print("标的来源类:", dict(source_mix.most_common()))
+    if info["orphans"]:
+        print("清掉孤儿主体:", info["orphans"])
+    print("包行按轮次分布:", dict(sorted(info["round_mix"].items())))
+    print("标的来源类:", dict(info["source_mix"].most_common()))
 
 
 if __name__ == "__main__":
