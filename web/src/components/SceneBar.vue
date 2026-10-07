@@ -7,6 +7,7 @@
  * 这样"当前问题"在界面上只有一个来源（右侧面板里的场景按钮），不再有两处真相。
  */
 import PartyPicker from '@/components/PartyPicker.vue'
+import type { PartyHit } from '@/types/explore'
 import { ref } from 'vue'
 
 withDefaults(
@@ -15,8 +16,9 @@ withDefaults(
 )
 
 const emit = defineEmits<{
-  /** 按全名定位一个节点：只选中，不提问（§18） */
-  (e: 'pick', name: string): void
+  /** 按候选定位一个节点：只选中，不提问（§18）。带 id 是因为项目节点的图标签会被截断，
+   *  按名字匹配不到；按 id 才稳。 */
+  (e: 'pick', hit: PartyHit): void
   (e: 'reset'): void
   (e: 'reframe'): void
 }>()
@@ -24,8 +26,8 @@ const emit = defineEmits<{
 /** 输入框里的半成品字符串：不是共享状态，选完即清 */
 const text = ref('')
 
-function onPick(hit: { name: string }) {
-  emit('pick', hit.name)
+function onPick(hit: PartyHit) {
+  emit('pick', hit)
   text.value = ''
 }
 </script>

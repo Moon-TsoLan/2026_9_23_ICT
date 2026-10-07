@@ -8,6 +8,7 @@ import { NODE_KIND_LABEL } from '@/types/graph'
 /** 下拉里标的不是"身份"，而是"能不能拿它当这个场景的主体"：中标/投标只在具体项目上成立 */
 function hitKind(k: PartyHit['kind']): string {
   if (k === 'buyer') return '采购单位'
+  if (k === 'project') return '项目'
   if (k === 'winner') return '可查 S3/S4/S5'
   return '仅投标方'
 }

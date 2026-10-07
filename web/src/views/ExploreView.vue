@@ -24,6 +24,7 @@ import StarMap from '@/components/StarMap.vue'
 import type {
   Distribution,
   OverviewResult,
+  PartyHit,
   PartyProfile,
   SceneId,
   SceneResult,
@@ -434,10 +435,12 @@ function onRankSelect(id: string) {
   void flyToNode(id)
 }
 
-function onSearchPick(name: string) {
-  const n = graphNodes.value.find((x) => x.label === name)
+/** 搜索选中一个节点。项目节点的图标签是截断后的“项目名 · 包N”，
+ *  与候选里的全名不同，所以先按 id 匹配、再退回按名字匹配。 */
+function onSearchPick(hit: PartyHit) {
+  const n = nodeById.value.get(hit.id) ?? graphNodes.value.find((x) => x.label === hit.name)
   if (!n) {
-    tip.value = '底图里还没有「' + name + '」这个节点，它可能不在高频采样内'
+    tip.value = '底图里还没有「' + hit.name + '」这个节点，它可能不在高频采样内'
     return
   }
   // 多选态/结果态：搜索等于把这家加进对比篮；其余状态：只是选中（§18）

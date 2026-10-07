@@ -37,17 +37,22 @@ CREATE TABLE announcement (
 );
 
 -- ---------------------------------------------------------------------
--- 2) 项目（= 项目名 + 包号，一个包一行）
+-- 2) 项目（= 项目编号 + 包号 + 轮次，一个包一行）
+--    说明：包号只在单则公告内唯一。同一（项目编号, 包号）被多则公告复用时
+--    （重新采购时公告会重新编号或沿用原编号），用 round_no 区分，
+--    project_id = <package_key>（第 1 轮）/ <package_key>|rN（第 N 轮）。
 -- ---------------------------------------------------------------------
 CREATE TABLE project (
-  project_id           text PRIMARY KEY,             -- <project_name>|<package_no>
+  project_id           text PRIMARY KEY,             -- <package_key> 或 <package_key>|rN
+  package_key          text NOT NULL,                -- <source_project_no>|<package_no>（编号缺失时见 load_runs 兜底）
+  package_no           text NOT NULL,                -- 字符串："1" / "4" / "A"
+  round_no             integer NOT NULL DEFAULT 1,   -- 同 package_key 的第几轮，按公告日期
+  source_project_no    text,                         -- 项目编号；模型抽取，可能为空
   announcement_id      text NOT NULL REFERENCES announcement(announcement_id) ON DELETE CASCADE,
   project_name         text NOT NULL,
-  package_no           text NOT NULL,                -- 字符串："1" / "4" / "A"
   purchaser            text,
   package_total_amount numeric(18,2),
-  source_project_no    text,
-  UNIQUE (announcement_id, project_name, package_no)
+  UNIQUE (package_key, round_no)
 );
 
 -- ---------------------------------------------------------------------
@@ -107,6 +112,7 @@ CREATE TABLE winner_coop_supplier (
 CREATE INDEX idx_project_announcement ON project (announcement_id);
 CREATE INDEX idx_project_purchaser    ON project (purchaser);
 CREATE INDEX idx_project_name_trgm    ON project USING gin (project_name gin_trgm_ops);
+CREATE INDEX idx_project_package_key  ON project (package_key);
 CREATE INDEX idx_cob_project          ON cob (project_id);
 CREATE INDEX idx_cob_category         ON cob (category_code);
 CREATE INDEX idx_cob_brand            ON cob (brand);

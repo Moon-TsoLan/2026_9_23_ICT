@@ -292,8 +292,24 @@ def parties_search(q_: str = Query("", alias="q")) -> dict:
         """,
         (like,),
     )
+    # 项目节点：03 探索的星图上 proj: 是一等节点，搜索也必须能定位到它，
+    # 否则用户在星图上看见一颗项目星，却搜不到它。
+    projects = q(
+        """
+        SELECT project_id, project_name, package_no, round_no
+        FROM project
+        WHERE project_name ILIKE %s
+        ORDER BY package_total_amount DESC NULLS LAST, project_id
+        LIMIT 8
+        """,
+        (like,),
+    )
     items = [
         {"id": f"buyer:{p['name']}", "name": p["name"], "kind": "buyer"} for p in purchasers
+    ] + [
+        {"id": f"proj:{p['project_id']}", "name": _project_label(p["project_name"], p["package_no"], p["round_no"]),
+         "kind": "project"}
+        for p in projects
     ] + [
         {"id": f"sup:{s['name']}", "name": s["name"], "kind": "winner" if s["has_win"] else "bidder"}
         for s in suppliers
@@ -301,11 +317,19 @@ def parties_search(q_: str = Query("", alias="q")) -> dict:
     return {"items": items}
 
 
+def _project_label(project_name: str, package_no: str, round_no: int = 1) -> str:
+    """星图上项目节点的显示名；与 server/scenes.py 的 _short 保持同一种读法。"""
+    suffix = f" · 包{package_no}" + (f"（第{round_no}轮）" if round_no > 1 else "")
+    return f"{project_name}{suffix}"
+
+
 @app.get("/api/parties/{party_id:path}")
 def party_profile(party_id: str) -> dict:
     kind, _, name = party_id.partition(":")
     if kind == "buyer":
         return _buyer_profile(party_id, name)
+    if kind == "proj":
+        return _project_profile(party_id, name)
     if kind in ("sup", "vendor"):
         # 星图里的"产品供应商"节点写作 vendor:<名称>，实体可能仍在 supplier 表里。
         # 若按名称取不到（有些产品供应商从未作为投标主体入库），
@@ -318,7 +342,56 @@ def party_profile(party_id: str) -> dict:
                 if row:
                     return _supplier_profile("sup:" + name, row["name"])
             raise
-    raise HTTPException(422, "id 需形如 sup:/vendor:/buyer:<名称>")
+    raise HTTPException(422, "id 需形如 sup:/vendor:/buyer:/proj:<id>")
+
+
+def _project_profile(pid: str, project_id: str) -> dict:
+    """项目（= 一个包一轮）的档案：采购单位、编号、中标/投标方。"""
+    base = q1(
+        """
+        SELECT p.project_id, p.project_name, p.package_no, p.round_no, p.purchaser,
+               p.package_total_amount, p.source_project_no, p.announcement_id,
+               (SELECT count(*) FROM cob c WHERE c.project_id = p.project_id) AS cobs
+        FROM project p WHERE p.project_id = %s
+        """,
+        (project_id,),
+    )
+    if not base:
+        raise HTTPException(404, "项目不存在")
+    bidders = q(
+        """
+        SELECT s.name, b.is_winner
+        FROM bid b JOIN supplier s ON s.supplier_id = b.supplier_id
+        WHERE b.project_id = %s
+        ORDER BY b.is_winner DESC, b.score DESC NULLS LAST
+        """,
+        (project_id,),
+    )
+    winners = [b["name"] for b in bidders if b["is_winner"]]
+    facts = [
+        f"中标方：{'、'.join(winners)}" if winners else "还没有中标记录",
+        f"投标方 {len(bidders)} 家",
+    ]
+    if base["purchaser"]:
+        facts.append(f"采购单位：{base['purchaser']}")
+    if base["source_project_no"]:
+        facts.append(f"项目编号：{base['source_project_no']}")
+    if base["round_no"] > 1:
+        facts.append(f"同一（项目编号, 包号）的第 {base['round_no']} 轮公告")
+    facts.append(f"公告：{base['announcement_id']}")
+    return {
+        "id": pid,
+        "name": _project_label(base["project_name"], base["package_no"], base["round_no"]),
+        "project_name": base["project_name"],
+        "kind": "project",
+        "stats": [
+            {"k": "包金额", "v": yuan(base["package_total_amount"])},
+            {"k": "标的物", "v": str(base["cobs"])},
+            {"k": "投标方", "v": str(len(bidders))},
+            {"k": "轮次", "v": str(base["round_no"])},
+        ],
+        "facts": facts,
+    }
 
 
 def _buyer_profile(pid: str, name: str) -> dict:

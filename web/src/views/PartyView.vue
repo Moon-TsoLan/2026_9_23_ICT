@@ -47,6 +47,12 @@ function goExplore() {
 function goSearch() {
   const name = profile.value?.name
   if (!name) return
+  // 项目档案：用项目原名走关键词检索（kw 命中 project_name），
+  // 因为 name 里带了“ · 包N”后缀，不能直接当项目名。
+  if (profile.value?.kind === 'project') {
+    void router.push({ path: '/search', query: { kw: profile.value.project_name ?? name } })
+    return
+  }
   const query =
     profile.value?.kind === 'buyer' ? { purchaser: name } : { winner: name }
   void router.push({ path: '/search', query })

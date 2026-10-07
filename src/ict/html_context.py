@@ -15,7 +15,38 @@ PACKAGE_LIST_RE = re.compile(
     r"(?:采购包|合同包|标\s*包)\s*[:：]?\s*([0-9A-Za-z]+(?:\s*[、,，]\s*[0-9A-Za-z]+)+)"
 )
 KV_LABEL_RE = re.compile(r"标\s*包|供应商|金额|名称|服务范围|服务标准|服务时间|服务要求|地址|品牌|规格|数量|单价|施工范围")
-PROJECT_NO_RE = re.compile(r"项目编号[:：]\s*([A-Za-z0-9\-]+)")
+# 项目编号的原文抽取。只作为第 1 步的线索（source_project_no_hint）送给模型，
+# 不做任何判定。真实公告有三种写法，旧式 `项目编号[:：]([A-Za-z0-9-]+)` 只认第一种的一部分：
+#   1. 值写在标题里：`一、项目编号：440001-2026-27404`
+#   2. 标签带括号说明：`项目编号（政府采购计划编号）：SDGP...`、`项目编号（或招标编号…，如有）：...`
+#   3. 标题只有标签、值在下一个节点：正文里成了 `一、项目编号 SDGP370203000202602000053`
+# 值本身还会带 `/`、`[]`、`（）`、中文（`NJC/A260034`、`[231201]ALAZ[CS]20260001`、
+# `KSHZX（GK）2026-002`、`FS34000120264452号`、`豫财招标采购-2025-1596`），
+# 所以不能再按字符白名单截断。
+_PROJECT_NO_STOP = (
+    r"(?![一二三四五六七八九十]、|\d+、|项目名称|采购人|采购单位|采购方式|中标|成交|供应商)"
+)
+PROJECT_NO_RE = re.compile(
+    r"项目\s*编号"
+    r"(?:\s*[（(][^）)]{0,80}[）)])?"          # 可选的括号说明，如“（政府采购计划编号）”
+    r"\s*[：:]?\s*"                              # 冒号可写可不写
+    r"([^\s，。；、）)](?:" + _PROJECT_NO_STOP + r"[^\s，。；、]){0,59})"
+)
+
+
+def _clean_project_no(value: str) -> str | None:
+    """Strip stray trailing closers; a value like 'TGPC-2026-D-0028)' must not keep the ')'."""
+    value = value.strip().strip("，。；、")
+    opens = value.count("（") + value.count("(")
+    closes = value.count("）") + value.count(")")
+    while value and value[-1] in "）)" and closes > opens:
+        value = value[:-1]
+        closes -= 1
+    value = value.strip()
+    # 项目编号一定含数字或字母；纯中文的（如“无”“详见附件”）不是编号，宁可不给。
+    if not value or not any(ch.isdigit() or ch.isascii() and ch.isalpha() for ch in value):
+        return None
+    return value
 AMOUNT_RE = re.compile(r"[￥¥]?\s*[\d,，]+(?:\.\d+)?\s*[（(]?\s*(?:万元|元)")
 NUMBERED_SPLIT = re.compile(r"(?=(?:^|\s)[一二三四五六七八九十百]+、)")
 COMPANY_RE = re.compile(r"[\u4e00-\u9fffA-Za-z0-9（）()]{2,40}?(?:有限公司|股份公司|公司)")
@@ -182,6 +213,7 @@ def parse_notice(path: Path) -> ParsedNotice:
         sections.append({"title": section, "text": " ".join(section_parts)[:4000]})
     body = _text(content)
     project_no = PROJECT_NO_RE.search(body)
+    source_project_no = _clean_project_no(project_no.group(1)) if project_no else None
     seen: list[str] = []
     for hint in hints:
         if hint["package_no"] not in seen:
@@ -195,7 +227,7 @@ def parse_notice(path: Path) -> ParsedNotice:
         tables=tables,
         package_hints=hints,
         sections=sections,
-        source_project_no=project_no.group(1) if project_no else None,
+        source_project_no=source_project_no,
         body_packages=seen,
         package_anchors=anchors,
     )

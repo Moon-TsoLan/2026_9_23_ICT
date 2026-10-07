@@ -123,6 +123,22 @@ D:\python\python.exe -m uvicorn server.app:app --port 8000
 （`merge_decisions` / `amount_audit` / `unmatched_summary_rows` / `conflicts` / `checks`），
 前端不用改表就能取到。
 
+### project 的唯一键：项目编号 + 包号 + 轮次
+
+`project` 一行 = 一个包的**一轮**。`project_id = <项目编号>|<包号>`，同一（项目编号, 包号）
+被多则公告复用时（重新采购、重排包号）第 2 轮起写成 `<项目编号>|<包号>|rN`，并带
+`round_no`。轮次按**公告号里的日期戳**排（`announcement.created_at` 是入库时间，不能用）。
+
+`package_key` 是合并前的业务键（= `<项目编号>|<包号>`），`round_no` 是它在公告中的序号。
+模型没抽到项目编号时，`package_key` 退回 `<项目名>|<包号>`（详见 `doc/archive/数据库改造计划-已实施.md` §4）。
+
+已存在的库要先跑一次迁移再重灌：
+
+```powershell
+Get-Content db\002_project_round_key.sql -Raw | docker exec -i ict-pg psql -U ict -d <库名> -v ON_ERROR_STOP=1
+D:\python\python.exe db\load_runs.py --db <库名> --runs work\runs --reset
+```
+
 **已知缺口**：`cob` 表只有 `source_type`（html/pdf/docx/…）和 `source_file_id`，没有"文件类"
 （`award_detail` / `bid_quote` / `qualification` / `unknown`）这一列。所以 UI 里筛不出"来自资格证明
 材料的标的"这类行，只能靠 `source_type='pdf'` 粗筛或直接查 `raw_json`。要按类筛就得给 `cob` 加列，
@@ -134,6 +150,7 @@ D:\python\python.exe -m uvicorn server.app:app --port 8000
 |---|---|
 | `docker-compose.yml` | Postgres 16 容器定义（编码/排序规则锁定，跨环境一致） |
 | `db/001_schema.sql` | 建表 + 索引 + 视图 + 归一化函数（DDL，不含数据） |
+| `db/002_project_round_key.sql` | 迁移：给已存在的库补 `package_key` / `round_no` 并换唯一键（新库不需要） |
 | `db/queries.sql` | 只读查询集（检索 + S1–S5 + 星图 + 统计） |
 | `db/load_runs.py` | 把 `work/runs/` 的批次结果导入一个同结构库（只读源、幂等 `--reset`） |
 

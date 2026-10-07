@@ -73,6 +73,8 @@ export interface PartyProfile {
   id: string
   name: string
   kind: NodeKind
+  /** 只有 kind=project 时返回：项目原名（不含“ · 包N”后缀），用于跳转标的检索 */
+  project_name?: string
   stats: SceneStat[]
   facts: string[]
 }
