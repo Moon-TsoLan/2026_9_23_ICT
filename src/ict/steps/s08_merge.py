@@ -19,6 +19,7 @@ import json
 import re
 from dataclasses import dataclass, field
 
+from ict.catalog import Catalog
 from ict.config import COB_FIELDS, MERGE_THINKING, SUB_FIELDS
 from ict.concurrency import parallel_map
 from ict.llm import LLMClient, LLMError, complete_json
@@ -34,8 +35,9 @@ CENT = 0.01
 MEMBER_RE = re.compile(r"\([^()]*成员[^()]*\)")
 DETAIL_ROLES = {"cob_detail", "winner"}
 EXCLUDE_KINDS = ("subtotal_row", "project_row", "index_row", "not_an_object")
-DELTA_ORDER = ("exclude", "split", "merge", "sum", "name_from", "price_from", "fields_from")
-PROMPT = "merge-objects-v2"
+DELTA_ORDER = ("exclude", "split", "merge", "sum", "name_from", "price_from", "fields_from",
+               "category_from_announcement")
+PROMPT = "merge-objects-v3"
 # What fields_from is allowed to move onto a group. The two money numbers are deliberately not
 # here: a unit price from one row joined to a quantity from another invents a total nobody wrote.
 # They can still arrive through price_from with an explicit key list, where the source is named.
@@ -47,6 +49,64 @@ SUSPECT_PROJECT = "suspect_project_name_row"
 
 
 # --------------------------------------------------------------------------- values
+
+_SHARED_CATALOG: Catalog | None = None
+
+
+def _catalog() -> Catalog:
+    global _SHARED_CATALOG
+    if _SHARED_CATALOG is None:
+        _SHARED_CATALOG = Catalog()
+    return _SHARED_CATALOG
+
+
+def _pack(text: str) -> str:
+    return re.sub(r"\s+", "", text)
+
+
+def category_items(understanding: AnnouncementUnderstanding) -> list[str]:
+    """公告概要抄下来的品目条目，保持原文顺序去重。
+
+    375 则公告的品目只写在公告概要里，正文表格与附件都没有这一列，所以第 1 步抄下来的这份
+    清单是唯一来源。这里只搬运，不解释内容。
+    """
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in understanding.announcement_categories or []:
+        text = str(item or "").strip()
+        key = _pack(text)
+        if not text or key in seen:
+            continue
+        seen.add(key)
+        out.append(text)
+    return out
+
+
+def _category_missing(group: Group) -> bool:
+    return bool(group.members) and not (_value(group.members[0], "category_name")
+                                        or _value(group.members[0], "category_code"))
+
+
+def _fill_category(base: Candidate, hit: dict, item: str) -> list[str]:
+    """把某条公告概要品目查到的编码与名称写进这组还空着的品目格。
+
+    值与第 7 步同一套：模型只判"这条品目说的是这个标的"，编码和名称都来自 2022 品目目录，
+    规则不猜、不编。只填空格，已经写过的格不动。
+    """
+    filled: list[str] = []
+    for key, value in (("category_code", hit.get("matched_code")),
+                       ("category_name", hit.get("matched_name")),
+                       ("category_type", hit.get("category_type"))):
+        if value in (None, "") or _value(base, key) not in (None, ""):
+            continue
+        observation = base.fields[key]
+        observation.normalized_value = value
+        observation.status = "present"
+        observation.normalization = {"filled_from": "announcement_summary", "raw_item": item,
+                                     "match_type": hit.get("match_type")}
+        filled.append(key)
+    return filled
+
 
 def _value(candidate: Candidate, key: str):
     field = candidate.fields[key]
@@ -214,6 +274,10 @@ class Group:
     price_entry: dict | None = None
     name_entry: dict | None = None
     donor_entries: list[dict] = field(default_factory=list)
+    # 公告概要品目判给这一组的结果：原文条目、目录查到的编码/名称，以及这条 delta 的审计行。
+    category_item: str | None = None
+    category_hit: dict | None = None
+    category_entry: dict | None = None
 
 
 @dataclass
@@ -442,7 +506,8 @@ def _candidate_view(candidate: Candidate, group_id: int, ctx: _Context,
 
 def _ask_merge(ctx: _Context, groups: list[Group], cobs: list[Candidate], amount: float | None,
                raw: str | None, suspect: str | None, evidence: MergeEvidence | None,
-               llm: LLMClient, counter) -> tuple[list[dict], str | None, str | None]:
+               llm: LLMClient, counter,
+               categories: list[str] | None = None) -> tuple[list[dict], str | None, str | None]:
     by_group = {candidate.candidate_id: group.group_id for group in groups for candidate in group.members}
     payload = {
         "project_name": ctx.project_name,
@@ -457,13 +522,18 @@ def _ask_merge(ctx: _Context, groups: list[Group], cobs: list[Candidate], amount
         "candidates": [_candidate_view(item, by_group.get(item.candidate_id, -1), ctx, evidence)
                        for item in sorted(cobs, key=lambda entry: _rank(entry, ctx))],
     }
+    if categories:
+        # 公告概要抄下来的品目，原文给到模型；选哪条属于内容判断，编码与名称由规则查目录补。
+        payload["announcement_categories"] = list(categories)
     group_ids = {group.group_id for group in groups}
     candidate_ids = {item.candidate_id for item in cobs}
+    category_keys = {_pack(item) for item in (categories or [])}
     notes: dict = {}
     try:
         produced = complete_json(llm, step="merge_candidates", prompt_version=PROMPT,
                                  user=json.dumps(payload, ensure_ascii=False),
-                                 validate=lambda parsed: _validate_merge(parsed, group_ids, candidate_ids),
+                                 validate=lambda parsed: _validate_merge(parsed, group_ids, candidate_ids,
+                                                                         category_keys),
                                  counter=counter, thinking=MERGE_THINKING, notes=notes)
     except (LLMError, ValueError) as exc:
         return [], ("llm_call_failed" if isinstance(exc, LLMError) else "llm_schema_invalid"), None
@@ -471,7 +541,8 @@ def _ask_merge(ctx: _Context, groups: list[Group], cobs: list[Candidate], amount
     return (deltas if isinstance(deltas, list) else []), None, (notes.get("reasoning") or None)
 
 
-def _validate_merge(parsed: dict, group_ids: set[int], candidate_ids: set[str]) -> str:
+def _validate_merge(parsed: dict, group_ids: set[int], candidate_ids: set[str],
+                    category_keys: set[str] | None = None) -> str:
     deltas = parsed.get("deltas")
     if not isinstance(deltas, list):
         return "需要 deltas 数组"
@@ -524,6 +595,12 @@ def _validate_merge(parsed: dict, group_ids: set[int], candidate_ids: set[str]) 
             if keys is not None and (not isinstance(keys, list) or not keys
                                      or any(item not in PRICE_BUNDLE for item in keys)):
                 return "price_from 的 keys 只能取 unit_price、quantity、unit、total_price 的子集"
+        elif op == "category_from_announcement":
+            if gid not in group_ids:
+                return "category_from_announcement 的 group_id 不在输入里"
+            item = delta.get("raw_item")
+            if not isinstance(item, str) or _pack(item) not in (category_keys or set()):
+                return "category_from_announcement 的 raw_item 必须是公告概要里给出的品目原文之一"
         else:
             if gid not in group_ids:
                 return "%s 的 group_id 不在输入里" % op
@@ -533,7 +610,9 @@ def _validate_merge(parsed: dict, group_ids: set[int], candidate_ids: set[str]) 
 
 
 def _apply_deltas(groups: list[Group], deltas: list[dict], by_id: dict[str, Candidate],
-                  ctx: _Context, decisions: list[dict]) -> tuple[list[Group], list[tuple[Candidate, str]]]:
+                  ctx: _Context, decisions: list[dict],
+                  categories: dict[str, str] | None = None
+                  ) -> tuple[list[Group], list[tuple[Candidate, str]]]:
     """Apply the model's edits one at a time. A delta that does not hold is dropped on its own.
 
     Nothing is all-or-nothing: an unresolvable group id costs that one edit, not the package. The
@@ -561,7 +640,7 @@ def _apply_deltas(groups: list[Group], deltas: list[dict], by_id: dict[str, Cand
         entry = {"package_no": ctx.package_no, "accepted": accepted}
         entry.update({key: value for key, value in delta.items() if key in
                       ("op", "group_id", "group", "groups", "parts", "members", "candidate_id", "kind",
-                       "keys", "name_from", "price_from", "reason", "confidence")})
+                       "keys", "raw_item", "name_from", "price_from", "reason", "confidence")})
         if reject:
             entry["reject"] = reject
         if extra:
@@ -678,6 +757,27 @@ def _apply_deltas(groups: list[Group], deltas: list[dict], by_id: dict[str, Cand
             group.price_from = target
             group.price_keys = keys
             group.price_entry = entry
+        elif op == "category_from_announcement":
+            group = resolve(_delta_group(delta))
+            if group is None:
+                log(delta, False, "unknown_group")
+                continue
+            canonical = (categories or {}).get(_pack(str(delta.get("raw_item") or "")))
+            if not canonical:
+                log(delta, False, "item_not_in_announcement")
+                continue
+            hit = _catalog().match(None, canonical)
+            if hit.get("match_type") == "unmatched":
+                # 目录里查不到就不写：宁可这组品目为空，也不把模型的话当成值。
+                log(delta, False, "category_unmatched")
+                continue
+            entry = log(delta, True, extra={"raw_item": canonical,
+                                            "match_type": hit.get("match_type"),
+                                            "matched_code": hit.get("matched_code"),
+                                            "matched_name": hit.get("matched_name")})
+            group.category_item = canonical
+            group.category_hit = hit
+            group.category_entry = entry
         elif op == "name_from":
             group = resolve(_delta_group(delta))
             target = delta.get("candidate_id")
@@ -862,6 +962,13 @@ def _reconcile(group: Group, ctx: _Context, by_id: dict[str, Candidate], conflic
             if entry.get("candidate_id") == donor.candidate_id:
                 entry["applied"] = bool(filled)
                 entry["filled"] = sorted(set(filled))
+    if group.category_hit is not None:
+        # 品目只写在公告概要里的公告：模型在这一步判"哪条品目说的是这个标的"，值由目录给出。
+        # 放在命名捐赠之后，文档里真写过的品目优先，这里只补还空着的格。
+        filled = _fill_category(base, group.category_hit, group.category_item or "")
+        if group.category_entry is not None:
+            group.category_entry["applied"] = bool(filled)
+            group.category_entry["filled"] = sorted(filled)
     readings, options = _readings(group, ctx, by_id, decisions)
     reading = None
     if group.price_from:
@@ -1172,6 +1279,10 @@ def merge_projects(run_id: str, understanding: AnnouncementUnderstanding, candid
 
     projects: list[Project] = []
     single = understanding.package_mode == "single"
+    # 公告概要里抄下来的品目（可能为空）。它只写在概要里，正文表格与附件都没有这一列的公告
+    # 有 375 则；没有这一句，那些标的的品目永远填不上。
+    categories = category_items(understanding)
+    category_map = {_pack(item): item for item in categories}
 
     # Phase 1, in package order: everything a package needs before the model sees it. The local
     # decision rules write into that package's own buffers, never into the shared lists.
@@ -1222,7 +1333,9 @@ def merge_projects(run_id: str, understanding: AnnouncementUnderstanding, candid
             trace.unmatched.append({"candidate_id": candidate.candidate_id,
                                     "reason": "missing_object_name"})
 
-        wanted = llm is not None and _needs_model(cobs)
+        wanted = llm is not None and (_needs_model(cobs) or
+                                      (bool(categories) and any(_category_missing(group)
+                                                                for group in groups)))
         if not wanted:
             trace.decisions.append({"package_no": package.package_no, "op": "model", "accepted": False,
                                     "reject": "no_model" if llm is None else "nothing_to_disambiguate"})
@@ -1241,7 +1354,8 @@ def merge_projects(run_id: str, understanding: AnnouncementUnderstanding, candid
         todo = [entry for entry in prepared if entry["wanted"]]
         for entry, produced in zip(todo, parallel_map(
                 lambda item: _ask_merge(item["ctx"], item["groups"], item["cobs"], item["amount"],
-                                        item["raw"], item["suspect_hint"], evidence, llm, counter),
+                                        item["raw"], item["suspect_hint"], evidence, llm, counter,
+                                        categories),
                 todo)):
             deltas, fallback, note = produced
             asked[entry["package"].package_no] = deltas
@@ -1265,7 +1379,7 @@ def merge_projects(run_id: str, understanding: AnnouncementUnderstanding, candid
         repairs, decisions = trace.repairs, trace.decisions
         conflicts, unmatched = trace.conflicts, trace.unmatched
 
-        groups, excluded = _apply_deltas(groups, deltas, by_id, ctx, decisions)
+        groups, excluded = _apply_deltas(groups, deltas, by_id, ctx, decisions, category_map)
         _donate_excluded(excluded, groups, ctx, decisions)
         for candidate, kind in excluded:
             unmatched.append({"candidate_id": candidate.candidate_id, "reason": kind})

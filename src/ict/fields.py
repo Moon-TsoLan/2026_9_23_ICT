@@ -36,6 +36,8 @@ FIELD_SEMANTICS = {
     "amount_alternatives": "同一包里你看到但没有选作 package_amount 的其它金额，每项含 raw_text、amount_yuan、scope、confidence；只作留痕，不参与判定。",
     "package_evidence_text": "证明该包存在的原文片段。",
     "summary_amount": "公告概览层面的项目总额，含 raw_text、amount_yuan、scope、confidence；scope 固定为 announcement。",
+    "announcement_categories": "公告概要一行里写出的品目条目，一项一条，逐字照抄；可能是编码（C16990000）、"
+                              "品目名称或带斜杠的目录路径，也可能是空的。只抄公告概要那一行，正文表格里的品目不算。",
     "unclear_reason": "判不清包结构时的原因说明。",
     "table_role": "这张表的作用，取值 cob_detail 标的明细、cob_summary 标的汇总、sub_score 供应商得分、winner 中标信息、agency_fee 代理服务费、other 其它。",
     "row_grain": "这一行代表什么，取值 cob 一个标的、supplier 一个供应商、project 一个项目、other 其它。",
@@ -96,7 +98,10 @@ FIELD_SEMANTICS = {
     "deltas": "你对基线分组的修改清单，每项一个操作；不需要修改的组不要输出。",
     "op": "操作类型，取值 merge 两组合并为同一标的、split 一组拆成多个标的、sum 组内若干行是同一标的的"
           "拆行需求和、exclude 该候选不是标的、name_from 该组名称取哪条、price_from 该组价格取哪条、"
-          "fields_from 把某条的指定字段补进该组空缺。",
+          "fields_from 把某条的指定字段补进该组空缺、category_from_announcement 把公告概要里的某条品目"
+          "判给该组。",
+    "raw_item": "这次操作指名的那条原文，逐字照抄输入里给到的内容，不要改写、不要拼接；"
+                "category_from_announcement 用它表示把哪条品目判给该组。",
     "groups": "要合并的基线分组编号列表，至少两个。",
     "parts": "拆分结果，每项是一组 candidate_id；所有 part 合起来必须正好是原组成员，不重不漏。",
     "members": "需求和的那些 candidate_id，至少两个。",
@@ -185,7 +190,7 @@ STEP_FIELD_OVERRIDES = {
     "attachment-extract-v1": {
         "candidates": "抽取出的候选对象列表，每项含 entity_type、package_no、file_id、fields、issues。",
     },
-    "merge-objects-v2": {
+    "merge-objects-v3": {
         "candidates": "本包全部标的候选，每项含 candidate_id、group_id、origin、来源信息、11 个业务字段、"
                       "field_states，以及规则给出的事实 price_reading 与可能的 rule_suspect、"
                       "price_ineligible、owner_suspect、unparsable_fields。",
@@ -206,7 +211,7 @@ STEP_FIELDS = {
                          "package_hints", "source_project_no_hint"],
                         ["project_name", "purchaser", "source_project_no", "announcement_type", "package_mode",
                          "packages", "package_no", "package_evidence_text", "package_amount", "summary_amount",
-                         "unclear_reason", "amount_alternatives"]),
+                         "unclear_reason", "amount_alternatives", "announcement_categories"]),
     "html-tables-v1": (["table_index", "before_text", "headers", "first_rows", "section", "key_value",
                         "package_candidates", "other_tables"],
                        ["table_role", "row_grain", "package_scope", "column_mapping", "unmapped_columns",
@@ -236,17 +241,17 @@ STEP_FIELDS = {
                                "unit_price", "quantity", "unit", "total_price", "supplier_name", "score",
                                "is_winner", "issues", "package_amounts", "raw_text",
                                "row_text", "bidder_supplier", "winner_supplier"]),
-    "merge-objects-v2": (["project_name", "package_no", "package_total_amount", "package_amount_raw",
+    "merge-objects-v3": (["project_name", "package_no", "package_total_amount", "package_amount_raw",
                           "package_amount_suspect", "winner_suppliers", "baseline_groups", "group_id",
-                          "candidates", "candidate_id", "origin", "file_name", "file_class", "table_index",
-                          "table_role", "table_section", "page_no", "row_text", "quote_supplier",
-                          "bidder_supplier", "winner_supplier", "is_winner_quote", "object_name",
-                          "category_code", "category_name", "category_type", "brand", "product_supplier",
-                          "spec_model", "unit_price", "quantity", "unit", "total_price", "field_states",
-                          "price_reading", "price_ineligible", "owner_suspect", "unparsable_fields",
-                          "rule_suspect"],
+                          "announcement_categories", "candidates", "candidate_id", "origin", "file_name",
+                          "file_class", "table_index", "table_role", "table_section", "page_no", "row_text",
+                          "quote_supplier", "bidder_supplier", "winner_supplier", "is_winner_quote",
+                          "object_name", "category_code", "category_name", "category_type", "brand",
+                          "product_supplier", "spec_model", "unit_price", "quantity", "unit", "total_price",
+                          "field_states", "price_reading", "price_ineligible", "owner_suspect",
+                          "unparsable_fields", "rule_suspect"],
                          ["deltas", "op", "groups", "parts", "members", "group_id", "candidate_id",
-                          "name_from", "price_from", "fields_from", "keys", "kind", "reason",
+                          "name_from", "price_from", "fields_from", "keys", "raw_item", "kind", "reason",
                           "confidence"]),
     "repair-package-v1": (["package_no", "package_total_amount", "violations", "clusters", "cluster_id",
                            "object_name", "current_candidate_id", "options", "candidate_id", "file_id",

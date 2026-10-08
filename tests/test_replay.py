@@ -59,10 +59,10 @@ def test_a_recorded_answer_replays_unchanged(tmp_path):
 def test_reasoning_is_replayed_too(tmp_path):
     """The merge step's thinking excerpt ends up in merge_notes, so it must survive the cassette."""
     recorder = replay.RecordingLLM(FakeInner(reasoning="因为两行名称相同"), tmp_path / "llm.jsonl")
-    recorder.complete(step="merge_candidates", prompt_version="merge-objects-v2", user="{}",
+    recorder.complete(step="merge_candidates", prompt_version="merge-objects-v3", user="{}",
                       thinking=True)
     replayed = replay.ReplayLLM(tmp_path / "llm.jsonl")
-    result = replayed.complete(step="merge_candidates", prompt_version="merge-objects-v2", user="{}",
+    result = replayed.complete(step="merge_candidates", prompt_version="merge-objects-v3", user="{}",
                                thinking=True)
     assert result.reasoning == "因为两行名称相同"
 

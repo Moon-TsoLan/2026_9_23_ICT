@@ -9,7 +9,7 @@ from collections import Counter
 from ict.candidates import align_fields, seal_candidate
 from ict.concurrency import parallel_map
 from ict.config import SOURCE_PRIORITY
-from ict.html_context import ParsedNotice, ParsedTable, bidder_body_sections, step2a_payload
+from ict.html_context import ParsedNotice, ParsedTable, step2a_payload
 from ict.ids import make_project_id
 from ict.llm import LLMClient, LLMError, complete_json
 from ict.package_resolve import promote_object_tables, resolve_table_packages
@@ -227,7 +227,12 @@ def extract_html_candidates(
                 candidate.issues.append("product_supplier_from_bidder_column")
             if pointer and candidate.entity_type == "cob" and "line_fields_point_to_attachment" not in candidate.issues:
                 candidate.issues.append("line_fields_point_to_attachment")
-    body_sections = bidder_body_sections(notice)
+    # 2026-10-08 用户指示：正文不再筛选，整篇一次交给模型。
+    # 原来是 bidder_body_sections() 按"公司/供应商 + （数字"挑段落，实测把 65% 的公告挑成 0 段，
+    # 而 t20260206_26155241 的「八、其它补充事宜」里明明写着「（第1包）…中标人…：宁夏隆昆…85.32分」。
+    # 全篇正文中位只有 533 字、最长 5583 字，一次给的代价可以忽略。
+    body_sections = [{"title": section["title"], "text": section["text"]}
+                     for section in notice.sections]
     if body_sections:
         payload = {
             "entity_type": "sub",

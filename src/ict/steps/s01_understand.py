@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from ict.html_context import ParsedNotice
 from ict.ids import make_project_id
 from ict.llm import LLMClient, LLMError
@@ -9,6 +11,38 @@ from ict.money import parse_amount
 from ict.schemas import Amount, AnnouncementUnderstanding, Failure, ModelMetadata, PackageUnderstanding
 
 PROMPT = "announcement-v1"
+
+
+def _pack(text: str) -> str:
+    return re.sub(r"\s+", "", text)
+
+
+def checked_categories(raw_items, summary_text) -> tuple[list[str], list[str]]:
+    """Keep only the 品目 entries the model transcribed from the announcement summary.
+
+    公告概要里的品目只有这一个出口，而它的分隔符（逗号、顿号、分号、换行）没有稳定写法，切开
+    这件事交给模型。规则只做结构校验：留下来的每一项都必须在它被抄的那段原文里连续出现，
+    否则丢掉并报告——模型改写、补全或凭记忆写出来的条目进不到下游。
+    """
+    if not isinstance(raw_items, list):
+        return [], []
+    haystack = _pack(str(summary_text or ""))
+    kept: list[str] = []
+    dropped: list[str] = []
+    seen: set[str] = set()
+    for item in raw_items:
+        text = str(item or "").strip()
+        if not text:
+            continue
+        key = _pack(text)
+        if not haystack or key not in haystack:
+            dropped.append(text)
+            continue
+        if key in seen:                  # 原文自己会重复（如 C16990000,C16990000），不算抄错
+            continue
+        seen.add(key)
+        kept.append(text)
+    return kept, dropped
 
 
 def _confidence(value, default: float = 0.9) -> float:
@@ -85,6 +119,8 @@ def seal(run_id: str, proposed: dict, metadata: ModelMetadata | None, failures: 
     status = "failed" if mode == "unclear" or not name else "success"
     if failures and status == "success":
         status = "partial"
+    categories = [str(item).strip() for item in (proposed.get("announcement_categories") or [])
+                  if isinstance(item, str) and str(item).strip()]
     return AnnouncementUnderstanding(
         run_id=run_id,
         status=status,
@@ -95,6 +131,7 @@ def seal(run_id: str, proposed: dict, metadata: ModelMetadata | None, failures: 
         package_mode=mode if mode in {"single", "multi", "unclear"} else "unclear",
         packages=[] if status == "failed" and not name else packages,
         summary_amount=_amount(proposed.get("summary_raw"), "announcement"),
+        announcement_categories=categories,
         unclear_reason=proposed.get("unclear_reason"),
         model_metadata=metadata,
         failures=failures,
@@ -143,6 +180,12 @@ def understand(run_id: str, notice: ParsedNotice, llm: LLMClient | None, counter
     if "summary_raw" not in proposed:
         summary = proposed.get("summary_amount") or {}
         proposed["summary_raw"] = summary.get("raw_text") if isinstance(summary, dict) else None
+    kept, dropped = checked_categories(proposed.get("announcement_categories"),
+                                       notice.summary.get("品目"))
+    proposed["announcement_categories"] = kept
+    for text in dropped:
+        failures.append(Failure(failure_code="category_item_not_in_summary",
+                                failure_message="公告概要里没有这一段：" + text))
     understanding = seal(run_id, proposed, metadata, failures)
     fill_package_amounts(understanding, notice)
     return understanding

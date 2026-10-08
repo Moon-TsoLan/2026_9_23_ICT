@@ -398,6 +398,9 @@ PDF 若在 `work/attachments-md/` 下有同相对路径的 `.md`，索引把该 
     "scope": "announcement",
     "confidence": 0.98
   },
+  "announcement_categories": [
+    "货物/设备/办公设备/输入输出设备/液晶显示器"
+  ],
   "unclear_reason": null,
   "model_metadata": {
     "model_name": "deepseek-flash",
@@ -420,6 +423,7 @@ PDF 若在 `work/attachments-md/` 下有同相对路径的 `.md`，索引把该 
 | `package_mode` | enum | 是 | 包结构模式 |
 | `packages` | array | 是 | 包列表 |
 | `summary_amount` | object/null | 是 | 公告概要金额 |
+| `announcement_categories` | array | 是 | 公告概要那一行抄下来的品目，一项一条，逐字照抄；公告概要没写就是空数组。只在公告概要有品目时才有内容——全量 1038 则里 375 则的品目只写在这里，正文表格与附件都没有这一列 |
 | `unclear_reason` | string/null | 是 | 包结构不清楚时的说明 |
 | `model_metadata` | object/null | 是 | LLM 调用元数据 |
 | `failures` | array | 是 | 失败记录 |
@@ -1471,7 +1475,7 @@ total_price
 4. 指针行标记：HTML 行自己没有任何数字价格、且带 `line_fields_point_to_attachment` 或某个行字段为 `points_to_attachment`，而本包另有可当标的且写了价格的候选时，该行**只打上 `suspect_html_pointer_row`** 并随候选进入模型输入（`rule_suspect`），去留由模型判。没有模型时（离线、回放、退回基线）才按旧语义排除，记 `html_pointer_row`。
 5. 项目全称行标记：名称等于项目名，或包含项目名且余下部分只是括号或标点，**且**公告侧另有非项目名的可当标的的行时，打 `suspect_project_name_row`，同上。没有模型时才排除并由全序最高的一行把价格转移到唯一无价标的上，记 `项目全称行，价格并入唯一标的` / `项目全称行不作为标的`。
 6. 基线分组：按规范化名称（去空白、全角括号转半角）完全相同分组，组号按全序排定。这是模型要修改的基线，也是没有模型时的全部结果。
-7. 模型一次调用（`merge-objects-v2`，思考开启：`config.MERGE_THINKING`，思考摘录按包存入 `merge_notes`，只供复核不参与判定），输出对基线的修改 `deltas`，七种：`merge`、`split`、`sum`、`exclude(kind ∈ subtotal_row/project_row/index_row/not_an_object)`、`name_from`、`price_from`（可带 `keys` 只取四字段中的若干格）、`fields_from`（把某行写过的指定字段补进某组空缺，目标可以是别组或已被 `exclude` 的行）。按 `exclude → split → merge → sum → name_from → price_from → fields_from` 固定顺序应用，逐条校验、逐条否决、逐条留痕。整个调用失败或两次输出都不合法时退回基线，记 `merge_model_fallback`。本包只有一条 HTML 命名候选且没有任何 suspect 标记时不发起调用。模型不能写任何数字，也不能引用没给它的编号。
+7. 模型一次调用（`merge-objects-v3`，思考开启：`config.MERGE_THINKING`，思考摘录按包存入 `merge_notes`，只供复核不参与判定），输出对基线的修改 `deltas`，八种：`merge`、`split`、`sum`、`exclude(kind ∈ subtotal_row/project_row/index_row/not_an_object)`、`name_from`、`price_from`（可带 `keys` 只取四字段中的若干格）、`fields_from`（把某行写过的指定字段补进某组空缺，目标可以是别组或已被 `exclude` 的行）、`category_from_announcement`（`group_id` + `raw_item`，把公告概要抄下来的某条品目判给该组；编码与名称由 `catalog.match()` 查 2022 品目目录补，目录查不到就否决）。按 `exclude → split → merge → sum → name_from → price_from → fields_from → category_from_announcement` 固定顺序应用，逐条校验、逐条否决、逐条留痕。整个调用失败或两次输出都不合法时退回基线，记 `merge_model_fallback`。本包只有一条 HTML 命名候选且没有任何 suspect 标记时不发起调用；但公告概要给了品目、而这一条的品目还空着时仍要发起。模型不能写任何数字，也不能引用没给它的编号。
 7b. `accepted` 表示这条 delta 合法，`applied` 表示它真的改变了输出，两者分开记录：`price_from` 点名的行给不出数字时当场记 `accepted=false, reject=target_states_no_number_price`；改用了别的读法时记 `used_instead`；`fields_from` 记实际补上的 `filled`；`exclude` 记它捐出的 `donated_keys`。不再存在"接受了但什么都没发生"。
 8. 来源资格（取代封闭清单）：`tender_requirement` 不供价、不新增标的；报价归属明确且不是中标人的，不供价、不新增标的；两者都仍可补描述字段，名称与既有组相同就并入该组。归属不明时放行，交包金额裁决。整组都被资格挡下时记入 `unmatched_summary_rows`，原因为 `tender_requirement` 或 `non_winner_quote`。
 9. 描述字段（名称、品目、规格、品牌、制造商）按全序取最高者为基，其余只补空字段；两边都有且不等记 `conflicts`。品牌冲突且基是 HTML 明细行时不记冲突。被 `exclude` 的行不再让字段消失：它写过的字段自动补进它原来那一组，整包只剩一个标的时补进那个标的。

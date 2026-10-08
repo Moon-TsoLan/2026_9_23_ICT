@@ -338,24 +338,6 @@ def winner_hints(notice: ParsedNotice, package_nos: list[str]) -> dict[str, list
     return hints
 
 
-def bidder_body_sections(notice: ParsedNotice) -> list[dict]:
-    """Bidder prose selected by content, not by the heading the DOM happened to use."""
-    found = []
-    seen: set[str] = set()
-    for section in notice.sections:
-        blob = f"{section['title']} {section['text']}"
-        company_score = ("公司" in blob or "供应商" in blob) and re.search(r"[（(]\s*\d", blob)
-        supplier_amount = "供应商名称" in blob and ("金额" in blob or "万元" in blob)
-        if not company_score and not supplier_amount:
-            continue
-        key = section["text"][:80]
-        if key in seen:
-            continue
-        seen.add(key)
-        found.append({"title": section["title"], "text": section["text"]})
-    return found
-
-
 def fill_package_amounts(understanding, notice: ParsedNotice) -> None:
     from ict.schemas import Amount
 

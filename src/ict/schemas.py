@@ -30,6 +30,7 @@ FailureCode = Literal[
     "parse_http_failed",
     "parse_refused",
     "office_convert_failed",
+    "category_item_not_in_summary",
     "unexpected_error",
 ]
 EntityType = Literal["cob", "sub"]
@@ -108,6 +109,9 @@ class AnnouncementUnderstanding(Model):
     package_mode: PackageMode
     packages: list[PackageUnderstanding] = Field(default_factory=list)
     summary_amount: Amount | None = None
+    # 品目只写在公告概要里的公告（全量 1038 则里 375 则），正文表格与附件都没有这一列。
+    # 这里存的是第 1 步模型从公告概要逐项抄下来的原文条目，供第 8 步做归属判断。
+    announcement_categories: list[str] = Field(default_factory=list)
     unclear_reason: str | None = None
     model_metadata: ModelMetadata | None = None
     failures: list[Failure] = Field(default_factory=list)

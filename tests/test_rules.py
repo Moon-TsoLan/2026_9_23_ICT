@@ -3,7 +3,7 @@ from pathlib import Path
 
 from ict.candidates import seal_candidate
 from ict.catalog import Catalog
-from ict.html_context import bidder_body_sections, parse_notice
+from ict.html_context import parse_notice
 from ict.money import parse_amount, parse_price_cell, parse_quantity
 from ict.schemas import AnnouncementUnderstanding, PackageUnderstanding
 from ict.steps.s03_plan import plan_projects
@@ -105,23 +105,29 @@ def test_alias_field_names_keep_object_name():
     assert named.fields["object_name"].raw_value == "潜伏式搬运机器人"
 
 
-def test_bidder_score_paragraph_is_kept():
+def test_all_prose_sections_go_to_the_model_unfiltered():
+    """2026-10-08 用户指示：正文不再筛选，整篇一次交给模型。
+
+    旧规则（bidder_body_sections）按"公司/供应商 + （数字"挑段落，实测把 65% 的公告挑成 0 段，
+    而 t20260206_26155241 的「八、其它补充事宜」里就写着「（第1包）…中标人…：宁夏隆昆…85.32分」。
+    """
     html = """<div class="vF_detail_content">
     <h2>五、评审专家名单：</h2>
     <p>标包：A 青岛示例科技有限公司（55.5、58、60） 杭州示例股份有限公司（93、92、96）</p>
+    <h2>六、公告期限</h2>
+    <p>自本公告发布之日起1个工作日。</p>
     </div>"""
     path = Path("work/pytest-tmp/score-paragraph.html")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(html, encoding="utf-8")
-    texts = bidder_body_sections(parse_notice(path))
-    assert len(texts) == 1
-    assert "青岛示例科技有限公司" in texts[0]["text"]
+    sections = parse_notice(path).sections
+    assert len(sections) == 2                                   # 一条都不筛
+    assert any("青岛示例科技有限公司" in item["text"] for item in sections)
+    assert any("公告期限" in item["title"] for item in sections)  # 旧规则会把它筛掉
+
     html_root = Path(r"D:\all_contest\2026_9_23_ICT\data\赛题五基准测试数据\赛题五.基准测试数据_html")
-    prose = bidder_body_sections(parse_notice(html_root / "t20260203_26142958.html"))
+    prose = parse_notice(html_root / "t20260203_26142958.html").sections
     assert any("青岛挚璞" in item["text"] for item in prose)
-    assert any("未中标" in item["title"] or "青岛挚璞" in item["text"] for item in prose)
-    experts = bidder_body_sections(parse_notice(html_root / "t20260202_26139917.html"))
-    assert all("公司" in item["text"] or "供应商名称" in item["text"] for item in experts)
 
 
 def test_page_scope_stays_inside_known_packages():
@@ -261,7 +267,7 @@ def test_multivalue_anchors_capture_package_amounts():
     amounts = {item["package_no"]: item["amount_yuan"] for item in notice.package_anchors if item.get("package_no")}
     assert amounts["3"] == 2431310
     assert amounts["4"] == 819000
-    texts = bidder_body_sections(notice)
+    texts = notice.sections
     assert any("万迪科" in item["text"] for item in texts)
 
 

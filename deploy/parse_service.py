@@ -40,9 +40,112 @@ NATIVE_TABLE_SUFFIXES = {".xls", ".xlsx", ".xlsm", ".csv"}
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff", ".webp"}
 IMAGE_REF = re.compile(r"!\[[^\]]*\]\([^)]*\)")
 
+RED_SEAL_MARGIN = 25      # R 比 G/B 都高出这么多就算"红墨"：章边被纸冲淡的淡粉色也要收进来，
+                          # 否则残留的粉环在高分辨率下会被版面模型重新认成印章，表格结构又塌了。
+                          # 代价是黄色 logo 之类的暖色图形也会被一起洗掉——它们不是抽取目标。
+RED_SEAL_THRESHOLD = 140   # 红通道里低于它是墨（被压住的黑字保留），高于它是纸/章（洗白）
+
 
 def env(key: str, default: str = "") -> str:
     return os.environ.get(key, default) or default
+
+
+def red_seal_clean_enabled() -> bool:
+    """红章清理默认开启：没有红墨时它是一个恒等变换，见 clean_red_ink 的注释。"""
+    return env("ICT_RED_SEAL_CLEAN", "1") == "1"
+
+
+def _dilate(mask, radius: int):
+    import numpy as np
+
+    out = mask
+    for _ in range(max(0, radius)):
+        padded = np.pad(out, 1, constant_values=False)
+        out = (padded[:-2, :-2] | padded[:-2, 1:-1] | padded[:-2, 2:] |
+               padded[1:-1, :-2] | padded[1:-1, 1:-1] | padded[1:-1, 2:] |
+               padded[2:, :-2] | padded[2:, 1:-1] | padded[2:, 2:])
+    return out
+
+
+def has_red_ink(image) -> bool:
+    """便宜的一问：这页有没有红墨。没有红墨时后面的清理是恒等变换，可以直接跳过重渲染。"""
+    import numpy as np
+
+    array = np.asarray(image)
+    if array.ndim != 3 or array.shape[2] < 3:
+        return False
+    # 必须先转 int16：uint8 相减会回绕（252-255 变成 253），掩码会命中几乎整页。
+    channel_b = array[..., 0].astype(np.int16)
+    channel_g = array[..., 1].astype(np.int16)
+    channel_r = array[..., 2].astype(np.int16)
+    return bool(np.any(channel_r - np.maximum(channel_g, channel_b) > RED_SEAL_MARGIN))
+
+
+def clean_red_ink(image):
+    """把红色印章/红章从纸面上"洗掉"，只动被判定为红墨的像素。
+
+    PaddleX 的版面模型会把印章切出来当单元格内容，被它压住的"单位/数量/合计"就再也读不到
+    （附件3：第2包采购标的.pdf 的第 5-8、22-24 行就是这么丢的，合计还读成 0.00）。红章是红色的、
+    正文是黑的，所以按颜色把红墨像素挑出来、只在那块区域内用红通道二值化：红墨变白、被压住的
+    黑字留下，页面其余像素逐位不变。
+
+    没有红墨的页面（绝大多数黑白扫描件、以及所有纯文本 PDF）掩码为空，返回值与原图逐位相同，
+    因此这条预处理可以常开。返回 (图像, 红墨像素占比)。
+    """
+    import numpy as np
+
+    if not red_seal_clean_enabled():
+        return image, 0.0
+    array = np.asarray(image)
+    if array.ndim != 3 or array.shape[2] < 3:          # 灰度图没有红通道可言
+        return image, 0.0
+    # 同 has_red_ink：uint8 相减会回绕，必须先升到 int16。
+    channel_b = array[..., 0].astype(np.int16)
+    channel_g = array[..., 1].astype(np.int16)
+    channel_r = array[..., 2].astype(np.int16)
+    mask = channel_r - np.maximum(channel_g, channel_b) > RED_SEAL_MARGIN
+    count = int(mask.sum())
+    if count == 0:
+        return image, 0.0
+    # 固定阈值，不是 Otsu：掩码里绝大多数像素是"章盖在纸上"（红通道 200 以上），只有少数是被压住的
+    # 黑字；在这种"一个峰 + 一条暗尾"的分布上 Otsu 会落在 190 附近，把章的笔画也判成墨，留下一片黑点。
+    # 140 在两档实测渲染（144dpi / 300dpi）下都刚好把章洗白、把被压住的字留下。
+    threshold = int(env("ICT_RED_SEAL_THRESHOLD", str(RED_SEAL_THRESHOLD)))
+    kept = _dilate(mask, int(env("ICT_RED_SEAL_DILATE", "4")))
+    out = array.copy()
+    ink = (channel_r < threshold) & kept
+    paper = kept & ~ink
+    out[ink] = 0
+    out[paper] = 255
+    return out, count / float(array.shape[0] * array.shape[1])
+
+
+def install_red_seal_cleaning() -> None:
+    """把清理挂在 PaddleX 渲染 PDF 页的那一步出口上。
+
+    这样渲染比例、分页、跨页表格合并全都保持原样，只在图送进版面模型之前多一步像素处理。
+    先按管线本来的比例渲染一次只用来判"这页有没有红墨"；没有就原样返回（逐位不变），有才按更高
+    比例重渲染一次再清理——被章压住的细字在 144dpi 下读不出来（896 会被读成 800）。
+    """
+    from paddlex.inference.utils.io import readers as px_readers
+
+    if getattr(px_readers, "_ict_red_seal_patched", False):
+        return
+    original = px_readers.render_pdf_page_to_numpy
+
+    def patched(page, **kwargs):
+        image = original(page, **kwargs)
+        if not red_seal_clean_enabled() or not has_red_ink(image):
+            return image
+        high = dict(kwargs)
+        high["requested_scale"] = float(env("ICT_RED_SEAL_ZOOM", "4.0"))
+        cleaned, ratio = clean_red_ink(original(page, **high))
+        print("[red-seal] page=%s red=%.2f%% zoom=%s"
+              % (kwargs.get("page_index"), ratio * 100, high["requested_scale"]), flush=True)
+        return cleaned
+
+    px_readers.render_pdf_page_to_numpy = patched
+    px_readers._ict_red_seal_patched = True
 
 
 _pipeline = None
@@ -56,6 +159,7 @@ def get_pipeline():
             if _pipeline is None:
                 from paddleocr import PaddleOCRVL
 
+                install_red_seal_cleaning()
                 kwargs = {
                     "pipeline_version": "v1.6",
                     "device": env("DEVICE", "cpu"),

@@ -136,7 +136,7 @@ def test_chat_request_shape_is_pinned(monkeypatch):
 
 
 def test_thinking_request_still_drops_forced_json(monkeypatch):
-    seen = _capture(monkeypatch, lambda c: c.complete(step="test", prompt_version="merge-objects-v2",
+    seen = _capture(monkeypatch, lambda c: c.complete(step="test", prompt_version="merge-objects-v3",
                                                       user="{}", thinking=True))
     body = seen["body"]
     assert body["thinking"] == {"type": "enabled"}
