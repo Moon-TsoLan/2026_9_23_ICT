@@ -1,0 +1,24 @@
+# 到 GPU 机解析服务的 SSH 隧道：本机 127.0.0.1:6008 -> GPU 机 127.0.0.1:6008。
+#
+# 解析服务只绑 GPU 机的回环地址，所以**隧道必须常驻**；断了附件就解析不了。
+# tunnel.py 在检测到 SSH 传输已死时会主动退出，交给这里的 Restart 重连。
+#
+# 安装：
+#   sudo cp deploy/systemd/ict-tunnel.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now ict-tunnel
+[Unit]
+Description=ICT SSH tunnel to parse service (local 6008)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/workspace/ICT
+Environment=PYTHONUNBUFFERED=1
+# tunnel.py 需要 paramiko（装在 venv 里），不用仓库里那份 Windows 专用的 .tools_py
+ExecStart=/root/workspace/ICT/.venv/bin/python deploy/tunnel.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,24 @@
+# 后端 API。只监听 127.0.0.1，由 nginx 反代出去，不对公网暴露。
+#
+# 安装：
+#   sudo cp deploy/systemd/ict-api.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now ict-api
+[Unit]
+Description=ICT API (uvicorn, 127.0.0.1:8000)
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/workspace/ICT
+Environment=PYTHONUNBUFFERED=1
+# ICT_DATA_ROOT 必须是**进程环境变量**（.env 里写它不生效），后端与 worker 必须一致
+Environment=ICT_DATA_ROOT=/root/workspace/ICT/var
+Environment=PYTHONPATH=/root/workspace/ICT/src
+ExecStart=/root/workspace/ICT/.venv/bin/python -m uvicorn server.app:app --host 127.0.0.1 --port 8000 --workers 1
+Restart=always
+RestartSec=3
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

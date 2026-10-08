@@ -1,0 +1,26 @@
+# 提取工作进程：领取任务 → 解压 → 提取 → 入库 → 删原件。
+#
+# 只跑**一个**进程（LLM/解析闸门、任务领取都在进程内）。线程数 = 同时处理的公告数。
+# 2 核 4G 且 Postgres 同机时用 2；如果数据库在别的机器，可以提到 4。
+#
+# 安装：
+#   sudo cp deploy/systemd/ict-worker.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now ict-worker
+[Unit]
+Description=ICT extraction worker
+After=network-online.target docker.service ict-api.service ict-tunnel.service
+Wants=network-online.target ict-tunnel.service
+
+[Service]
+Type=simple
+WorkingDirectory=/root/workspace/ICT
+Environment=PYTHONUNBUFFERED=1
+Environment=ICT_DATA_ROOT=/root/workspace/ICT/var
+Environment=ICT_ANNOUNCEMENT_WORKERS=2
+ExecStart=/root/workspace/ICT/.venv/bin/python -m ict.worker
+Restart=always
+RestartSec=5
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
