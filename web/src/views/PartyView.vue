@@ -53,6 +53,14 @@ function goSearch() {
     void router.push({ path: '/search', query: { kw: profile.value.project_name ?? name } })
     return
   }
+  if (partyId.value.startsWith('brand:')) {
+    void router.push({ path: '/search', query: { brand: name } })
+    return
+  }
+  if (profile.value?.kind === 'vendor') {
+    void router.push({ path: '/search', query: { product_supplier: name } })
+    return
+  }
   const query =
     profile.value?.kind === 'buyer' ? { purchaser: name } : { winner: name }
   void router.push({ path: '/search', query })

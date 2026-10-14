@@ -32,6 +32,8 @@ def score(announcement_id: str, run_dir: Path) -> dict:
         return {"error": "missing gold or projects"}
     gold = json.loads(gold_path.read_text(encoding="utf-8"))["projects"]
     got = json.loads(projects_path.read_text(encoding="utf-8"))
+    if isinstance(got, dict):
+        got = got["packages"]
     by_package = {str(project.get("package_no")): project for project in got}
     rows = []
     total_gold = total_hit = 0

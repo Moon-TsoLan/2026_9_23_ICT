@@ -10,7 +10,8 @@ from ict.llm import LLMClient, LLMError
 from ict.money import parse_amount
 from ict.schemas import Amount, AnnouncementUnderstanding, Failure, ModelMetadata, PackageUnderstanding
 
-PROMPT = "announcement-v1"
+PROMPT = "announcement-v4"
+from ict.packages import registry_references
 
 
 def _pack(text: str) -> str:
@@ -54,11 +55,13 @@ def _confidence(value, default: float = 0.9) -> float:
     return number if 0 <= number <= 1 else default
 
 
-def _amount(raw: str | None, scope: str, confidence: float | None = 0.9) -> Amount | None:
+def _amount(raw: str | None, scope: str, confidence: float | None = 0.9,
+            amount_kind: str = "unknown", source_ref: str | None = None) -> Amount | None:
     if not raw:
         return None
     yuan, _ = parse_amount(raw)
-    return Amount(raw_text=raw, amount_yuan=yuan, scope=scope, confidence=confidence)
+    return Amount(raw_text=raw, amount_yuan=yuan, scope=scope, confidence=confidence,
+                  amount_kind=amount_kind, source_ref=source_ref)
 
 
 def seal(run_id: str, proposed: dict, metadata: ModelMetadata | None, failures: list[Failure]) -> AnnouncementUnderstanding:
@@ -66,15 +69,10 @@ def seal(run_id: str, proposed: dict, metadata: ModelMetadata | None, failures: 
     mode = proposed.get("package_mode") or "unclear"
     raw_packages = proposed.get("packages") or []
     packages: list[PackageUnderstanding] = []
-    seen: set[str] = set()
     if not name:
         failures.append(Failure(failure_code="package_structure_unclear", failure_message="项目名称缺失"))
         mode = "unclear"
-    for item in raw_packages:
-        package_no = str(item.get("package_no") or "").strip()
-        if not package_no or package_no in seen:
-            continue
-        seen.add(package_no)
+    for item, (package_no, source_no) in zip(raw_packages, registry_references(raw_packages)):
         evidence = item.get("package_evidence_text") or item.get("title") or package_no
         raw_amount = item.get("raw_amount") or (item.get("package_amount") or {}).get("raw_text")
         # Every other amount the model saw for this package, kept verbatim. Step 8 still receives
@@ -85,16 +83,21 @@ def seal(run_id: str, proposed: dict, metadata: ModelMetadata | None, failures: 
             if not isinstance(entry, dict):
                 continue
             alt = _amount(entry.get("raw_text") or entry.get("raw_amount"), "package",
-                          _confidence(entry.get("confidence")))
+                          _confidence(entry.get("confidence")), entry.get("amount_kind", "unknown"),
+                          entry.get("source_ref"))
             if alt is not None:
                 alternatives.append(alt)
         packages.append(
             PackageUnderstanding(
                 package_no=package_no,
+                source_package_no=source_no,
+                package_kind=item.get("package_kind", "unknown"),
+                package_name=item.get("package_name"),
                 title=item.get("title"),
                 project_id=make_project_id(name, package_no) if name else "",
                 package_evidence_text=evidence,
-                package_amount=_amount(raw_amount, "package"),
+                package_amount=_amount(raw_amount, "package", amount_kind=(item.get("package_amount") or {}).get("amount_kind", "unknown"),
+                                       source_ref=(item.get("package_amount") or {}).get("source_ref")),
                 amount_alternatives=alternatives,
             )
         )
@@ -130,7 +133,9 @@ def seal(run_id: str, proposed: dict, metadata: ModelMetadata | None, failures: 
         announcement_type=proposed.get("announcement_type") or "unknown",
         package_mode=mode if mode in {"single", "multi", "unclear"} else "unclear",
         packages=[] if status == "failed" and not name else packages,
-        summary_amount=_amount(proposed.get("summary_raw"), "announcement"),
+        summary_amount=_amount(proposed.get("summary_raw"), "announcement",
+                               amount_kind=(proposed.get("summary_amount") or {}).get("amount_kind", "unknown"),
+                               source_ref=(proposed.get("summary_amount") or {}).get("source_ref")),
         announcement_categories=categories,
         unclear_reason=proposed.get("unclear_reason"),
         model_metadata=metadata,
@@ -140,11 +145,38 @@ def seal(run_id: str, proposed: dict, metadata: ModelMetadata | None, failures: 
 
 def _validate_announcement(parsed: dict) -> str:
     mode = parsed.get("package_mode")
-    if mode not in {"single", "multi", "unclear", None, ""}:
+    if mode is not None and (not isinstance(mode, str) or mode not in {"single", "multi", "unclear", ""}):
         return "package_mode 不在 single、multi、unclear 之中"
     kind = parsed.get("announcement_type")
-    if kind not in {"winning_announcement", "deal_announcement", "unknown", None, ""}:
+    if kind is not None and (not isinstance(kind, str) or kind not in {"winning_announcement", "deal_announcement", "unknown", ""}):
         return "announcement_type 不在允许值内"
+    packages = parsed.get("packages", [])
+    if not isinstance(packages, list) or any(not isinstance(item, dict) for item in packages):
+        return "packages 必须为对象数组"
+    for key in ("project_name", "purchaser", "source_project_no", "summary_raw"):
+        if parsed.get(key) is not None and not isinstance(parsed[key], str):
+            return f"{key} 必须为字符串或 null"
+    amounts = [(parsed.get("summary_amount"), "announcement")]
+    for package in packages:
+        if package.get("package_kind", "unknown") not in ("lot", "contract_package", "unpartitioned", "unknown"):
+            return "package_kind 无效"
+        if package.get("package_name") is not None and not isinstance(package["package_name"], str):
+            return "package_name 必须为字符串或 null"
+        if package.get("package_no") is not None and not isinstance(package["package_no"], str):
+            return "package_no 必须为字符串或 null"
+        alternatives = package.get("amount_alternatives", [])
+        if not isinstance(alternatives, list):
+            return "amount_alternatives 必须为数组"
+        amounts.extend((item, "package") for item in [package.get("package_amount")] + alternatives)
+    for item, scope in amounts:
+        if item is not None and (not isinstance(item, dict) or
+                not isinstance(item.get("amount_kind", "unknown"), str) or
+                item.get("amount_kind", "unknown") not in {"award", "budget", "ceiling", "unknown"}):
+            return "金额需要合法的 amount_kind"
+        if item is not None and (item.get("scope", scope) != scope or
+                                item.get("raw_text") is not None and not isinstance(item["raw_text"], str) or
+                                item.get("source_ref") is not None and not isinstance(item["source_ref"], str)):
+            return "金额的 scope 与承载位必须一致，raw_text 必须为字符串"
     return ""
 
 

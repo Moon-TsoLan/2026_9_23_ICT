@@ -59,7 +59,7 @@ def test_a_group_with_no_number_still_keeps_the_quantity_and_unit_it_stated():
     assert row.quantity == 1.0
     assert row.unit == "项"
     assert row.unit_price is None
-    assert row.total_price == 797737
+    assert row.total_price is None  # Package money now requires an explicit p:amount binding.
 
 
 def test_price_from_naming_a_row_without_a_number_is_refused_out_loud():
@@ -98,7 +98,7 @@ def test_price_from_can_take_only_the_fields_it_names():
     assert entry["bundle"] == "partial_keys"
 
 
-def test_excluding_a_row_hands_what_it_stated_to_the_group_it_came_from():
+def test_excluded_evidence_can_supply_explicitly_named_fields():
     """The exclusion that used to delete the announcement's only category statement.
 
     t20260805_27080785: one HTML row carried 品目 and 品牌 and pointed its details into the
@@ -113,13 +113,16 @@ def test_excluding_a_row_hands_what_it_stated_to_the_group_it_came_from():
                   source_class="bid_quote")
     merged = _merged_with_deltas([index_row, detail], [{
         "op": "exclude", "candidate_id": "cand_000001", "kind": "index_row",
-        "reason": "公告只说明标的存在，内容在附件", "confidence": 0.8}])
+        "reason": "公告只说明标的存在，内容在附件", "confidence": 0.8},
+        {"op": "fields_from", "group_id": 0, "candidate_id": "cand_000001",
+         "keys": ["category_code", "brand"], "reason": "共有字段明确属于该组"}])
     row = _rows(merged)[0]
     assert row.category_code == "A02091399"
     assert row.brand == "海康威视"
     assert row.total_price == 898890
-    entry = next(item for item in merged.merge_decisions if item.get("op") == "exclude")
-    assert "category_name" in entry["donated_keys"]
+    entry = next(item for item in merged.merge_decisions if item.get("op") == "fields_from")
+    assert set(entry["filled"]) == {"category_code", "brand"}
+    assert row.category_name is None
 
 
 def test_fields_from_moves_a_category_onto_a_group_that_never_stated_it():

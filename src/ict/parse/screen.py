@@ -61,13 +61,16 @@ class ScreenDecision:
     is_award_notice: bool | None = None
     ms: int = 0
     tokens: dict = field(default_factory=dict)
+    evidence_refs: list[str] = field(default_factory=list)
+    requires_deep_parse: bool = True
 
     def short(self) -> dict:
         return {"file_id": self.file_id, "decision": self.decision, "kind": self.kind,
                 "confidence": self.confidence, "method": self.method, "reason": self.reason,
                 "name_rule": self.name_rule, "header": self.header, "found_fields": self.found_fields,
                 "needs_hit": self.needs_hit, "quote_supplier": self.quote_supplier,
-                "is_award_notice": self.is_award_notice, "ms": self.ms, "tokens": self.tokens}
+                "is_award_notice": self.is_award_notice, "ms": self.ms, "tokens": self.tokens,
+                "evidence_refs": self.evidence_refs, "requires_deep_parse": self.requires_deep_parse}
 
 
 def name_rule(name: str) -> str:
@@ -151,9 +154,14 @@ def _ask_text(llm, entry: FileEntry, peek: Peek, counter, needs: list[dict] | No
     payload = {"file_name": entry.name, "format": entry.fmt, "pages": entry.pages,
                "table_headers": peek.table_headers[:3], "needs": needs or [],
                "content_view": peek.view[:SCREEN_TEXT_CHARS]}
+    payload["source_segments"] = peek.segments
     parsed = complete_json(
-        llm, step="screen_files", prompt_version="screen-file-v1",
-        user=json.dumps(payload, ensure_ascii=False), validate=_validate, counter=counter)
+        llm, step="screen_files", prompt_version="screen-file-v3",
+        user=json.dumps(payload, ensure_ascii=False),
+        validate=lambda value: _validate(value) or (
+            "evidence_refs 必须引用给出的 source_segments" if any(
+                not isinstance(ref, str) or ref not in {segment["source_ref"] for segment in peek.segments}
+                for ref in value.get("evidence_refs", [])) else ""), counter=counter)
     return parsed, 0
 
 
@@ -163,7 +171,7 @@ def _ask_images(llm, entry: FileEntry, images: list[str], counter, needs: list[d
     from ict.llm import parse_json_object
 
     try:
-        result = llm.complete_with_images(step="screen_images", prompt_version="screen-page-v1",
+        result = llm.complete_with_images(step="screen_images", prompt_version="screen-page-v3",
                                           images=images, user_text=json.dumps({"file_name": entry.name,
                                                                                "needs": needs or []}, ensure_ascii=False))
     except Exception:  # noqa: BLE001 - no vision on this model, or the call failed: keep the file
@@ -192,6 +200,10 @@ def _validate(parsed: dict) -> str:
     supplier = parsed.get("quote_supplier")
     if supplier is not None and not isinstance(supplier, str):
         return "quote_supplier 必须是字符串"
+    if not isinstance(parsed.get("evidence_refs", []), list):
+        return "evidence_refs 必须是数组"
+    if not isinstance(parsed.get("requires_deep_parse", True), bool):
+        return "requires_deep_parse 必须是布尔值"
     return ""
 
 
@@ -207,6 +219,8 @@ def _verdict(decision: ScreenDecision, parsed: dict, method: str, needs: list[di
     decision.quote_supplier = str(parsed.get("quote_supplier") or "").strip()[:120]
     noticed = parsed.get("is_award_notice")
     decision.is_award_notice = None if noticed is None else bool(noticed)
+    decision.evidence_refs = list(parsed.get("evidence_refs") or [])
+    decision.requires_deep_parse = parsed.get("requires_deep_parse", True)
     if not wanted:
         # No target list means there is nothing to find: never drop on that basis.
         decision.decision, decision.reason = "parse", "%s_no_needs_keep" % method

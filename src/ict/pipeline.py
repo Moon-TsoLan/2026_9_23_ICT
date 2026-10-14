@@ -8,9 +8,12 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from ict.catalog import Catalog
+from ict.packages import package_context
 from ict.concurrency import CallCounter, counts_snapshot
 from ict.config import ATTACHMENTS_ROOT, DATA_HTML, concurrency_settings
-from ict.html_context import parse_notice, winner_hints
+from ict.html_context import parse_notice
+from ict.bindings import bind_packages, winner_names
+from ict.evidence import page_segments, html_rows
 from ict.index.build import build_index, load_index
 from ict.llm import LLMClient, build_client
 from ict.schemas import CandidateFile, Failure, MergeEvidence, RunReport
@@ -20,6 +23,8 @@ from ict.steps.s02_html import extract_html_candidates, understand_tables
 from ict.steps.s03_plan import plan_projects
 from ict.steps.s04_attach import (
     extract_attachment_candidates,
+    extract_screen_evidence,
+    apply_native_resolutions,
     file_names_of,
     locate_pages,
     parse_pages,
@@ -28,6 +33,7 @@ from ict.steps.s04_attach import (
 from ict.steps.s07_normalize import normalize_candidates
 from ict.steps.s08_merge import merge_projects
 from ict.steps.s08b_repair import repair_packages
+from ict.steps.s09_supplier import complete_suppliers
 
 
 def _status_from_failures(base: str, failures: list[Failure]) -> str:
@@ -61,16 +67,18 @@ def run_announcement(announcement_id: str, llm: LLMClient | None = None, html_di
 
     package_nos = [package.package_no for package in understanding.packages]
     # Needed by step 6 (so it copies the winner instead of re-deriving it) and by step 8b.
-    award_hints = winner_hints(notice, package_nos)
+    award_hints = {}
     store.begin("understand_html_tables")
-    tables = understand_tables(store.run_id, notice, package_nos, client, calls)
+    tables = understand_tables(store.run_id, notice, package_nos, client, calls,
+                               package_registry=[package_context(p) for p in understanding.packages])
     store.write_output("understand_html_tables", tables)
     store.finish("understand_html_tables", tables.status)
     all_failures.extend(tables.failures)
 
     store.begin("extract_html_candidates")
     html_candidates, html_failures, seq = extract_html_candidates(
-        store.run_id, notice, tables, understanding.project_name or "", client, counter=calls, known_packages=package_nos
+        store.run_id, notice, tables, understanding.project_name or "", client, counter=calls, known_packages=package_nos,
+        package_registry=[package_context(p) for p in understanding.packages]
     )
     html_file = CandidateFile(
         run_id=store.run_id,
@@ -82,6 +90,13 @@ def run_announcement(announcement_id: str, llm: LLMClient | None = None, html_di
     store.finish("extract_html_candidates", html_file.status)
     store.state.counts["html_candidates"] = len(html_candidates)
     all_failures.extend(html_failures)
+
+    store.begin("bind_packages")
+    binding_audit, binding_failures = bind_packages(understanding, html_candidates, notice, tables, client, calls)
+    store.write_output("bind_packages", binding_audit | {"effective_understanding": understanding.model_dump()})
+    store.finish("bind_packages", "partial" if binding_failures or binding_audit["unresolved"] else "success")
+    all_failures.extend(binding_failures)
+    award_hints = winner_names(html_candidates)
 
     attachments_dir = (attachments_root or ATTACHMENTS_ROOT) / announcement_id
     index = load_index(announcement_id, attachments_root or ATTACHMENTS_ROOT)
@@ -100,14 +115,18 @@ def run_announcement(announcement_id: str, llm: LLMClient | None = None, html_di
     file_decisions = None
     page_decisions = None
     parsed: dict[str, list[dict]] = {}
+    native_pages: dict[str, list[dict]] = {}
+    native_reception: list[dict] = []
+    attachment_reception: list[dict] = []
+    resolutions: list[dict] = []
     if index is None:
         store.begin("triage_files")
         skipped = triage_files(store.run_id, plans, None, client)
         store.write_output("triage_files", skipped)
         store.finish("triage_files", "skipped", "attachment_index_miss", "附件索引不存在")
         # 附件链路整条跳过时也把这几步登记上（状态 skipped）：让每则公告的步骤表
-        # 都是同样的 12 步，01 页的进度分母才一致。只是留痕，不改变任何判定。
-        for step in ("parse_pages", "locate_pages", "extract_attachment_candidates"):
+        # 都登记完整阶段，01 页的进度分母才一致。
+        for step in ("extract_native_evidence", "parse_pages", "locate_pages", "extract_attachment_candidates"):
             store.begin(step)
             store.finish(step, "skipped")
         all_failures.extend(skipped.failures)
@@ -119,6 +138,39 @@ def run_announcement(announcement_id: str, llm: LLMClient | None = None, html_di
         store.finish("triage_files", file_decisions.status)
         store.state.counts["selected_files"] = sum(1 for item in file_decisions.file_decisions if item.read_strategy == "target_pages")
         all_failures.extend(file_decisions.failures)
+
+        store.begin("extract_native_evidence")
+        native_candidates, native_failures, native_quality, seq, native_pages, resolutions = extract_screen_evidence(
+            store.run_id, understanding.project_name or "", plans, file_decisions, index, client, seq,
+            counter=calls, package_amounts=package_amounts, winners=award_hints, reception=native_reception)
+        native_sources = [{**page, "source_segments": page.get("source_segments") or page_segments(file_id, page)}
+                          for file_id, pages in native_pages.items() for page in pages]
+        if native_candidates or package_amounts:
+            binding_audit, errors = bind_packages(understanding, html_candidates + native_candidates, notice, tables,
+                                                 client, calls, native_sources, previous=binding_audit,
+                                                 package_amounts=package_amounts)
+            all_failures.extend(errors)
+            plans = plan_projects(store.run_id, understanding, html_candidates + native_candidates, has_attachment)
+            award_hints = winner_names(html_candidates + native_candidates)
+            store.write_output("bind_packages", binding_audit | {"effective_understanding": understanding.model_dump()})
+            store.write_output("plan_project_gaps", plans)
+        apply_native_resolutions(plans, file_decisions, native_candidates, resolutions)
+        store.write_output("plan_project_gaps", plans)
+        native_outcome = ("candidates_extracted" if native_candidates else "amounts_only" if package_amounts else
+                          "attempted_empty" if native_reception else "failed" if native_failures else "not_attempted")
+        if native_outcome == "attempted_empty" and not native_failures:
+            native_failures.append(Failure(failure_code="no_candidate_extracted",
+                                           failure_message="原生证据已尝试抽取，但未形成候选或金额观测"))
+        native_status = ("partial" if native_failures else "success"
+                         if native_candidates or package_amounts else "skipped")
+        all_failures.extend(native_failures)
+        store.write_output("extract_native_evidence", CandidateFile(run_id=store.run_id,
+                           status=native_status,
+                           candidates=native_candidates, failures=native_failures,
+                           page_quality=native_quality, need_resolutions=resolutions,
+                           package_amounts=list(package_amounts), reception=native_reception, outcome=native_outcome))
+        store.finish("extract_native_evidence", native_status)
+        store.state.counts["native_extraction_attempts"] = sum(len(item.get("attempts", [])) for item in native_reception)
 
         parse_failures: list[Failure] = []
         store.begin("parse_pages")
@@ -157,14 +209,29 @@ def run_announcement(announcement_id: str, llm: LLMClient | None = None, html_di
             winner_suppliers=award_hints,
             file_award_notices={item.file_id: True for item in file_decisions.file_decisions
                                 if item.is_award_notice},
+            reception=attachment_reception,
         )
+        if attachment_candidates or package_amounts:
+            source_pages = native_sources + [dict(page, source_segments=page_segments(file_id, page))
+                                             for file_id, pages in parsed.items() for page in pages]
+            binding_audit, errors = bind_packages(
+                understanding, html_candidates + native_candidates + attachment_candidates, notice, tables,
+                client, calls, source_pages, previous=binding_audit, package_amounts=package_amounts)
+            all_failures.extend(errors)
+            store.write_output("bind_packages", binding_audit | {"effective_understanding": understanding.model_dump()})
+        attachment_candidates = native_candidates + attachment_candidates
+        quality = native_quality + quality
+        award_hints = winner_names(html_candidates + attachment_candidates)
         attach_file = CandidateFile(
             run_id=store.run_id,
-            status="skipped" if not page_decisions.page_decisions else ("partial" if attach_failures else "success"),
+            status=("partial" if attach_failures or native_failures else "success"
+                    if attachment_candidates or page_decisions.page_decisions else "skipped"),
             candidates=attachment_candidates,
             failures=attach_failures,
             page_quality=quality,
             package_amounts=package_amounts,
+            reception=native_reception + attachment_reception,
+            need_resolutions=resolutions,
         )
         store.write_output("extract_attachment_candidates", attach_file)
         store.finish("extract_attachment_candidates", attach_file.status)
@@ -180,8 +247,13 @@ def run_announcement(announcement_id: str, llm: LLMClient | None = None, html_di
     all_failures.extend(normalized.failures)
 
     store.begin("merge_candidates")
+    evidence_pages = {key: list(value) for key, value in parsed.items()}
+    for file_id, pages in native_pages.items():
+        evidence_pages.setdefault(file_id, []).extend(pages)
     evidence = _merge_evidence(notice, tables, understanding, index, file_decisions, page_decisions,
-                               parsed, package_amounts, award_hints)
+                               evidence_pages, package_amounts, award_hints)
+    evidence.native_extraction = {"reception": native_reception, "need_resolutions": resolutions,
+                                 "needs": [need for plan in plans.projects for need in plan.needs]}
     store.write_output("merge_evidence", evidence)
     merged = merge_projects(store.run_id, understanding, normalized.candidates, package_amounts,
                             evidence=evidence, llm=client, counter=calls)
@@ -194,12 +266,27 @@ def run_announcement(announcement_id: str, llm: LLMClient | None = None, html_di
     merged.failures.extend(check_failures)
     store.write_output("repair_packages", merged)
     store.finish("repair_packages", "partial" if check_failures else "success")
+
+    store.begin("complete_suppliers")
+    supplier_failures = complete_suppliers(merged, client, calls)
+    all_failures.extend(supplier_failures)
+    merged.failures.extend(supplier_failures)
+    if supplier_failures:
+        merged.status = "partial"
+    store.write_output("complete_suppliers", merged)
+    store.finish("complete_suppliers", "partial" if supplier_failures else "success")
     store.state.counts["final_cobs"] = sum(len(project.cobs) for project in merged.projects)
     store.state.counts["final_subs"] = sum(len(project.subs) for project in merged.projects)
     public = [project.model_dump(exclude={"provenance"}) for project in merged.projects]
+    result = {"schema_version": "announcement-v2", "announcement_id": announcement_id,
+              "project_name": understanding.project_name, "source_project_no": understanding.source_project_no,
+              "purchaser": understanding.purchaser, "announcement_type": understanding.announcement_type,
+              "summary_amount": understanding.summary_amount.model_dump() if understanding.summary_amount else None,
+              "packages": public}
     if persist:
-        write_json(store.directory / "projects.json", public)
+        write_json(store.directory / "projects.json", result)
     store.projects = public
+    store.result = result
 
     final = "success"
     if understanding.status == "failed" or not merged.projects:
@@ -266,12 +353,18 @@ def _merge_evidence(notice, tables, understanding, index, file_decisions, page_d
     selected = {(item.file_id, item.page_no) for item in (page_decisions.page_decisions if page_decisions else [])}
     for file_id, pages in (parsed or {}).items():
         for page in pages:
-            if selected and (file_id, page["page_no"]) not in selected:
+            native_segments = [segment for segment in page.get("source_segments", [])
+                               if ":native:" in segment.get("source_ref", "")]
+            if selected and (file_id, page["page_no"]) not in selected and not native_segments:
                 continue
-            attachment_pages["%s:%s" % (file_id, page["page_no"])] = {
+            key = "%s:%s" % (file_id, page["page_no"])
+            prior = attachment_pages.get(key, {})
+            attachment_pages[key] = {
                 "file_name": names.get(file_id, file_id),
                 "text_head": (page.get("text") or "")[:400],
                 "table_headers": [table.get("headers") for table in (page.get("tables") or [])],
+                "native_segments": prior.get("native_segments", []) + native_segments,
+                "selected_for_deep_extraction": (file_id, page["page_no"]) in selected,
             }
     observations: dict[str, list[dict]] = {}
 
@@ -285,17 +378,27 @@ def _merge_evidence(notice, tables, understanding, index, file_decisions, page_d
     for package in understanding.packages:
         amount = package.package_amount
         if amount is not None:
-            _observe(package.package_no, amount.raw_text, amount.amount_yuan, "announcement_package")
+            _observe(package.package_no, amount.raw_text, amount.amount_yuan, "announcement_package",
+                     {"scope": amount.scope, "amount_kind": amount.amount_kind, "source_type": amount.source_type})
         for extra in package.amount_alternatives or []:
-            _observe(package.package_no, extra.raw_text, extra.amount_yuan, "announcement_alternative")
+            _observe(package.package_no, extra.raw_text, extra.amount_yuan, "announcement_alternative",
+                     {"scope": extra.scope, "amount_kind": extra.amount_kind})
         if single and understanding.summary_amount is not None:
             _observe(package.package_no, understanding.summary_amount.raw_text,
-                     understanding.summary_amount.amount_yuan, "announcement_summary")
+                     understanding.summary_amount.amount_yuan, "announcement_summary",
+                     {"scope": "announcement", "amount_kind": understanding.summary_amount.amount_kind})
     for item in package_amounts or []:
         _observe(item.package_no, item.raw_text, item.amount_yuan, "attachment",
                  {"file_id": item.file_id, "file_name": item.file_name, "page_no": item.page_no,
-                  "file_class": item.file_class})
+                  "file_class": item.file_class, "amount_kind": item.amount_kind})
     return MergeEvidence(
+        package_registry=[package_context(p) for p in understanding.packages],
+        source_contexts={row["source_ref"]: row for row in
+            [row | {"headers": table.headers, "section": table.section, "before_text": table.before_text}
+             for table in notice.tables for row in html_rows(table)]
+            + [{"source_ref": f"html:body:{index}", **section} for index, section in enumerate(notice.sections)]
+            + [segment for file_id, pages in parsed.items() for page in pages
+               for segment in (page.get("source_segments") or page_segments(file_id, page))]},
         file_names=names,
         file_classes={item.file_id: item.file_class for item in (file_decisions.file_decisions if file_decisions else [])},
         file_quote_suppliers={item.file_id: item.quote_supplier
@@ -328,6 +431,7 @@ def _finish(store: RunStore, calls: CallCounter, failures: list[Failure], starte
         review_required=store.state.review_required or store.state.status != "success",
     )
     report.projects = getattr(store, "projects", None)
+    report.result = getattr(store, "result", None)
     store.begin("persist_and_report")
     store.write_output("persist_and_report", report)
     store.finish("persist_and_report", "success")

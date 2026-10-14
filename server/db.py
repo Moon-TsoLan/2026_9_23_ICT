@@ -61,9 +61,5 @@ def yuan(x: Any) -> str:
     """金额（元）→ 中文短写法，用于叙事面板的指标卡。"""
     if x is None:
         return "—"
-    v = float(x)
-    if v >= 1e8:
-        return f"{v / 1e8:.2f} 亿"
-    if v >= 1e4:
-        return f"{v / 1e4:.1f} 万"
-    return f"{v:,.2f} 元" if round(v, 2) != round(v) else f"{v:,.0f} 元"
+    from ict.official import money_wan
+    return f"{money_wan(x):,.2f} 万元"

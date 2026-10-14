@@ -1,17 +1,59 @@
+# Local data, uploads and extraction/test outputs
 work/
 var/
 online-runs/
+data/
+runs-current/
+/runtime/
+/uploads/
+/doc/设计报告
+/_vllm_bench/result*.json
+
+# Local environment settings (keep configuration templates)
 .env
+.env.*
+!.env.example
+!.env.template
+!.env.*.example
+
+# Python environments, bytecode, build and test caches
 __pycache__/
-.pytest_cache/
-*.pyc
+*.py[cod]
 .venv/
 .tools_py/
-dist/
 *.egg-info/
+build/
+dist/
+.pytest_cache/
 .mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+
+# Frontend dependencies, build caches and coverage
+node_modules/
+.vite/
+*.tsbuildinfo
+coverage/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local agent/editor state and filesystem permission recovery
 .cursor/
 .codex/
 .workbuddy/
-data/
-runs-current/
+/.acl-recovery/
+
+# OS metadata and Office temporary lock files; keep actual documents/assets
+.DS_Store
+Thumbs.db
+Desktop.ini
+~$*

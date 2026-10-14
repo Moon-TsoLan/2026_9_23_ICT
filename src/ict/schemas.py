@@ -18,6 +18,8 @@ FailureCode = Literal[
     "document_parse_failed",
     "package_structure_unclear",
     "llm_schema_invalid",
+    "llm_plan_invalid",
+    "llm_validator_incompatible",
     "llm_call_failed",
     "no_text_extractable",
     "no_candidate_extracted",
@@ -40,7 +42,9 @@ FieldStatus = Literal[
 ]
 AnnouncementType = Literal["winning_announcement", "deal_announcement", "unknown"]
 PackageMode = Literal["single", "multi", "unclear"]
-TableRole = Literal["cob_detail", "cob_summary", "sub_score", "winner", "agency_fee", "other"]
+TableRole = Literal["cob_detail", "cob_summary", "sub_score", "sub_info", "winner", "agency_fee", "other"]
+PackageKind = Literal["lot", "contract_package", "unpartitioned", "unknown"]
+ReviewStatus = Literal["passed", "failed", "unknown"]
 RowGrain = Literal["cob", "supplier", "project", "other"]
 Readability = Literal["unknown", "text_extractable", "low_text", "parse_failed", "unsupported",
                  "needs_normalisation", "ocr_needed"]
@@ -85,10 +89,18 @@ class Amount(Model):
     amount_yuan: float | None = None
     scope: Literal["package", "announcement"]
     confidence: float | None = None
+    amount_kind: Literal["award", "budget", "ceiling", "unknown"] = "unknown"
+    source_type: str = "html"
+    source_ref: str | None = None
+    source_refs: list[str] = Field(default_factory=list)
+    binding: dict[str, Any] = Field(default_factory=dict)
 
 
 class PackageUnderstanding(Model):
     package_no: str
+    package_kind: PackageKind = "unknown"
+    package_name: str | None = None
+    source_package_no: str | None = None
     title: str | None = None
     project_id: str
     package_evidence_text: str
@@ -152,6 +164,8 @@ class CandidateEvidence(Model):
     """
 
     table_index: int | None = None
+    row_index: int | None = None
+    source_refs: list[str] = Field(default_factory=list)
     row_text: str | None = None
     # field -> the header text of the column it came from, e.g. {"unit_price": "单价(万元)"}.
     # Amounts are per-cell but the 万元/元 unit is often only written in the column header, and
@@ -183,6 +197,9 @@ class Candidate(Model):
     warnings: list[str] = Field(default_factory=list)
     source_class: str | None = None
     evidence: CandidateEvidence | None = None
+    # Package assignment is adjudicated separately from extraction. Original suggestions live here.
+    binding: dict[str, Any] = Field(default_factory=dict)
+    unmapped_fields: dict[str, Any] = Field(default_factory=dict)
 
 
 class PackageAmountObservation(Model):
@@ -196,6 +213,10 @@ class PackageAmountObservation(Model):
     file_name: str | None = None
     page_no: int | None = None
     file_class: str | None = None
+    scope: Literal["package"] = "package"
+    amount_kind: Literal["award", "budget", "ceiling", "unknown"] = "unknown"
+    source_ref: str | None = None
+    binding: dict[str, Any] = Field(default_factory=dict)
 
 
 class CandidateFile(Model):
@@ -205,6 +226,8 @@ class CandidateFile(Model):
     failures: list[Failure] = Field(default_factory=list)
     page_quality: list[dict[str, Any]] | None = None
     package_amounts: list[PackageAmountObservation] = Field(default_factory=list)
+    reception: list[dict[str, Any]] = Field(default_factory=list)
+    need_resolutions: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class FieldStat(Model):
@@ -218,11 +241,14 @@ class FieldStat(Model):
 class ProjectPlan(Model):
     project_id: str
     package_no: str
+    package_kind: PackageKind = "unknown"
+    package_name: str | None = None
+    source_package_no: str | None = None
     cob_candidate_ids: list[str] = Field(default_factory=list)
     sub_candidate_ids: list[str] = Field(default_factory=list)
     field_stats: dict[str, FieldStat] = Field(default_factory=list if False else dict)
     missing_fields: list[str] = Field(default_factory=list)
-    needs: list[dict[str, str]] = Field(default_factory=list)
+    needs: list[dict[str, Any]] = Field(default_factory=list)
     suspects: list[str] = Field(default_factory=list)
     has_attachment: bool
     needs_attachment: bool
@@ -273,6 +299,9 @@ class FileDecision(Model):
     # notice. Step 6 only looks for a winner supplier when this left it empty.
     quote_supplier: str | None = None
     is_award_notice: bool | None = None
+    native_segments: list[dict[str, Any]] = Field(default_factory=list)
+    evidence_refs: list[str] = Field(default_factory=list)
+    reuse_status: str | None = None
 
 
 class FileDecisions(Model):
@@ -319,6 +348,10 @@ class Sub(Model):
     supplier_name: str
     score: float | None = None
     is_winner: bool
+    supplier_award_amount: float | None = None
+    bid_amount: float | None = None
+    review_status: ReviewStatus = "unknown"
+    review_failure_reason: str | None = None
     cooperative_product_suppliers: list[str] = Field(default_factory=list)
 
 
@@ -327,6 +360,9 @@ class Project(Model):
     source_project_no: str | None = None
     project_name: str
     package_no: str
+    package_kind: PackageKind = "unknown"
+    package_name: str | None = None
+    source_package_no: str | None = None
     purchaser: str | None = None
     package_total_amount: float | None = None
     cobs: list[Cob] = Field(default_factory=list)
@@ -355,6 +391,12 @@ class MergedProjects(Model):
     # truncated audit excerpt keyed by package_no. Nothing branches on it: it exists so a reviewer
     # can read why a delta was proposed. Empty when the package was not asked.
     merge_notes: dict[str, str] = Field(default_factory=dict)
+    merge_attempts: dict[str, list[dict[str, Any]]] = Field(default_factory=dict)
+    protocol_version: str | None = None
+    field_bindings: list[dict[str, Any]] = Field(default_factory=list)
+    unresolved: list[dict[str, Any]] = Field(default_factory=list)
+    supplier_inferences: list[dict[str, Any]] = Field(default_factory=list)
+    sub_merge_decisions: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class MergeEvidence(Model):
@@ -379,6 +421,9 @@ class MergeEvidence(Model):
     winner_hints: dict[str, list[str]] = Field(default_factory=dict)
     # package_no -> every package-level amount observed, from any source
     amount_observations: dict[str, list[dict[str, Any]]] = Field(default_factory=dict)
+    native_extraction: dict[str, Any] = Field(default_factory=dict)
+    package_registry: list[dict[str, Any]] = Field(default_factory=list)
+    source_contexts: dict[str, dict[str, Any]] = Field(default_factory=dict)
 
 
 class RunStep(Model):
@@ -414,3 +459,4 @@ class RunReport(Model):
     review_required: bool
     # in-memory only: excluded so 10_run_report.json stays exactly as the contract defines it
     projects: list[dict[str, Any]] | None = Field(default=None, exclude=True)
+    result: dict[str, Any] | None = Field(default=None, exclude=True)

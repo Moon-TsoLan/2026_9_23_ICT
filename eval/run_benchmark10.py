@@ -38,6 +38,8 @@ def main() -> None:
             report = run_announcement(announcement_id)
             projects_path = REPO_ROOT / "work" / "runs" / announcement_id / "projects.json"
             projects = json.loads(projects_path.read_text(encoding="utf-8")) if projects_path.exists() else []
+            if isinstance(projects, dict):
+                projects = projects["packages"]
             row.update(
                 {
                     "status": report.status,

@@ -320,7 +320,7 @@ def test_service_gap_ignores_missing_brand():
         packages=[PackageUnderstanding(package_no="1", title=None, project_id="项目|1", package_evidence_text="单包")],
     )
     plans = plan_projects("run_x", understanding, [candidate], True)
-    assert plans.projects[0].needs_attachment is False
+    assert plans.projects[0].needs_attachment is True  # 新供应商信息/名单发现任务需要目检附件
 
 
 def test_plan_needs_attachment_when_brand_missing():
@@ -393,7 +393,7 @@ def _understanding(amount=None, packages=("1",), project_name="项目"):
                 package_no=no,
                 project_id=f"{project_name}|{no}",
                 package_evidence_text=no,
-                package_amount=None if amount is None else {"raw_text": str(amount), "amount_yuan": amount, "scope": "package"},
+                package_amount=None if amount is None else {"raw_text": str(amount), "amount_yuan": amount, "scope": "package", "amount_kind": "award"},
             )
             for no in packages
         ],
@@ -421,7 +421,7 @@ def _obs(package_no, raw_text, file_id="a004", page_no=1):
 
     return PackageAmountObservation(package_no=package_no, raw_text=raw_text,
                                     amount_yuan=parse_amount(raw_text)[0], file_id=file_id,
-                                    file_name="开标记录表.pdf", page_no=page_no, file_class="award_detail")
+                                    file_name="开标记录表.pdf", page_no=page_no, file_class="award_detail", amount_kind="award")
 
 
 def test_attachment_package_amount_fills_only_an_empty_package():
@@ -935,7 +935,7 @@ def test_a_merge_delta_joins_rows_the_baseline_could_not():
             _cob("cand_000002", "pdf", 90, {"object_name": "城维计划一景区日常维护", "quantity": "1", "unit": "项",
                                             "unit_price": "950000", "total_price": "950000"}, source_class="bid_quote"),
         ],
-        [{"op": "merge", "groups": [0, 1], "reason": "破折号被识别成了一"}],
+        [{"op": "merge", "groups": [0, 1], "as": "g:joined", "reason": "破折号被识别成了一"}],
         amount=950000,
     )
     cobs = merged.projects[0].cobs
@@ -953,15 +953,16 @@ def test_a_split_delta_separates_rows_that_only_share_a_name():
             _cob("cand_000002", "html", 100, {"object_name": "智能建造设备", "spec_model": "机器人实训平台",
                                               "quantity": "2", "unit": "台"}),
         ],
-        [{"op": "split", "group_id": 0, "parts": [["cand_000001"], ["cand_000002"]], "reason": "规格不同"}],
+        [{"op": "split", "group_id": 0, "parts": [{"as": "g:a", "members": ["cand_000001"]},
+                                                     {"as": "g:b", "members": ["cand_000002"]}], "reason": "规格不同"}],
     )
     cobs = merged.projects[0].cobs
     assert len(cobs) == 2
     assert sorted(cob.spec_model for cob in cobs) == ["3D混凝土打印机", "机器人实训平台"]
 
 
-def test_a_delta_that_breaks_a_rule_is_dropped_alone():
-    """One bad edit costs that edit. The rest of the model's answer still stands."""
+def test_an_invalid_plan_rolls_back_without_publishing_partial_bindings():
+    """A failed dependency transaction leaves the audited baseline, never a half plan."""
     from ict.schemas import MergeEvidence
 
     evidence = MergeEvidence(winner_hints={"1": ["甲公司"]})
@@ -978,8 +979,9 @@ def test_a_delta_that_breaks_a_rule_is_dropped_alone():
     )
     by_op = {item["op"]: item for item in merged.merge_decisions if item["op"] in {"price_from", "name_from"}}
     assert by_op["price_from"]["accepted"] is False
-    assert by_op["price_from"]["reject"] == "source_cannot_own_price"
-    assert by_op["name_from"]["accepted"] is True
+    assert "供价资格" in by_op["price_from"]["reject"]
+    assert by_op["name_from"]["accepted"] is False
+    assert all(item["transaction_rolled_back"] for item in by_op.values())
     assert merged.projects[0].cobs[0].total_price == 100
 
 
@@ -993,7 +995,8 @@ def test_an_unknown_id_costs_the_call_and_the_baseline_still_decides():
         amount=100,
     )
     assert [cob.object_name for cob in merged.projects[0].cobs] == ["服务器", "伺服器"]
-    assert {"package_no": "1", "action": "merge_model_fallback", "reason": "llm_schema_invalid"} in merged.repairs
+    assert any(item.get("action") == "merge_model_fallback" and item.get("reason") == "llm_plan_invalid"
+               for item in merged.repairs)
 
 
 def _split_rows():
@@ -1005,17 +1008,18 @@ def _split_rows():
     ]
 
 
-def test_a_sum_is_recomputed_by_rules_and_gated_by_the_amount():
-    """The model names the rows; 15 and 15000 are computed here, and only because the amount agrees."""
+def test_a_sum_is_recomputed_and_adopted_by_explicit_binding():
+    """15 and 15000 are computed; the explicit reading is protected from amount arbitration."""
     merged = _merged_with_deltas(
         _split_rows(),
-        [{"op": "sum", "group_id": 0, "members": ["cand_000001", "cand_000002"], "reason": "同一张表拆行"}],
+        [{"op": "sum", "group_id": 0, "members": ["cand_000001", "cand_000002"], "as": "r:sum", "reason": "同一张表拆行"},
+         {"op": "price_from", "group_id": 0, "source": "r:sum", "reason": "采用求和"}],
         amount=15000,
     )
     cobs = merged.projects[0].cobs
     assert len(cobs) == 1
     assert (cobs[0].quantity, cobs[0].unit_price, cobs[0].total_price) == (15, 1000, 15000)
-    assert any(item["action"] == "price_bundle_by_amount" and item["to"] == "sum:0" for item in merged.repairs)
+    assert not any(item["action"] == "price_bundle_by_amount" for item in merged.repairs)
 
 
 def test_a_sum_is_refused_when_the_units_disagree():
@@ -1031,19 +1035,18 @@ def test_a_sum_is_refused_when_the_units_disagree():
         amount=2000,
     )
     assert len(merged.projects[0].cobs) == 1
-    assert "sum_unit_conflict" in [item.get("reject") for item in merged.merge_decisions if item["op"] == "sum"]
+    assert any("sum_unit_conflict" in item.get("reject", "") for item in merged.merge_decisions if item["op"] == "sum")
 
 
-def test_a_sum_is_left_alone_without_a_package_amount():
-    """Nothing to check the sum against, so the object stays one row and keeps an observed number."""
+def test_declaring_a_sum_without_binding_does_not_adopt_it():
+    """A computed reading alone is not a final selection; unselected quantities remain unresolved."""
     merged = _merged_with_deltas(
         _split_rows(),
-        [{"op": "sum", "group_id": 0, "members": ["cand_000001", "cand_000002"], "reason": "同一张表拆行"}],
+        [{"op": "sum", "group_id": 0, "members": ["cand_000001", "cand_000002"], "as": "r:sum", "reason": "同一张表拆行"}],
     )
     cobs = merged.projects[0].cobs
     assert len(cobs) == 1 and cobs[0].quantity == 10
-    rejects = [item.get("reject") for item in merged.merge_decisions if item["op"] == "sum"]
-    assert "sum_unverified_no_package_amount" in rejects
+    assert any(item["reason"] == "quantity_observation_unresolved" for item in merged.unresolved)
 
 
 def test_the_result_does_not_depend_on_the_order_candidates_arrive_in():

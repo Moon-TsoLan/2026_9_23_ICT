@@ -102,7 +102,8 @@ def test_current_run_state_is_used(tmp_path: Path) -> None:
     item = ingest.merge_records(jobs, [], 1, 20, roots=[tmp_path])["items"][0]
     assert item["run_started"] is True
     # 分母是整条流程的步数（12），不是"这条 run 已经登记了几步"（夹具里只有 5 步）
-    assert item["progress"] == {"done": 3, "total": 12, "current_step": "s1", "status": None}
+    from ict.state import STEP_TOTAL
+    assert item["progress"] == {"done": 3, "total": STEP_TOTAL, "current_step": "s1", "status": None}
 
 
 def test_finished_run_reads_full_marks(tmp_path: Path) -> None:
@@ -116,7 +117,8 @@ def test_finished_run_reads_full_marks(tmp_path: Path) -> None:
     jobs = [job("j1", "2026-10-07T11:00:05+08:00", [("t1", "running", None)],
                 created_at="2026-10-07T11:00:00+08:00")]
     progress = ingest.merge_records(jobs, [], 1, 20, roots=[tmp_path])["items"][0]["progress"]
-    assert progress["done"] == 12 and progress["total"] == 12
+    from ict.state import STEP_TOTAL
+    assert progress["done"] == STEP_TOTAL and progress["total"] == STEP_TOTAL
 
 
 def test_job_discardable_only_before_anything_starts() -> None:

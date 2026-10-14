@@ -110,6 +110,8 @@ def seal_candidate(
     quote_supplier: str | None = None,
     bidder_supplier: str | None = None,
     winner_supplier: str | None = None,
+    row_index: int | None = None,
+    source_refs: list[str] | None = None,
 ) -> Candidate:
     fields = blank_fields(entity_type)
     raw_fields = align_fields(entity_type, raw_fields)
@@ -123,13 +125,16 @@ def seal_candidate(
              if v not in (None, "") and str(v).strip()}
     evidence_values = {
         "table_index": table_index,
+        "row_index": row_index,
+        "source_refs": list(source_refs or []),
         "row_text": None if not row_text else str(row_text).strip()[:400] or None,
         "column_units": units,
         "quote_supplier": _clean(quote_supplier),
         "bidder_supplier": _clean(bidder_supplier),
         "winner_supplier": _clean(winner_supplier),
     }
-    has_evidence = any(key != "column_units" and value is not None for key, value in evidence_values.items()) \
+    has_evidence = any(key not in {"column_units", "source_refs"} and value is not None for key, value in evidence_values.items()) \
+        or bool(evidence_values["source_refs"]) \
         or bool(evidence_values["column_units"])
     evidence = CandidateEvidence(**evidence_values) if has_evidence else None
     return Candidate(
@@ -143,6 +148,7 @@ def seal_candidate(
         issues=issues or [],
         source_class=source_class,
         evidence=evidence,
+        unmapped_fields={key: value for key, value in raw_fields.items() if key not in fields},
     )
 
 

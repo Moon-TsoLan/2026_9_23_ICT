@@ -27,7 +27,7 @@ class _Asker:
         self.payload = None
 
     def complete(self, *, step, prompt_version, user, thinking=False):
-        self.payload = json.loads(user)
+        self.payload, _ = json.JSONDecoder().raw_decode(user)
         return LLMResult(json.dumps({"deltas": self.deltas}, ensure_ascii=False),
                          "asker", "test", prompt_version, 1)
 
@@ -84,7 +84,7 @@ def test_the_model_only_chooses_which_item_never_what_it_says():
         [LCD])
     row = merged.projects[0].cobs[0]
     assert (row.category_code, row.category_name, row.category_type) == (None, None, None)
-    assert [item["reason"] for item in merged.repairs] == ["llm_schema_invalid"]
+    assert [item["reason"] for item in merged.repairs] == ["llm_plan_invalid"]
 
 
 def test_an_item_the_catalog_does_not_know_is_refused_out_loud():
@@ -123,18 +123,18 @@ def test_a_category_the_row_already_stated_is_never_overwritten():
     assert kept["accepted"] is True and kept["filled"] == [] and kept["raw_item"] == FIBER
 
 
-def test_no_summary_category_means_no_extra_model_call():
-    """没有公告概要品目时，单行 HTML 包仍然不调模型，与改动前一致。"""
+def test_single_html_rows_are_also_checked_for_field_ownership():
+    """Single rows must reach the model so service description/spec mistakes can be corrected."""
     merged, asker = _run(
         [_cob("c1", "html", 100, {"object_name": "服务采购", "category_name": "其他商业保险服务"})],
         [], [])
-    assert asker.payload is None
+    assert asker.payload is not None
     assert merged.projects[0].cobs[0].category_name == "其他商业保险服务"
 
     _, asker2 = _run(
         [_cob("c1", "html", 100, {"object_name": "光跳纤架", "category_code": "A02080504"})],
         [], [FIBER])
-    assert asker2.payload is None
+    assert asker2.payload is not None
 
 
 def test_the_model_is_asked_when_a_summary_item_is_the_only_source():

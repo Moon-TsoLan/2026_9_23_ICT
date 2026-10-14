@@ -9,6 +9,8 @@ export interface GraphNode {
   labelShort?: string
   kind: NodeKind
   weight: number
+  identity_kind?: 'company' | 'brand'
+  roles?: string[]
 }
 
 export interface GraphEdge {
@@ -16,6 +18,8 @@ export interface GraphEdge {
   b: string
   role: EdgeRole
   weight: number
+  project_id?: string
+  project_ids?: string[]
 }
 
 export interface Placed {

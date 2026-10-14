@@ -44,14 +44,16 @@ def read_xlsx(path: Path) -> list[dict]:
     return pages
 
 
-def read_native(path: Path) -> list[dict]:
+def read_native(path: Path, fmt: str | None = None) -> list[dict]:
     """docx and spreadsheets keep their own structure; no rasterising, no model."""
-    suffix = path.suffix.lower()
+    suffix = "." + fmt if fmt else path.suffix.lower()
     # Reading a whole spreadsheet or tender document is CPU work, so it queues behind the same
     # gate as the other native readers.
     with LOCAL_GATE:
         if suffix == ".docx":
             return read_docx(path)
         if suffix in {".xlsx", ".xlsm"}:
-            return read_xlsx(path)
+            # A stream prevents suffix checks from contradicting the sniffed container.
+            with path.open("rb") as stream:
+                return read_xlsx(stream)
     raise ValueError("unsupported native document " + suffix)

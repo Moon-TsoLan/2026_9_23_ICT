@@ -7,8 +7,6 @@
 """
 from __future__ import annotations
 
-import csv
-import io
 import json
 import re
 import sys
@@ -21,7 +19,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
-from .db import num, q, q1, yuan
+from .db import num, q as db_q, q1 as db_q1, yuan
+from .results import annotate_units, result_from_storage, display_unit
+
+
+def q(sql, params=()):
+    return annotate_units(db_q(sql, params), db_q)
+
+
+def q1(sql, params=()):
+    rows = q(sql, params)
+    return rows[0] if rows else None
+
 from . import ingest
 from .scenes import SCENES, overview
 
@@ -29,6 +38,8 @@ ROOT = Path(__file__).resolve().parent.parent
 # 与 db/load_runs.py 同一做法：ict 包在 src/ 下，容器/本机都不装包也能 import。
 sys.path.insert(0, str(ROOT / "src"))
 from ict.config import DATA_ROOT, tenant_paths  # noqa: E402
+from ict.official import export_workbook, bidder_category, review_label
+from ict.packages import package_context
 
 # 上传的大文件会先落到临时文件（Starlette 的 UploadFile 超过 1MB 就落盘）。
 # 把**这个进程**的临时目录放到 ICT_DATA_ROOT 下，免得 2 核 4G 机器的系统盘被几百 MB 的包顶满。
@@ -99,10 +110,10 @@ def _build_search(
     if kw:
         like = f"%{kw}%"
         conds.append(
-            "(object_name ILIKE %s OR project_name ILIKE %s OR brand ILIKE %s"
+            "(object_name ILIKE %s OR project_name ILIKE %s OR brand ILIKE %s OR product_supplier ILIKE %s"
             " OR spec_model ILIKE %s OR winner_name ILIKE %s OR purchaser ILIKE %s)"
         )
-        params += [like] * 6
+        params += [like] * 7
     if purchaser:
         conds.append("purchaser = %s")
         params.append(purchaser)
@@ -142,6 +153,8 @@ def _cob_item(r: dict) -> dict:
         "project_id": r["project_id"],
         "project_name": r["project_name"],
         "package_no": r["package_no"],
+        "package_kind": r.get("package_kind", "unknown"), "package_name": r.get("package_name"),
+        "package_label": display_unit(r.get("package_label"), r["package_no"]),
         "purchaser": r["purchaser"],
         "package_total_amount": num(r["package_total_amount"]),
         "object_name": r["object_name"],
@@ -149,6 +162,8 @@ def _cob_item(r: dict) -> dict:
         "category_name": r["category_name"],
         "category_type": r["category_type"],
         "brand": r["brand"],
+        "brand_display": r["brand"],
+        "brand_display_source": "brand" if r["brand"] else None,
         "product_supplier": r["product_supplier"],
         "spec_model": r["spec_model"],
         "unit_price": num(r["unit_price"]),
@@ -209,28 +224,29 @@ def objects_export(
         kw, purchaser, winner, product_supplier, project_name, brand,
         category_type, source_type, price_field, price_min, price_max, sort,
     )
-    rows = q(f"SELECT * FROM v_cob_record WHERE {where} ORDER BY {order} LIMIT 5000", params)
-    buf = io.StringIO()
-    buf.write("﻿")  # BOM：保证 Excel 打开中文不乱码
-    writer = csv.writer(buf)
-    writer.writerow([
-        "标的物名称", "品目编码", "品目名称", "品目类别", "品牌", "产品供应商", "规格型号",
-        "单价(元)", "数量", "单位", "总价(元)", "项目名称", "包号", "采购单位",
-        "中标供应商", "中标得分", "来源公告", "来源类型",
-    ])
-    for r in rows:
-        writer.writerow([
-            r["object_name"], r["category_code"], r["category_name"], r["category_type"],
-            r["brand"], r["product_supplier"], r["spec_model"],
-            num(r["unit_price"]), num(r["quantity"]), r["unit"], num(r["total_price"]),
-            r["project_name"], r["package_no"], r["purchaser"],
-            r["winner_name"], num(r["winner_score"]), r["announcement_id"], r["source_type"],
-        ])
-    return Response(
-        buf.getvalue(),
-        media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": 'attachment; filename="cob_export.csv"'},
-    )
+    filtered = any((kw, purchaser, winner, product_supplier, project_name, brand, category_type, source_type,
+                    price_min is not None, price_max is not None))
+    if filtered:
+        announcements = db_q(f"""SELECT announcement_id, raw_json FROM announcement WHERE announcement_id IN
+            (SELECT DISTINCT announcement_id FROM v_cob_record WHERE {where}) ORDER BY announcement_id""", params)
+    else:
+        announcements = db_q("SELECT announcement_id, raw_json FROM announcement ORDER BY announcement_id")
+    results = [result_from_storage(a["announcement_id"], a.get("raw_json"), db_q) for a in announcements]
+    return _xlsx_response(results)
+
+
+def _xlsx_response(results):
+    return Response(export_workbook(results),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="official_export.xlsx"'})
+
+
+@app.get("/api/announcements/{announcement_id}/export")
+def announcement_export(announcement_id: str):
+    row = db_q1("SELECT raw_json FROM announcement WHERE announcement_id = %s", (announcement_id,))
+    if row is None:
+        raise HTTPException(404, "公告不存在")
+    return _xlsx_response([result_from_storage(announcement_id, row.get("raw_json"), db_q)])
 
 
 @app.get("/api/objects/{cob_id}")
@@ -238,19 +254,20 @@ def objects_detail(cob_id: int) -> dict:
     row = q1("SELECT * FROM v_cob_record WHERE cob_id = %s", (cob_id,))
     if not row:
         raise HTTPException(404, "标的物不存在")
-    bidders = q(
-        """
-        SELECT s.name, b.score, b.is_winner
-        FROM bid b JOIN supplier s ON s.supplier_id = b.supplier_id
-        WHERE b.project_id = %s
-        ORDER BY b.is_winner DESC, b.score DESC NULLS LAST
-        """,
-        (row["project_id"],),
-    )
     item = _cob_item(row)
-    item["bidders"] = [
-        {"supplier_name": b["name"], "score": num(b["score"]), "is_winner": b["is_winner"]} for b in bidders
-    ]
+    audit = q1("""SELECT a.raw_json,
+                         (SELECT count(*) FROM cob c WHERE c.project_id = p.project_id AND c.cob_id < %s) AS cob_index
+                  FROM project p JOIN announcement a ON a.announcement_id = p.announcement_id
+                  WHERE p.project_id = %s""", (cob_id, row["project_id"])) or {}
+    item["field_origins"] = {entry["field"]: entry for entry in (audit.get("raw_json") or {}).get("field_bindings", [])
+                             if entry.get("package_no") == row["package_no"]
+                             and entry.get("cob_index") == audit.get("cob_index")}
+    result = result_from_storage(row["announcement_id"], audit.get("raw_json"), db_q)
+    ref = (audit.get("raw_json") or {}).get("project_map", {}).get(row["project_id"], row["package_no"])
+    package = next((p for p in result.get("packages", []) if p.get("package_no") == ref), {})
+    item["bidders"] = [{**b, "category": bidder_category(b), "review_display": review_label(b)}
+                       for b in package.get("subs", [])]
+
     return item
 
 
@@ -329,7 +346,7 @@ def parties_search(q_: str = Query("", alias="q")) -> dict:
     items = [
         {"id": f"buyer:{p['name']}", "name": p["name"], "kind": "buyer"} for p in purchasers
     ] + [
-        {"id": f"proj:{p['project_id']}", "name": _project_label(p["project_name"], p["package_no"], p["round_no"]),
+        {"id": f"proj:{p['project_id']}", "name": _project_label(p["project_name"], p["package_no"], p["round_no"], p.get("package_label")),
          "kind": "project"}
         for p in projects
     ] + [
@@ -339,9 +356,9 @@ def parties_search(q_: str = Query("", alias="q")) -> dict:
     return {"items": items}
 
 
-def _project_label(project_name: str, package_no: str, round_no: int = 1) -> str:
+def _project_label(project_name: str, package_no: str, round_no: int = 1, package_name=None) -> str:
     """星图上项目节点的显示名；与 server/scenes.py 的 _short 保持同一种读法。"""
-    suffix = f" · 包{package_no}" + (f"（第{round_no}轮）" if round_no > 1 else "")
+    suffix = " · " + display_unit(package_name, package_no) + (f"（第{round_no}轮）" if round_no > 1 else "")
     return f"{project_name}{suffix}"
 
 
@@ -352,6 +369,11 @@ def party_profile(party_id: str) -> dict:
         return _buyer_profile(party_id, name)
     if kind == "proj":
         return _project_profile(party_id, name)
+    if kind == "brand":
+        profile = _vendor_profile(party_id, name, brand=True)
+        if profile:
+            return profile
+        raise HTTPException(404, "品牌替代主体不存在")
     if kind in ("sup", "vendor"):
         # 星图里的"产品供应商"节点写作 vendor:<名称>，实体可能仍在 supplier 表里。
         # 若按名称取不到（有些产品供应商从未作为投标主体入库），
@@ -364,7 +386,7 @@ def party_profile(party_id: str) -> dict:
                 if row:
                     return _supplier_profile("sup:" + name, row["name"])
             raise
-    raise HTTPException(422, "id 需形如 sup:/vendor:/buyer:/proj:<id>")
+    raise HTTPException(422, "id 需形如 sup:/vendor:/brand:/buyer:/proj:<id>")
 
 
 def _project_profile(pid: str, project_id: str) -> dict:
@@ -403,7 +425,7 @@ def _project_profile(pid: str, project_id: str) -> dict:
     facts.append(f"公告：{base['announcement_id']}")
     return {
         "id": pid,
-        "name": _project_label(base["project_name"], base["package_no"], base["round_no"]),
+        "name": _project_label(base["project_name"], base["package_no"], base["round_no"], base.get("package_label")),
         "project_name": base["project_name"],
         "kind": "project",
         "stats": [
@@ -456,34 +478,37 @@ def _buyer_profile(pid: str, name: str) -> dict:
     }
 
 
-def _vendor_profile(pid: str, name: str) -> dict | None:
+def _vendor_profile(pid: str, name: str, brand: bool = False) -> dict | None:
     """产品供应商的降级档案：只依据 cob.product_supplier 聚合。
     这些主体在星图上是合法节点（标的物里的厂商/经销商），但从未投标，因此没有 supplier 行。"""
+    predicate = "c.brand = %s AND nullif(c.product_supplier, '') IS NULL" if brand else "c.product_supplier = %s"
     base = q1(
-        """
+        f"""
         SELECT count(*) AS cobs,
                count(DISTINCT c.project_id) AS projects,
                sum(c.total_price) AS amount
-        FROM cob c WHERE c.product_supplier = %s
+        FROM cob c WHERE {predicate}
         """,
         (name,),
     )
     if not base or not base["cobs"]:
         return None
     buyers = q(
-        """
+        f"""
         SELECT p.purchaser, count(*) AS times
         FROM cob c JOIN project p ON p.project_id = c.project_id
-        WHERE c.product_supplier = %s AND p.purchaser IS NOT NULL
+        WHERE {predicate} AND p.purchaser IS NOT NULL
         GROUP BY p.purchaser ORDER BY times DESC LIMIT 3
         """,
         (name,),
     )
-    facts = [f"作为产品供应商出现在 {b['purchaser']} 的 {b['times']} 个标的物中" for b in buyers]
+    role = "品牌替代主体" if brand else "产品供应商"
+    facts = [f"作为{role}出现在 {b['purchaser']} 的 {b['times']} 个标的物中" for b in buyers]
     return {
         "id": pid,
         "name": name,
         "kind": "vendor",
+        "identity_kind": "brand" if brand else "company",
         "stats": [
             {"k": "供货标的物", "v": str(base["cobs"])},
             {"k": "涉及项目", "v": str(base["projects"])},

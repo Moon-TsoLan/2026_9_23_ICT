@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CloudUpload, FileClock, Trash2, Workflow } from 'lucide-vue-next'
+import { CloudUpload, Download, FileClock, Trash2, Workflow } from 'lucide-vue-next'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { api } from '@/api/client'
 import EmptyState from '@/components/EmptyState.vue'
@@ -230,6 +230,10 @@ function fmtTime(iso: string | null): string {
             <td class="r num">{{ r.cobs ?? '—' }}</td>
             <td class="l num text-muted">{{ fmtTime(r.updated_at) }}</td>
             <td class="r nowrap">
+              <a v-if="r.status === 'done'" class="mini" :href="api.announcementExportUrl(r.announcement_id)"
+                title="导出本公告完整三表 XLSX" download @click.stop>
+                <Download :size="13" /> XLSX
+              </a>
               <button class="mini" title="展开处理步骤" @click.stop="toggleRun(r)">
                 <Workflow :size="13" />
               </button>

@@ -46,26 +46,30 @@ LIMIT 10;
 
 -- ---------------------------------------------------------------------
 -- S1. 指定采购单位 → 长期/大量合作的中标供应商、产品供应商
---     输出：合作次数、交易总金额
+--     2026-10-10：企业角色复用、品牌替代、次数按 project_id 去重；中标/供应金额分列
 -- ---------------------------------------------------------------------
 WITH win AS (
-  SELECT s.name AS subject, count(*) AS coop_times, sum(p.package_total_amount) AS amount
-  FROM project p
-  JOIN bid b      ON b.project_id = p.project_id AND b.is_winner
-  JOIN supplier s ON s.supplier_id = b.supplier_id
-  WHERE p.purchaser = :'purchaser'
-  GROUP BY s.name
-), ps AS (
-  SELECT c.product_supplier AS subject, count(DISTINCT c.project_id) AS coop_times,
-         sum(c.total_price) AS amount
+  SELECT DISTINCT p.project_id, s.name AS subject, 'company' AS identity_kind,
+         '中标供应商' AS role, p.package_total_amount AS award_amount, NULL::numeric AS supply_amount
+  FROM project p JOIN bid b ON b.project_id = p.project_id AND b.is_winner
+  JOIN supplier s ON s.supplier_id = b.supplier_id WHERE p.purchaser = :'purchaser'
+), supply AS (
+  SELECT c.project_id,
+         CASE WHEN nullif(c.product_supplier, '') IS NOT NULL
+              THEN coalesce(s.name, c.product_supplier) ELSE c.brand END AS subject,
+         CASE WHEN nullif(c.product_supplier, '') IS NOT NULL THEN 'company' ELSE 'brand' END AS identity_kind,
+         CASE WHEN nullif(c.product_supplier, '') IS NOT NULL THEN '产品供应商' ELSE '品牌替代' END AS role,
+         NULL::numeric AS award_amount, sum(c.total_price) AS supply_amount
   FROM project p JOIN cob c ON c.project_id = p.project_id
-  WHERE p.purchaser = :'purchaser' AND c.product_supplier IS NOT NULL
-  GROUP BY c.product_supplier
-)
-SELECT '中标供应商' AS role, subject, coop_times, amount FROM win
-UNION ALL
-SELECT '产品供应商' AS role, subject, coop_times, amount FROM ps
-ORDER BY coop_times DESC;
+  LEFT JOIN supplier s ON s.norm_name = norm_name(c.product_supplier)
+  WHERE p.purchaser = :'purchaser' AND coalesce(nullif(c.product_supplier, ''), nullif(c.brand, '')) IS NOT NULL
+  GROUP BY c.project_id, subject, identity_kind, role
+), links AS (SELECT * FROM win UNION ALL SELECT * FROM supply)
+SELECT subject, identity_kind, string_agg(DISTINCT role, '、' ORDER BY role) AS role,
+       count(DISTINCT project_id) AS coop_times, sum(award_amount) AS award_amount,
+       sum(supply_amount) AS supply_amount
+FROM links GROUP BY subject, identity_kind
+ORDER BY coop_times DESC, identity_kind, subject;
 
 -- ---------------------------------------------------------------------
 -- S2a. 指定采购单位 → 高频（TOP5）参与投标的主体

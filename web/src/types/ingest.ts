@@ -156,6 +156,8 @@ export const FAILURE_LABEL: Record<string, string> = {
   document_parse_failed: '文档解析失败',
   package_structure_unclear: '无法判断包结构',
   llm_schema_invalid: '模型输出格式不合法',
+  llm_plan_invalid: '模型计划不满足执行约束',
+  llm_validator_incompatible: '输出校验器与契约不兼容',
   llm_call_failed: '模型调用失败',
   no_text_extractable: '没有可提取文本',
   no_candidate_extracted: '未抽到任何候选',

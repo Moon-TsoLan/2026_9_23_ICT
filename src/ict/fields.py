@@ -9,17 +9,18 @@ about how to reason.
 """
 
 FIELD_SEMANTICS = {
-    "object_name": "单个标的名称，一件货物、一项服务或一段工程内容；不是项目名称，也不是包的名称。",
+    "object_name": "当前成交输出单元的标的名称：货物、服务或工程；整体服务确实以项目全称命名时可用原文，不为无名行猜填项目名。",
     "category_name": "品目类别名，如“工业机器人”“其他商业保险服务”；不是标的名称。",
     "category_code": "品目目录编码：一个字母加八位数字，如 A02100499。",
     "category_type": "品目大类：A 货物、B 工程、C 服务。",
     "brand": "品牌，如“佳能”“达梦”。",
-    "product_supplier": "制造商或生产厂商名称；不是投标供应商名称。",
-    "spec_model": "规格型号：型号串或技术参数标识。",
+    "product_supplier": "该标的产品或服务提供方，可为制造商、明确产品供应方或服务提供方；不能仅凭投标/中标身份认定。末尾模型确认的中标人自供须单独留痕。",
+    "spec_model": "属于当前标的输出粒度的规格型号或技术参数标识；服务范围、要求、时间、标准不算，其它组成或点位参数不自动属于整体服务。",
     "unit_price": "单价，即每个计价单位的金额。",
     "quantity": "数量，纯数值；人数、面积、点位数等不是计价数量。",
     "unit": "计价单位，如台、套、项、人。",
-    "total_price": "单个标的行的合计金额；整包或整项目的总金额不算它。",
+    "total_price": "当前最终标的的中标成交合计金额。抽取时只抄该标的成交金额，预算、最高限价、报价模板不填；合并时模型确认整体成交对象与本包金额对应后，可显式引用 p:amount；程序计算值单独记录依赖。",
+    "supplier_award_amount": "明确归属于本包当前供应商的中标成交金额或中标份额；不是 COB 总价，不把包金额复制给每家供应商。未写明归属时留空。",
     "package_total_amount": "某个包的中标（成交）金额；不是单个标的行的总价，也不是公告层面的项目总额。",
     "supplier_name": "投标（响应）供应商全称；联合体作为一个整体，不拆分。",
     "score": "综合得分或评审总得分；多位评委各自打的分数不算。",
@@ -32,21 +33,21 @@ FIELD_SEMANTICS = {
     "package_mode": "包结构，取值 single 单包、multi 多包、unclear 判不清。",
     "packages": "包列表，每项含 package_no、title、package_evidence_text、package_amount。",
     "package_no": "包编号本身，必须是字符串，不含“第”“包”等前后缀；用原文里的数字或字母，不把 A 转成 1，不补前导零。",
-    "package_amount": "该包的中标（成交）金额，含 raw_text、amount_yuan、scope、confidence；scope 固定为 package。",
-    "amount_alternatives": "同一包里你看到但没有选作 package_amount 的其它金额，每项含 raw_text、amount_yuan、scope、confidence；只作留痕，不参与判定。",
+    "package_amount": "该包的中标（成交）金额，含 raw_text、amount_yuan、scope、amount_kind、confidence；scope 固定为 package，amount_kind 必须为 award。",
+    "amount_alternatives": "同一包里没有选作 package_amount 的其它金额，每项含 raw_text、amount_yuan、scope、amount_kind、confidence；保留原文及性质，不能混为成交价。",
     "package_evidence_text": "证明该包存在的原文片段。",
-    "summary_amount": "公告概览层面的项目总额，含 raw_text、amount_yuan、scope、confidence；scope 固定为 announcement。",
+    "summary_amount": "仅从 HTML 抽取的公告层项目总额，含 raw_text、amount_yuan、scope、amount_kind、confidence；scope 固定为 announcement。层级与预算/限价/成交性质分别记录，不能从附件补公告总额。",
     "announcement_categories": "公告概要一行里写出的品目条目，一项一条，逐字照抄；可能是编码（C16990000）、"
                               "品目名称或带斜杠的目录路径，也可能是空的。只抄公告概要那一行，正文表格里的品目不算。",
     "unclear_reason": "判不清包结构时的原因说明。",
     "table_role": "这张表的作用，取值 cob_detail 标的明细、cob_summary 标的汇总、sub_score 供应商得分、winner 中标信息、agency_fee 代理服务费、other 其它。",
     "row_grain": "这一行代表什么，取值 cob 一个标的、supplier 一个供应商、project 一个项目、other 其它。",
     "package_scope": "这段内容属于哪个包；只写编号本身，不带“第”“包”等前后缀；整篇范围写 announcement，判不出写 unknown。",
-    "column_mapping": "业务字段名到表头原文的对应关系；键只能取 object_name、category_name、category_code、brand、spec_model、quantity、unit、unit_price、total_price、supplier_name、score、is_winner，值必须是给到的表头原文。",
+    "column_mapping": "业务字段名到表头原文的对应关系；键只能取 object_name、category_name、category_code、brand、spec_model、quantity、unit、unit_price、total_price、supplier_name、score、is_winner、supplier_award_amount，值必须是给到的表头原文。",
     "unmapped_columns": "无法对应到任何业务字段的表头原文。",
     "issues": "你在这一步注意到的问题标记。",
     "candidates": "抽取出的候选对象列表。",
-    "package_amounts": "页面原文单独写出的某个包的中标（成交）总额，每项含 package_no 与 raw_text；行项总价、单价乘数量、项目总额不算，进度款与预付也不算。",
+    "package_amounts": "页面原文单独写出的包级金额观测，每项含 package_no、raw_text、amount_kind 和来源；区分 award 成交金额与 budget 预算，行项金额不当作包金额，预算仅留证据。",
     "raw_text": "金额的原文写法，连单位与符号一起照抄，不要换算、不要补零、不要改写成数字。",
     "fields": "该候选的字段值，只写看到的，不写的即为没有。",
     "entity_type": "要抽取的对象类型，取值 cob 标的、sub 供应商；与用户给定的保持一致。",
@@ -136,7 +137,7 @@ IO_NOTES = {
     "format": "由文件字节判出的容器类型，不是扩展名。",
     "pages": "文件页数。",
     "table_headers": "表格表头行的原文。",
-    "needs": "本公告还缺少的内容清单，每项含 field、package_no、reason。reason 取值：absent 公告里根本没有这项；coverage_low 公告里已有但填得不全；points_to_attachment 公告写「见附件」；maybe_more_objects 公告列出的标的可能不全，附件里可能有公告没提过的标的。",
+    "needs": "缺口清单，每项含 need_id、field、package_no、reason、purpose、target_candidate_ids、state。reason：absent 未提供、coverage_low 填写不全、points_to_attachment 见附件、maybe_more_objects 清单可能不全。purpose 区分 fill_field 补已有对象、discover_objects 发现对象、resolve_binding 确认归属；state=pending 未决或 evidence_ready 已有抽取证据，后者不代表最终合并已完成。",
     "field": "一个业务字段名。",
     "content_view": "该文件正文的前若干字原文。",
     "file_class": "上一步判定的文件内容类型。",
@@ -259,6 +260,168 @@ STEP_FIELDS = {
                            "unit", "total_price", "total_is_derived", "reading_kind", "sources"],
                           ["choices", "cluster_id", "candidate_id"]),
 }
+
+
+FIELD_SEMANTICS.update({
+    "source_ref": "程序提供的原文位置编号，照抄引用，不得新造。",
+    "source_refs": "该观测或判断依据的原文位置编号列表，只引用输入提供的编号。",
+    "source_segments": "有来源编号的原文片段；PDF 为实际页，原生 Word/表格可为逻辑片段，不假称物理页。",
+    "source_rows": "有稳定来源编号的原始行、单元格及章节上下文。",
+    "evidence_refs": "目检已看见、可供后续抽取的片段编号。",
+    "requires_deep_parse": "模型是否认为还需深度解析；false 仅为建议，程序仍验证已抽取证据是否覆盖缺口。",
+    "bindings": "逐候选的包归属结果，每项 candidate_id、package_no、source_refs、reason、confidence。",
+    "amount_bindings": "逐包金额归属，每项 package_no、amount_ref、amount_kind、reason；未决用 amount_ref=null。",
+    "amount_ref": "提供的金额观测编号，不是金额数值。",
+    "amount_kind": "金额性质：award 中标成交金额、budget 采购预算、ceiling 最高限价、unknown 未明确；未声明不默认为成交。",
+    "scope": "金额层级：announcement 公告、package 包；与金额性质分别表达。",
+    "amount_observations": "带编号与原文的金额观测，旧包号是建议而非事实。",
+    "table_contexts": "模型已读出的表角色、列映射及范围建议。",
+    "suggested_package_no": "上游建议的包号，仍需结合原文裁定。",
+    "previous_binding": "该候选此前的归属判断及证据，修订需说明新增依据。",
+    "protocol_version": "本次处理协议版本。",
+    "package_amount_bindable": "该包金额是否具备供最终整体标的总价的资格；仍需模型确认对应关系。",
+    "package_amount_evidence": "当前包金额的原文、性质、层级与已裁定来源；最终使用 p:amount 时保留此记录。",
+    "as": "显式声明的新组 g: 或计算读法 r: 编号，不能重复、不能复用消耗的组。",
+    "source": "供值来源：c:候选、r:计算读法、或允许的 p:amount 包金额。",
+    "target": "字段否定目标：c:候选或 g:最终组。",
+    "mode": "描述字段取值模式：fill 仅补空、select 显式选择覆盖。",
+    "group_ids": "要合并的当前活组引用列表。",
+    "candidate_ids": "当前操作涉及的输入候选编号列表。",
+    "quantity_accounting": "未采用计量字段的逐项解释，每项 candidate_id、keys、disposition、relates_to、reason。同一候选可按不同 keys 分别说明；采用单价数量不等于采用它的总价。",
+    "disposition": "未采用原因：duplicate 重复观测、alternative 冲突备选、unresolved 未决。",
+    "relates_to": "这项未采用观测对应的候选、活组或计算读法引用。",
+    "native_reuse": "当前输入来自已在目检中看见的原生片段，仍沿用正式抽取与来源校验。",
+    "need_resolutions": "本次观测支持的已有字段缺口，每项 need_id、source_ref、field、target_candidate_id；不是宣称全量已完成。",
+    "need_id": "缺口的稳定编号。",
+    "target_candidate_id": "本次补充针对的已有候选编号。",
+    "final_cobs": "合并及修复后的待判断 COB，每项含稳定 cob_ref 与最终字段。",
+    "cob_ref": "当前最终 COB 的唯一引用，同名对象不能混同。",
+    "winner_ref": "已确认中标供应商引用，只能选择输入提供的编号。",
+    "decisions": "逐最终 COB 的自供判断。",
+    "decision": "自供判断：confirm 确认、reject 不支持、uncertain 无法判断。",
+    "field_bindings": "已有最终字段取值与否定的审计，forbid_inference 表示禁止推断补全。",
+    "row_index": "程序提供的表内行序号，从 0 开始，不是采购文件业务序号。",
+    "observation_bindings": "逐附件金额观测复核归属，每项 amount_ref、package_no、amount_kind、reason；逐一覆盖附件金额，未决包号为 null。",
+    "evidence_context": "已有原文片段、原生抽取接收审计及缺口状态；看见不代表已抽取或已采用。",
+    "native_evidence": "目检已确认的片段、抽取结果与未决缺口；请结合页摘要决定后续处理，不声明它们自动入选。",
+})
+STEP_FIELDS["html-candidates-v1"][0].extend(["source_rows", "known_packages", "section", "before_text"])
+STEP_FIELDS["html-candidates-v1"][1].append("source_refs")
+STEP_FIELDS["screen-file-v1"][0].append("source_segments")
+STEP_FIELDS["screen-file-v1"][1].extend(["evidence_refs", "requires_deep_parse"])
+STEP_FIELDS["attachment-extract-v1"][0].extend(["source_segments", "known_packages", "native_reuse"])
+STEP_FIELDS["attachment-extract-v1"][1].extend(["source_ref", "page_no", "amount_kind", "need_resolutions",
+                                               "need_id", "target_candidate_id", "field"])
+STEP_FIELDS["package-binding-v1"] = (
+    ["known_packages", "project_name", "candidates", "source_rows", "body_sections", "table_contexts",
+     "amount_observations", "suggested_package_no", "previous_binding"],
+    ["bindings", "amount_bindings", "candidate_id", "package_no", "source_refs", "amount_ref",
+     "amount_kind", "reason", "confidence"])
+STEP_FIELDS["supplier-completion-v1"] = (
+    ["project_name", "package_no", "winner_suppliers", "final_cobs", "cob_ref", "winner_ref", "field_bindings"],
+    ["decisions", "cob_ref", "decision", "winner_ref", "reason", "confidence"])
+STEP_FIELD_OVERRIDES["supplier-completion-v1"] = {
+    "winner_suppliers": "本包最终确认的中标人，每项 winner_ref、supplier_name。"}
+STEP_FIELD_OVERRIDES["package-binding-v1"] = {
+    "known_packages": "公告确认存在的包集合，含标题与原文证据；其中金额与归属仍是上游建议。"}
+STEP_FIELDS["merge-objects-v4"] = (
+    STEP_FIELDS["merge-objects-v3"][0] + ["protocol_version", "package_amount_bindable", "source_refs", "row_index"],
+    STEP_FIELDS["merge-objects-v3"][1] + ["as", "source", "target", "mode", "group_ids", "candidate_ids",
+                                        "quantity_accounting", "disposition", "relates_to"])
+STEP_FIELD_OVERRIDES["merge-objects-v4"] = {
+    **STEP_FIELD_OVERRIDES.get("merge-objects-v3", {}),
+    "group_id": "当前活组引用，输入基线组可写 g:0；命名子组使用显式 as 引用，旧组消耗后失效。",
+    "op": "操作：exclude、split、merge、sum、name_from、price_from、fields_from、fields_reject、category_from_announcement。",
+    "parts": "split 子组，每项 as、members，必须无重叠且完整覆盖原组。",
+    "sources": "sum 来源列表，可引用 c:候选或已经声明的 r:读法；每个叶子只能计入一次。",
+    "keys": "fields_from 只取描述字段；price_from 取单价、数量、单位、总价；fields_reject 可否定除名称外的字段。",
+    "known_packages": "公告确认存在的包集合；其中已填金额与归属建议仍需证据裁定。",
+    "fields_from": "点名供值候选、目标活组与描述字段；fill 仅补空，select 显式选择。排除行或跨组来源不自动供值。",
+    "price_from": "点名供价候选 c:、计算读法 r: 或具备资格的 p:amount，按 keys 绑定最终计量字段；不能写数值。",
+}
+
+
+# Versioned callers prevent replaying pre-optimization decisions with new semantics.
+for _stem in ['announcement', 'html-tables', 'html-candidates', 'screen-file', 'screen-page', 'locate-pages', 'attachment-extract']:
+    STEP_FIELDS[_stem + "-v2"] = STEP_FIELDS[_stem + "-v1"]
+    STEP_FIELD_OVERRIDES[_stem + "-v2"] = dict(STEP_FIELD_OVERRIDES.get(_stem + "-v1", {}))
+
+for _stem in ["announcement", "html-tables", "html-candidates", "locate-pages", "attachment-extract"]:
+    STEP_FIELDS[_stem + "-v3"] = tuple(list(keys) for keys in STEP_FIELDS[_stem + "-v2"])
+    STEP_FIELD_OVERRIDES[_stem + "-v3"] = dict(STEP_FIELD_OVERRIDES.get(_stem + "-v2", {}))
+for _version in ["announcement-v3", "attachment-extract-v3"]:
+    STEP_FIELDS[_version][1].extend(["scope", "amount_kind"])
+for _version in ["html-tables-v3", "html-candidates-v3", "attachment-extract-v3"]:
+    STEP_FIELDS[_version][1].append("supplier_award_amount")
+STEP_FIELDS["locate-pages-v3"][0].append("native_evidence")
+STEP_FIELDS["package-binding-v2"] = (list(STEP_FIELDS["package-binding-v1"][0]),
+    list(STEP_FIELDS["package-binding-v1"][1]) + ["observation_bindings", "scope"])
+STEP_FIELD_OVERRIDES["package-binding-v2"] = dict(STEP_FIELD_OVERRIDES["package-binding-v1"])
+STEP_FIELDS["merge-objects-v5"] = (list(STEP_FIELDS["merge-objects-v4"][0]) + ["evidence_context", "package_amount_evidence"],
+                                    list(STEP_FIELDS["merge-objects-v4"][1]))
+STEP_FIELD_OVERRIDES["merge-objects-v5"] = dict(STEP_FIELD_OVERRIDES["merge-objects-v4"])
+STEP_FIELD_OVERRIDES["merge-objects-v5"]["protocol_version"] = "delta-v5：逐字段采用与计量说明，候选否定与最终置空分开。"
+FIELD_SEMANTICS.update({
+    "excluded": "退出 SUB 输出的候选列表，每项 candidate_id 与 reason。",
+    "score_from": "本组用于供应商综合得分的候选编号或 null。",
+    "amount_from": "本组用于供应商成交金额的候选编号或 null；只采用该候选 supplier_award_amount。",
+    "winner": "结合原文最终成交结果判断的本包实际中标身份，布尔值。",
+    "unmapped_fields": "历史模型输出中未进入业务字段契约的原值，保留审计，不自动改名供值。",
+})
+STEP_FIELDS["merge-subs-v1"] = (["package_no", "candidates", "candidate_id", "fields", "supplier_name",
+    "score", "is_winner", "supplier_award_amount", "unmapped_fields"],
+    ["groups", "candidate_ids", "name_from", "score_from", "amount_from", "winner", "excluded", "candidate_id", "reason"])
+STEP_FIELD_OVERRIDES["merge-subs-v1"] = {"groups": "最终 SUB 分组，每组给候选成员、名称/得分/金额来源、实际中标身份及理由。",
+    "name_from": "当前 SUB 组中供应商全称的供值候选编号。"}
+
+
+# Official output compatibility (2026-10-13). Older prompt versions remain replayable.
+FIELD_SEMANTICS.update({
+    "package_no": "采购单元内部引用，必须使用输入目录中的原样引用；与对外展示名称分开。第一步只抄原文编号，缺号可为 null，由封装分配引用。",
+    "package_scope": "只引用输入目录中的采购单元内部引用；跨单元为 announcement，无法确定为 unknown。不能把相同裸数字的标段和包混为一组。",
+    "package_kind": "采购单元类型：lot 标段、contract_package 合同包/采购包、unpartitioned 未分包、unknown 未知。独立采购标段与合同包保留区别，单个单元不等于未分包。",
+    "package_name": "对外展示的采购单元名称：标段抄原文标段名称；合同包抄原文包名称（仅有编号则抄原文包标题）；确认未分包填未分包，不能判断为 null。",
+    "source_package_no": "原文编号，与程序分配的内部引用分开保留。",
+    "package_registry": "公告确认的采购单元目录，含内部引用、原文编号、类型及展示名称；归属必须引用此目录，不根据数字相同合并标段与包。",
+    "bid_amount": "本采购单元当前供应商的最终投标/响应报价，原文连单位抄取；首次报价或评审优惠价不能代替最终报价，未明确披露为 null。归一化后单位元。",
+    "review_status": "原文明示的审查结论：passed 通过、failed 未通过、unknown 未知；不得根据中标、排名或有得分推断通过。",
+    "review_failure_reason": "当前供应商未通过审查的原文原因；只有未通过结论才采用，未披露为 null。",
+    "bid_amount_from": "本组最终投标/响应报价的供值候选编号或 null；结合原文报价阶段选择，不写数值。",
+    "review_from": "本组审查结论的供值候选编号或 null，需结合原文解决通过/未通过冲突。",
+    "review_reason_from": "本组未通过原因的供值候选编号或 null，须与所选 failed 结论对应同次审查。",
+    "unresolved_fields": "已有观测但本组不能确认的字段名列表，必须在 reason 说明，业务值保持未知。",
+    "source_candidate_ref": "供应商缺口解决所采用观测的唯一原文片段引用，须明确对应 target_candidate_id 指定供应商；同页其他供应商不能代替。",
+    "target_entity": "缺口目标实体，cob 标的或 sub 投标供应商；发现一条不等于名单完整。",
+    "brand": "原文明示在品牌字段的值，含原文写作定制等非商标写法；未披露为 null，不能用产品供应商或中标人补品牌。",
+    "spec_model": "当前标的规格型号字段的原文值，定制、国标、按照招标要求提供等非技术型号写法也保留；见附件不是已知值，不从其它层级的服务范围/时间/要求自行拼入。",
+    "source_contexts": "按供应商候选已引用的 source_ref 提供原始行或段落上下文，供最终报价阶段和审查结论判断；不能从中创造没有抽取的供值候选。",
+})
+FIELD_SEMANTICS["table_role"] = FIELD_SEMANTICS["table_role"].replace("sub_score 供应商得分、", "sub_score 供应商得分、sub_info 供应商报价/审查/混合信息、")
+FIELD_SEMANTICS["column_mapping"] = FIELD_SEMANTICS["column_mapping"].replace("supplier_award_amount，", "supplier_award_amount、bid_amount、review_status、review_failure_reason，")
+for _stem in ("announcement", "html-tables", "html-candidates", "locate-pages", "attachment-extract"):
+    _version = _stem + "-v4"
+    STEP_FIELDS[_version] = tuple(list(keys) for keys in STEP_FIELDS[_stem + "-v3"])
+    STEP_FIELD_OVERRIDES[_version] = dict(STEP_FIELD_OVERRIDES.get(_stem + "-v3", {}))
+    STEP_FIELDS[_version][0].append("package_registry")
+    STEP_FIELDS[_version][1].extend(["package_kind", "package_name"] if _stem == "announcement" else
+                                   ["bid_amount", "review_status", "review_failure_reason"])
+STEP_FIELDS["attachment-extract-v4"][1].append("source_candidate_ref")
+for _new, _old in (("package-binding-v3", "package-binding-v2"), ("merge-objects-v6", "merge-objects-v5"),
+                   ("merge-subs-v2", "merge-subs-v1"), ("screen-file-v3", "screen-file-v2"), ("screen-page-v3", "screen-page-v2")):
+    STEP_FIELDS[_new] = tuple(list(keys) for keys in STEP_FIELDS[_old])
+    STEP_FIELD_OVERRIDES[_new] = dict(STEP_FIELD_OVERRIDES.get(_old, {}))
+    STEP_FIELDS[_new][0].extend(["package_kind", "package_name", "package_registry", "bid_amount", "review_status", "review_failure_reason"])
+STEP_FIELDS["merge-subs-v2"][1].extend(["bid_amount_from", "review_from", "review_reason_from", "unresolved_fields"])
+STEP_FIELDS["merge-subs-v2"][0].append("source_contexts")
+for _version in ("screen-file-v3", "screen-page-v3", "locate-pages-v4", "attachment-extract-v4"):
+    STEP_FIELDS[_version][0].extend(["target_entity", "supplier_name", "bid_amount", "review_status", "review_failure_reason"])
+
+
+for _new, _old in (("html-tables-v5", "html-tables-v4"),
+                   ("html-candidates-v5", "html-candidates-v4"),
+                   ("package-binding-v4", "package-binding-v3")):
+    STEP_FIELDS[_new] = tuple(list(keys) for keys in STEP_FIELDS[_old])
+    STEP_FIELD_OVERRIDES[_new] = dict(STEP_FIELD_OVERRIDES.get(_old, {}))
 
 
 def field_block(prompt_version: str) -> str:

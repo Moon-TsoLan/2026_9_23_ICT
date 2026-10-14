@@ -10,7 +10,18 @@ from __future__ import annotations
 from time import perf_counter
 from typing import Any
 
-from .db import num, q, q1, yuan
+from .db import num, q as db_q, q1 as db_q1, yuan
+from .results import annotate_units, result_from_storage, display_unit
+
+
+def q(sql, params=()):
+    return annotate_units(db_q(sql, params), db_q)
+
+
+def q1(sql, params=()):
+    rows = q(sql, params)
+    return rows[0] if rows else None
+
 
 Node = dict[str, Any]
 Edge = dict[str, Any]
@@ -62,108 +73,53 @@ def _bid_map(project_ids: list[str]) -> list[dict]:
     )
 
 
-def _short(project_name: str, package_no: str, limit: int = 18) -> str:
+def _short(project_name: str, package_no: str, limit: int = 18, package_name=None) -> str:
     name = project_name if len(project_name) <= limit else project_name[: limit - 1] + "…"
-    return f"{name} · 包{package_no}"
+    return f"{name} · {display_unit(package_name, package_no)}"
 
 
 # ---------------------------------------------------------------------
 # S1 采购单位 → 长期/大量合作的中标供应商、产品供应商
 # ---------------------------------------------------------------------
 def scene_s1(purchaser: str, limit: int = 5) -> dict:
+    from .supply import S1_SQL, SUPPLY_PAIRS_SQL, supply_graph, supply_id
+
     t0 = perf_counter()
-    rows = q(
-        """
-        WITH win AS (
-          SELECT s.name AS subject, count(*) AS coop_times, sum(p.package_total_amount) AS amount
-          FROM project p
-          JOIN bid b      ON b.project_id = p.project_id AND b.is_winner
-          JOIN supplier s ON s.supplier_id = b.supplier_id
-          WHERE p.purchaser = %s
-          GROUP BY s.name
-        ), ps AS (
-          SELECT c.product_supplier AS subject, count(DISTINCT c.project_id) AS coop_times,
-                 sum(c.total_price) AS amount
-          FROM project p JOIN cob c ON c.project_id = p.project_id
-          WHERE p.purchaser = %s AND c.product_supplier IS NOT NULL
-          GROUP BY c.product_supplier
-        )
-        SELECT '中标供应商' AS role, subject, coop_times, amount FROM win
-        UNION ALL
-        SELECT '产品供应商' AS role, subject, coop_times, amount FROM ps
-        ORDER BY coop_times DESC
-        """,
-        (purchaser, purchaser),
-    )
+    rows = q(S1_SQL, (purchaser, purchaser))
     projects = _projects_of_purchaser(purchaser)
-    pids = [p["project_id"] for p in projects]
-    wins = _win_map(pids)
-    supply_pairs = q(
-        """
-        SELECT DISTINCT project_id, product_supplier FROM cob
-        WHERE project_id = ANY(%s) AND product_supplier IS NOT NULL
-        """,
-        (pids,),
-    ) if pids else []
-
-    nodes: list[Node] = [_node(f"buyer:{purchaser}", purchaser, "buyer", len(projects))]
-    edges: list[Edge] = []
-    for p in projects:
-        pid = f"proj:{p['project_id']}"
-        nodes.append(_node(pid, _short(p["project_name"], p["package_no"]), "project", p["package_total_amount"]))
-        edges.append(_edge(pid, f"buyer:{purchaser}", "buy"))
-    seen: set[str] = set()
-    for w in wins:
-        nid = f"sup:{w['name']}"
-        if nid not in seen:
-            seen.add(nid)
-            times = next((r["coop_times"] for r in rows if r["role"] == "中标供应商" and r["subject"] == w["name"]), 1)
-            nodes.append(_node(nid, w["name"], "winner", times))
-        edges.append(_edge(f"proj:{w['project_id']}", nid, "win"))
-    for sp in supply_pairs:
-        nid = f"vendor:{sp['product_supplier']}"
-        if nid not in seen:
-            seen.add(nid)
-            nodes.append(_node(nid, sp["product_supplier"], "vendor", 1))
-        edges.append(_edge(f"proj:{sp['project_id']}", nid, "supply"))
-
+    pids = [project["project_id"] for project in projects]
+    winners = _win_map(pids)
+    supplies = q(SUPPLY_PAIRS_SQL, (pids,)) if pids else []
+    nodes, edges = supply_graph(purchaser, projects, winners, supplies, rows)
     top = rows[:limit]
-    highlight = [
-        f"sup:{r['subject']}" if r["role"] == "中标供应商" else f"vendor:{r['subject']}" for r in top
-    ]
-    total_amount = sum(num(r["amount"]) or 0 for r in rows)
+    highlight = [supply_id(row["subject"], row["identity_kind"]) for row in top]
+    total = q1("SELECT sum(package_total_amount) AS amount FROM project WHERE purchaser = %s", (purchaser,)) or {}
+    table_rows = [{"subject": row["subject"], "identity_kind": row["identity_kind"], "role": row["role"],
+                   "coop_times": row["coop_times"], "award_amount": num(row["award_amount"]),
+                   "supply_amount": num(row["supply_amount"])} for row in rows]
     return {
-        "scene": "S1",
-        "elapsed_ms": round((perf_counter() - t0) * 1000, 1),
+        "scene": "S1", "elapsed_ms": round((perf_counter() - t0) * 1000, 1),
         "graph": {"nodes": nodes, "edges": edges, "highlight_ids": highlight},
         "narrative": {
-            "title": f"{purchaser} · 长期合作供应商",
+            "title": f"{purchaser} · 长期合作供应方",
             "stats": [
-                {"k": "合作主体", "v": str(len(rows))},
-                {"k": "合作总次数", "v": str(sum(r["coop_times"] for r in rows))},
-                {"k": "交易总金额", "v": yuan(total_amount)},
+                {"k": "合作企业", "v": str(sum(row["identity_kind"] == "company" for row in rows))},
+                {"k": "品牌替代主体", "v": str(sum(row["identity_kind"] == "brand" for row in rows))},
+                {"k": "合作总次数", "v": str(sum(row["coop_times"] for row in rows))},
+                {"k": "采购包总金额", "v": yuan(total.get("amount"))},
             ],
-            "ranking": [
-                {
-                    "rank": i + 1,
-                    "id": highlight[i],
-                    "name": r["subject"],
-                    "metrics": {"角色": r["role"], "合作次数": r["coop_times"], "交易金额": num(r["amount"]) or 0},
-                }
-                for i, r in enumerate(top)
-            ],
-            "table": {
-                "columns": [
-                    {"key": "subject", "label": "主体", "align": "left"},
-                    {"key": "role", "label": "角色", "align": "left"},
-                    {"key": "coop_times", "label": "合作次数", "align": "right"},
-                    {"key": "amount", "label": "交易金额", "align": "right"},
-                ],
-                "rows": [
-                    {"subject": r["subject"], "role": r["role"], "coop_times": r["coop_times"], "amount": num(r["amount"])}
-                    for r in rows
-                ],
-            },
+            "ranking": [{"rank": index + 1, "id": highlight[index], "name": row["subject"],
+                         "metrics": {"角色": row["role"], "合作次数": row["coop_times"],
+                                     "中标金额": yuan(row["award_amount"]),
+                                     "供应标的金额": yuan(row["supply_amount"])}}
+                        for index, row in enumerate(top)],
+            "table": {"columns": [
+                {"key": "subject", "label": "主体", "align": "left"},
+                {"key": "role", "label": "角色", "align": "left"},
+                {"key": "coop_times", "label": "合作次数", "align": "right"},
+                {"key": "award_amount", "label": "中标金额", "align": "right"},
+                {"key": "supply_amount", "label": "供应标的金额", "align": "right"},
+            ], "rows": table_rows},
         },
     }
 
@@ -216,7 +172,7 @@ def scene_s2(purchaser: str, limit: int = 5) -> dict:
     edges: list[Edge] = []
     for p in projects:
         pid = f"proj:{p['project_id']}"
-        nodes.append(_node(pid, _short(p["project_name"], p["package_no"]), "project", p["package_total_amount"]))
+        nodes.append(_node(pid, _short(p["project_name"], p["package_no"], package_name=p.get("package_label")), "project", p["package_total_amount"]))
         edges.append(_edge(pid, f"buyer:{purchaser}", "buy"))
     top_names = {r["subject"] for r in top_bidders}
     for c in combos:  # 协同组合里的主体也保证出现
@@ -314,7 +270,7 @@ def scene_s3(winner: str, limit: int = 5) -> dict:
     edges: list[Edge] = []
     for p in projects:
         pid = f"proj:{p['project_id']}"
-        nodes.append(_node(pid, _short(p["project_name"], p["package_no"]), "project", p["package_total_amount"]))
+        nodes.append(_node(pid, _short(p["project_name"], p["package_no"], package_name=p.get("package_label")), "project", p["package_total_amount"]))
         edges.append(_edge(pid, f"sup:{winner}", "win"))
     meta = {r["subject"]: r for r in rows}
     for name in sorted(co_names):
@@ -504,7 +460,7 @@ def scene_s5(suppliers: list[str], limit: int = 20) -> dict:
         wins = sum(1 for r in rows if r["winners"] and name in r["winners"])
         nodes.append(_node(f"sup:{name}", name, "winner", max(wins, 1)))
     for r in rows:
-        nodes.append(_node(f"proj:{r['project_id']}", _short(r["project_name"], r["package_no"]), "project", r["package_total_amount"]))
+        nodes.append(_node(f"proj:{r['project_id']}", _short(r["project_name"], r["package_no"], package_name=r.get("package_label")), "project", r["package_total_amount"]))
     for b in bids:
         if b["name"] in subj_set:
             edges.append(_edge(f"proj:{b['project_id']}", f"sup:{b['name']}", "win" if b["is_winner"] else "bid"))
@@ -525,7 +481,7 @@ def scene_s5(suppliers: list[str], limit: int = 20) -> dict:
                 {
                     "rank": i + 1,
                     "id": f"proj:{r['project_id']}",
-                    "name": _short(r["project_name"], r["package_no"], 30),
+                    "name": _short(r["project_name"], r["package_no"], 30, r.get("package_label")),
                     "metrics": {"包金额": num(r["package_total_amount"]) or 0},
                 }
                 for i, r in enumerate(rows[:5])
@@ -539,7 +495,7 @@ def scene_s5(suppliers: list[str], limit: int = 20) -> dict:
                 ],
                 "rows": [
                     {
-                        "project_name": _short(r["project_name"], r["package_no"], 30),
+                        "project_name": _short(r["project_name"], r["package_no"], 30, r.get("package_label")),
                         "purchaser": r["purchaser"],
                         "amount": num(r["package_total_amount"]),
                         "winners": r["winners"] or "—",
@@ -588,7 +544,7 @@ def overview(supplier_cap: int = 220, min_bids: int = 2) -> dict:
         nodes.append(_node(f"buyer:{p['name']}", p["name"], "buyer", p["weight"]))
     for p in projects:
         pid = f"proj:{p['project_id']}"
-        nodes.append(_node(pid, _short(p["project_name"], p["package_no"]), "project", p["amount"]))
+        nodes.append(_node(pid, _short(p["project_name"], p["package_no"], package_name=p.get("package_label")), "project", p["amount"]))
         if p["purchaser"]:
             edges.append(_edge(pid, f"buyer:{p['purchaser']}", "buy"))
     for s in kept:

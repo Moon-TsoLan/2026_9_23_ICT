@@ -63,6 +63,22 @@ class LLMError(RuntimeError):
     pass
 
 
+@dataclass
+class ValidationIssue:
+    message: str
+    category: str = "schema"
+    path: str = "$"
+
+    def as_dict(self):
+        return {"category": self.category, "path": self.path, "message": self.message}
+
+
+class LLMValidationError(ValueError):
+    def __init__(self, issues, attempts):
+        self.issues, self.attempts = issues, attempts
+        super().__init__("; ".join(item.message for item in issues))
+
+
 class LLMClient:
     def complete(self, *, step: str, prompt_version: str, user: str,
                  thinking: bool = False) -> LLMResult:
@@ -222,14 +238,25 @@ def complete_json(
     counter: Counter | None = None,
     thinking: bool = False,
     notes: dict | None = None,
+    receiver=None,
 ) -> dict:
-    """Call the model and, if the JSON or enum check fails, retry once with the error."""
+    """Repair representation/plan errors once; a receiver may retain independent valid items.
+
+    Dependent merge plans never use a receiver. Business uncertainty must be returned as audit,
+    not represented by a validation exception. An unexpected validator exception is an
+    implementation error and is never sent back to the model as its own mistake.
+    """
     payload = user
-    last_error = "model output has no JSON object"
-    parsed: dict | None = None
+    attempts, issues = [], []
     for attempt in range(2):
-        result = llm.complete(step=step, prompt_version=prompt_version, user=payload,
-                              thinking=thinking)
+        try:
+            result = llm.complete(step=step, prompt_version=prompt_version, user=payload,
+                                  thinking=thinking)
+        except LLMError as exc:
+            if receiver is None or not receiver.received:
+                raise
+            attempts.append({"attempt": attempt + 1, "issues": [ValidationIssue(str(exc), "transport").as_dict()]})
+            return receiver.result(attempts)
         if notes is not None:
             notes["reasoning"] = (getattr(result, "reasoning", "") or "")[:1200]
         if counter is not None:
@@ -237,12 +264,35 @@ def complete_json(
         try:
             parsed = parse_json_object(result.text)
         except (ValueError, json.JSONDecodeError) as exc:
-            last_error = str(exc)
-            parsed = None
+            issues = [ValidationIssue(str(exc))]
         else:
-            last_error = validate(parsed) or ""
-            if not last_error:
-                return parsed
+            try:
+                checked = validate(parsed)
+            except Exception as exc:
+                issues = [ValidationIssue(str(exc), "implementation")]
+                raise LLMValidationError(issues, attempts) from exc
+            issues = ([checked] if isinstance(checked, ValidationIssue) else
+                      [ValidationIssue(checked)] if checked else [])
+            if not issues and receiver is not None:
+                issues = receiver.accept(parsed, attempt)
+            if not issues:
+                attempts.append({"attempt": attempt + 1, "issues": []})
+                if notes is not None:
+                    notes["attempts"] = attempts
+                return receiver.result(attempts) if receiver is not None else parsed
+        attempts.append({"attempt": attempt + 1, "issues": [item.as_dict() for item in issues]})
+        if notes is not None:
+            notes["attempts"] = attempts
+        if any(item.category not in {"schema", "plan_constraint"} for item in issues):
+            raise LLMValidationError(issues, attempts)
         if attempt == 0:
-            payload = f"{user}\n\n上一次输出不合法：{last_error}。请只输出符合枚举的 JSON。"
-    raise ValueError(last_error)
+            repair = {"previous_response": result.text,
+                      "validation_issues": [item.as_dict() for item in issues]}
+            if receiver is not None:
+                repair["accepted_independent_outputs"] = receiver.result(attempts)
+            payload = (user + "\n\n协议修复：以下是上次回答与具体错误。保留合法信息，只修复列出的错误；"
+                       "带依赖的计划须返回完整合法计划。独立通道已接收的条目由程序保留，不必重复。\n" +
+                       json.dumps(repair, ensure_ascii=False))
+    if receiver is not None and receiver.received:
+        return receiver.result(attempts)
+    raise LLMValidationError(issues, attempts)

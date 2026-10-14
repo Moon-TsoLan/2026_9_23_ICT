@@ -21,10 +21,12 @@ from dataclasses import dataclass, field
 
 from ict.catalog import Catalog
 from ict.config import COB_FIELDS, MERGE_THINKING, SUB_FIELDS
+from ict.packages import package_context
 from ict.concurrency import parallel_map
-from ict.llm import LLMClient, LLMError, complete_json
+from ict.llm import LLMClient, LLMError, LLMValidationError, ValidationIssue, complete_json
 from ict.schemas import (AnnouncementUnderstanding, Candidate, Cob, Failure, MergeEvidence,
                          MergedProjects, Project, Sub)
+from ict.merge_protocol import compile_plan, materialize, PlanSchemaError, PlanBusinessError
 
 PRICE_BUNDLE = ("unit_price", "quantity", "unit", "total_price")
 LINE_FIELDS = ("brand", "spec_model", "quantity", "unit_price", "total_price")
@@ -37,7 +39,7 @@ DETAIL_ROLES = {"cob_detail", "winner"}
 EXCLUDE_KINDS = ("subtotal_row", "project_row", "index_row", "not_an_object")
 DELTA_ORDER = ("exclude", "split", "merge", "sum", "name_from", "price_from", "fields_from",
                "category_from_announcement")
-PROMPT = "merge-objects-v3"
+PROMPT = "merge-objects-v6"
 # What fields_from is allowed to move onto a group. The two money numbers are deliberately not
 # here: a unit price from one row joined to a quantity from another invents a total nobody wrote.
 # They can still arrive through price_from with an explicit key list, where the source is named.
@@ -109,6 +111,10 @@ def _fill_category(base: Candidate, hit: dict, item: str) -> list[str]:
 
 
 def _value(candidate: Candidate, key: str):
+    if key not in candidate.fields:
+        return None
+    if candidate.fields[key].status == "unsupported":
+        return None
     field = candidate.fields[key]
     if field.normalized_value is not None:
         return field.normalized_value
@@ -145,7 +151,7 @@ def _tender(candidate: Candidate) -> bool:
 
 
 def _completeness(candidate: Candidate) -> int:
-    keys = COB_FIELDS if candidate.entity_type == "cob" else SUB_FIELDS
+    keys = COB_FIELDS if candidate.entity_type == "cob" else SUB_FIELDS[:4]
     return sum(1 for key in keys if _value(candidate, key) not in (None, ""))
 
 
@@ -334,6 +340,8 @@ def _winner_names(items: list[Candidate], evidence: MergeEvidence | None, packag
     # A document the gate read as an award notice names the winner by definition, which is how a
     # quote file earns the right to supply prices when the HTML marked nobody.
     for file_id, notice in (evidence.file_award_notices or {}).items():
+        if not any(item.source.file_id == file_id for item in items):
+            continue
         owner = (evidence.file_quote_suppliers or {}).get(file_id)
         if notice and owner and _norm_name(owner):
             names.add(_norm_name(owner))
@@ -472,6 +480,8 @@ def _candidate_view(candidate: Candidate, group_id: int, ctx: _Context,
         if winner_quote is not None:
             view["is_winner_quote"] = winner_quote
     if ev is not None:
+        view["source_refs"] = ev.source_refs
+        view["row_index"] = ev.row_index
         if ev.row_text:
             view["row_text"] = ev.row_text
         if ev.bidder_supplier:
@@ -507,7 +517,7 @@ def _candidate_view(candidate: Candidate, group_id: int, ctx: _Context,
 def _ask_merge(ctx: _Context, groups: list[Group], cobs: list[Candidate], amount: float | None,
                raw: str | None, suspect: str | None, evidence: MergeEvidence | None,
                llm: LLMClient, counter,
-               categories: list[str] | None = None) -> tuple[list[dict], str | None, str | None]:
+               categories: list[str] | None = None, amount_evidence=None) -> tuple[dict | None, dict | None, str | None]:
     by_group = {candidate.candidate_id: group.group_id for group in groups for candidate in group.members}
     payload = {
         "project_name": ctx.project_name,
@@ -525,20 +535,49 @@ def _ask_merge(ctx: _Context, groups: list[Group], cobs: list[Candidate], amount
     if categories:
         # 公告概要抄下来的品目，原文给到模型；选哪条属于内容判断，编码与名称由规则查目录补。
         payload["announcement_categories"] = list(categories)
-    group_ids = {group.group_id for group in groups}
-    candidate_ids = {item.candidate_id for item in cobs}
-    category_keys = {_pack(item) for item in (categories or [])}
+    by_id = {item.candidate_id: item for item in cobs}
+    category_hits = {item: _catalog().match(None, item) for item in (categories or [])}
+    allowed_amount = amount if suspect is None else None
+    payload["protocol_version"] = "delta-v5"
+    payload["package_amount_bindable"] = allowed_amount is not None
+    payload["package_amount_evidence"] = amount_evidence or {}
+    if evidence is not None:
+        payload["package_registry"] = evidence.package_registry
+        payload["evidence_context"] = {"attachment_pages": evidence.attachment_pages,
+                                       "native_extraction": evidence.native_extraction,
+                                       "amount_observations": evidence.amount_observations.get(ctx.package_no, [])}
+
+    def validate(parsed):
+        invalid["parsed"] = parsed
+        try:
+            plan = compile_plan(groups, by_id, parsed, lambda item: _ownership(item, ctx), _value,
+                                _sum_bundle, allowed_amount, category_hits, amount_evidence)
+            materialize(plan, lambda item: _ownership(item, ctx), _value,
+                        lambda item: _rank(item, ctx), ctx.package_no)
+        except PlanSchemaError as exc:
+            return ValidationIssue(str(exc), "schema", "merge_plan")
+        except PlanBusinessError as exc:
+            return ValidationIssue(str(exc), "business", "merge_plan")
+        except ValueError as exc:
+            return ValidationIssue(str(exc), "plan_constraint", "merge_plan")
+        return ""
     notes: dict = {}
+    invalid: dict = {}
     try:
         produced = complete_json(llm, step="merge_candidates", prompt_version=PROMPT,
                                  user=json.dumps(payload, ensure_ascii=False),
-                                 validate=lambda parsed: _validate_merge(parsed, group_ids, candidate_ids,
-                                                                         category_keys),
+                                 validate=validate,
                                  counter=counter, thinking=MERGE_THINKING, notes=notes)
     except (LLMError, ValueError) as exc:
-        return [], ("llm_call_failed" if isinstance(exc, LLMError) else "llm_schema_invalid"), None
-    deltas = produced.get("deltas")
-    return (deltas if isinstance(deltas, list) else []), None, (notes.get("reasoning") or None)
+        category = exc.issues[-1].category if isinstance(exc, LLMValidationError) else "transport"
+        return None, {"code": "llm_call_failed" if isinstance(exc, LLMError) else
+                      "merge_conflict_unresolved" if category == "business" else
+                      "llm_validator_incompatible" if category == "implementation" else
+                      "llm_plan_invalid" if category == "plan_constraint" else "llm_schema_invalid",
+                      "category": category, "attempts": getattr(exc, "attempts", []),
+                      "detail": str(exc), "deltas": invalid.get("parsed", {}).get("deltas", [])}, None
+    produced["_validation_attempts"] = notes.get("attempts", [])
+    return produced, None, (notes.get("reasoning") or None)
 
 
 def _validate_merge(parsed: dict, group_ids: set[int], candidate_ids: set[str],
@@ -1179,7 +1218,7 @@ def _alternatives(clusters: list[_Cluster]) -> list[dict]:
 # --------------------------------------------------------------------------- package amount
 
 def _package_amount(package, single: bool, understanding: AnnouncementUnderstanding,
-                    observed: dict[str, list], repairs: list[dict]) -> tuple[float | None, str | None, str | None]:
+                    observed: dict[str, list], repairs: list[dict], strict=False) -> tuple[float | None, str | None, str | None]:
     """One amount per package, from a fixed priority chain. Never derived from the lines.
 
     The announcement wins. Only where it says nothing does the attachment's own observation get a
@@ -1187,14 +1226,21 @@ def _package_amount(package, single: bool, understanding: AnnouncementUnderstand
     unfilled and stay in the log. An attachment-sourced amount is then excluded from
     reconciliation: a file that supplies both the lines and the total would only confirm itself.
     """
-    if package.package_amount and package.package_amount.amount_yuan is not None:
-        return package.package_amount.amount_yuan, "announcement", package.package_amount.raw_text
-    if single and understanding.summary_amount and understanding.summary_amount.amount_yuan is not None:
+    if (package.package_amount and package.package_amount.amount_yuan is not None
+            and (not strict or package.package_amount.amount_kind == "award")):
+        origin = "attachment" if package.package_amount.source_type != "html" else "announcement"
+        return package.package_amount.amount_yuan, origin, package.package_amount.raw_text
+    if (single and understanding.summary_amount and understanding.summary_amount.amount_yuan is not None
+            and (not strict or understanding.summary_amount.amount_kind == "award")):
         return understanding.summary_amount.amount_yuan, "announcement", understanding.summary_amount.raw_text
-    values = [str(item.raw_text) for item in observed.get(package.package_no, []) if item.amount_yuan is not None]
+    values = [str(item.raw_text) for item in observed.get(package.package_no, [])
+              if item.amount_yuan is not None and item.amount_kind == "award"
+              and (not strict or item.binding.get("status") == "bound")]
     distinct = list(dict.fromkeys(values))
     if len(distinct) == 1:
-        picked = next(item for item in observed[package.package_no] if str(item.raw_text) == distinct[0])
+        picked = next(item for item in observed[package.package_no]
+                      if str(item.raw_text) == distinct[0] and item.amount_kind == "award"
+                      and (not strict or item.binding.get("status") == "bound"))
         repairs.append({"package_no": package.package_no, "action": "package_amount_from_attachment",
                         "value": picked.amount_yuan, "raw_text": picked.raw_text, "file_id": picked.file_id,
                         "file_name": picked.file_name, "page_no": picked.page_no})
@@ -1253,6 +1299,8 @@ def merge_projects(run_id: str, understanding: AnnouncementUnderstanding, candid
                    package_amounts: list | None = None, evidence: MergeEvidence | None = None,
                    llm: LLMClient | None = None, counter=None) -> MergedProjects:
     known = {package.package_no: package for package in understanding.packages}
+    if llm is not None:
+        candidates = [item.model_copy(deep=True) for item in candidates]
     conflicts: list[dict] = []
     unassigned: list[dict] = []
     unmatched: list[dict] = []
@@ -1263,6 +1311,9 @@ def merge_projects(run_id: str, understanding: AnnouncementUnderstanding, candid
     list_sources: dict[str, str] = {}
     amount_origins: dict[str, str] = {}
     amount_audit: dict[str, dict] = {}
+    field_bindings: list[dict] = []
+    unresolved: list[dict] = []
+    sub_decisions: list[dict] = []
     observed: dict[str, list] = {}
     for item in package_amounts or []:
         observed.setdefault(str(item.package_no), []).append(item)
@@ -1290,7 +1341,7 @@ def merge_projects(run_id: str, understanding: AnnouncementUnderstanding, candid
     for package in understanding.packages:
         items = grouped.get(package.project_id, [])
         trace = _PackageTrace()
-        amount, origin, raw = _package_amount(package, single, understanding, observed, trace.repairs)
+        amount, origin, raw = _package_amount(package, single, understanding, observed, trace.repairs, strict=llm is not None)
         amount_origins[package.package_no] = origin
         ctx = _Context(package_no=package.package_no, project_name=understanding.project_name,
                        winners=_winner_names(items, evidence, package.package_no),
@@ -1329,13 +1380,15 @@ def merge_projects(run_id: str, understanding: AnnouncementUnderstanding, candid
                 cobs = others
         by_id = {item.candidate_id: item for item in cobs}
         groups, nameless = _baseline(cobs, ctx)
-        for candidate in nameless:
-            trace.unmatched.append({"candidate_id": candidate.candidate_id,
-                                    "reason": "missing_object_name"})
+        if llm is not None:
+            for candidate in nameless:
+                groups.append(Group(group_id=len(groups), members=[candidate]))
+        else:
+            for candidate in nameless:
+                trace.unmatched.append({"candidate_id": candidate.candidate_id,
+                                        "reason": "missing_object_name"})
 
-        wanted = llm is not None and (_needs_model(cobs) or
-                                      (bool(categories) and any(_category_missing(group)
-                                                                for group in groups)))
+        wanted = llm is not None and bool(cobs)
         if not wanted:
             trace.decisions.append({"package_no": package.package_no, "op": "model", "accepted": False,
                                     "reject": "no_model" if llm is None else "nothing_to_disambiguate"})
@@ -1343,19 +1396,24 @@ def merge_projects(run_id: str, understanding: AnnouncementUnderstanding, candid
             "package": package, "items": items, "amount": amount, "origin": origin, "raw": raw,
             "ctx": ctx, "cobs": cobs, "by_id": by_id, "groups": groups, "trace": trace,
             "wanted": wanted,
+            "amount_evidence": (package.package_amount.model_dump() if package.package_amount is not None
+                                and package.package_amount.raw_text == raw and package.package_amount.amount_yuan == amount
+                                else understanding.summary_amount.model_dump() if single and understanding.summary_amount
+                                and understanding.summary_amount.raw_text == raw else {"raw_text": raw, "origin": origin}),
             # Only a non-positive amount is suspicious; the hint itself is not a judgement.
-            "suspect_hint": None if amount is None or amount > 0 else "non_positive",
+            "suspect_hint": "attachment_amount_not_bindable" if origin == "attachment" else
+                            None if amount is None or amount > 0 else "non_positive",
         })
 
     # Phase 2: the per-package identity call, for the packages that asked for one. The requests are
     # independent - each sees only its own groups and the read-only evidence - so they may overlap.
-    asked: dict[str, list[dict]] = {}
+    asked: dict[str, dict | None] = {}
     if llm is not None:
         todo = [entry for entry in prepared if entry["wanted"]]
         for entry, produced in zip(todo, parallel_map(
                 lambda item: _ask_merge(item["ctx"], item["groups"], item["cobs"], item["amount"],
                                         item["raw"], item["suspect_hint"], evidence, llm, counter,
-                                        categories),
+                                        categories, item["amount_evidence"]),
                 todo)):
             deltas, fallback, note = produced
             asked[entry["package"].package_no] = deltas
@@ -1363,9 +1421,17 @@ def merge_projects(run_id: str, understanding: AnnouncementUnderstanding, candid
                 notes[entry["package"].package_no] = note
             if fallback:
                 entry["trace"].repairs.append({"package_no": entry["package"].package_no,
-                                               "action": "merge_model_fallback", "reason": fallback})
+                                               "action": "merge_model_fallback", "reason": fallback["code"],
+                                               "category": fallback.get("category"), "attempts": fallback.get("attempts", []),
+                                               "detail": fallback["detail"]})
+                entry["trace"].decisions.extend({"package_no": entry["package"].package_no, **delta,
+                                                 "accepted": False, "applied": False, "reject": fallback["detail"],
+                                                 "transaction_rolled_back": True}
+                                                for delta in fallback["deltas"] if isinstance(delta, dict))
+                unresolved.append({"package_no": entry["package"].package_no,
+                                   "reason": "merge_model_fallback"})
 
-    def finish_one(entry: dict, deltas: list[dict]) -> Project:
+    def finish_one(entry: dict, plan: dict | None) -> Project:
         """Phase 3 for one package: apply the model's answer and build the project.
 
         Everything this writes goes into the package's own buffers, which the parent flushes in
@@ -1379,10 +1445,39 @@ def merge_projects(run_id: str, understanding: AnnouncementUnderstanding, candid
         repairs, decisions = trace.repairs, trace.decisions
         conflicts, unmatched = trace.conflicts, trace.unmatched
 
-        groups, excluded = _apply_deltas(groups, deltas, by_id, ctx, decisions, category_map)
-        _donate_excluded(excluded, groups, ctx, decisions)
-        for candidate, kind in excluded:
-            unmatched.append({"candidate_id": candidate.candidate_id, "reason": kind})
+        protocol = plan is not None
+        if protocol:
+            compiled = compile_plan(groups, by_id, plan, lambda item: _ownership(item, ctx), _value,
+                                    _sum_bundle, amount if entry["suspect_hint"] is None and origin != "attachment" else None,
+                                    {item: _catalog().match(None, item) for item in categories}, entry["amount_evidence"])
+            outputs, bound_fields, pending, field_conflicts = materialize(
+                compiled, lambda item: _ownership(item, ctx), _value, lambda item: _rank(item, ctx), ctx.package_no)
+            for position, output in enumerate(outputs):
+                for binding in bound_fields:
+                    if binding["group_id"] == output["group_ref"]:
+                        binding["cob_index"] = position
+            field_bindings.extend(bound_fields)
+            unresolved.extend(pending)
+            conflicts.extend(field_conflicts)
+            decisions.extend({"package_no": ctx.package_no, **delta} for delta in compiled.decisions)
+            for cid, kind in compiled.excluded.items():
+                unmatched.append({"candidate_id": cid, "reason": kind})
+            clusters = []
+            for output in outputs:
+                base = output["base"].model_copy(deep=True)
+                for key, value in output["values"].items():
+                    _copy_field(base, key, value)
+                    if value is None:
+                        base.fields[key].status = "missing"
+                reading = Reading(label=output["price_ref"] or base.candidate_id,
+                                  bundle={key: output["values"][key] for key in PRICE_BUNDLE},
+                                  sources=output["price_sources"], kind="bound", derived=False)
+                clusters.append(_Cluster(base=base, members=output["members"], options=[], chosen=None, reading=reading,
+                                         bundle=reading.bundle, bundle_kind="bound"))
+            html_groups = sum(any(item.source.source_type == "html" for item in cluster.members) for cluster in clusters)
+        else:
+            groups, excluded = _apply_deltas(groups, [], by_id, ctx, decisions, category_map)
+            _donate_excluded(excluded, groups, ctx, decisions)
 
         kept: list[Group] = []
         for group in groups:
@@ -1393,41 +1488,58 @@ def merge_projects(run_id: str, understanding: AnnouncementUnderstanding, candid
                 unmatched.append({"candidate_id": candidate.candidate_id,
                                   "reason": _ownership(candidate, ctx)[2] or "cannot_own_object"})
         groups = kept
-
-        html_groups = sum(1 for group in groups if any(item.source.source_type == "html" for item in group.members))
-        clusters = [_reconcile(group, ctx, by_id, conflicts, decisions) for group in groups]
-        clusters = [item for item in clusters if _value(item.base, "object_name")]
+        if not protocol:
+            html_groups = sum(1 for group in groups if any(item.source.source_type == "html" for item in group.members))
+            clusters = [_reconcile(group, ctx, by_id, conflicts, decisions) for group in groups]
+            clusters = [item for item in clusters if _value(item.base, "object_name")]
         suspect = _suspect_amount(amount, raw)
         reconciling = None if (origin == "attachment" or suspect is not None) else amount
-        if reconciling is not None:
+        if reconciling is not None and not protocol:
             _arbitrate(clusters, reconciling, package.package_no, repairs, decisions)
-        else:
+        elif not protocol:
             _log_unchosen_sums(clusters, package.package_no, decisions,
                                "sum_unverified_no_package_amount" if amount is None
                                else "sum_unverified_suspect_package_amount")
-        alternatives[package.project_id] = _alternatives(clusters)
+        alternatives[package.project_id] = [] if protocol else _alternatives(clusters)
         list_sources[package.package_no] = ("none" if not clusters else
                                             "html" if html_groups == len(clusters) else
                                             "attachment" if html_groups == 0 else "mixed")
         amount_audit[package.package_no] = {
             "amount_yuan": amount, "raw_text": raw, "origin": origin, "suspect": suspect,
-            "reconciled": reconciling is not None,
+            "reconciled": reconciling is not None and not protocol,
+            "explicit_bindings_protected": protocol,
             "observations": ((evidence.amount_observations or {}).get(package.package_no, [])
                              if evidence is not None else []),
         }
 
         cobs_out = [_to_cob(cluster) for cluster in clusters]
-        if (len(cobs_out) == 1 and cobs_out[0].total_price is None and cobs_out[0].unit_price is None
+        if (not protocol and len(cobs_out) == 1 and cobs_out[0].total_price is None and cobs_out[0].unit_price is None
                 and reconciling is not None):
             cobs_out[0].total_price = reconciling
             repairs.append({"package_no": package.package_no, "action": "total_from_package_amount",
                             "value": reconciling})
 
-        subs, sub_ids, sub_conflicts, _ = _merge_entity(items, "sub")
+        from ict.sub_merge import merge_subs
+        sub_result = merge_subs(items, package.package_no, llm, counter, _value, package_context(package),
+                                evidence.source_contexts if evidence else None)
+        if sub_result is None or not sub_result["accepted"]:
+            subs, sub_ids, sub_conflicts, _ = _merge_entity(items, "sub")
+        if sub_result is not None:
+            sub_decisions.append({"package_no": package.package_no,
+                                  **{key: value for key, value in sub_result.items() if key not in {"subs", "source_ids"}}})
+            if sub_result["accepted"]:
+                subs, sub_ids = sub_result["subs"], sub_result["source_ids"]
+                sub_conflicts = []
+                unresolved.extend(sub_result["unresolved"])
+            else:
+                unresolved.append({"package_no": package.package_no, "reason": "sub_merge_model_fallback"})
         conflicts.extend(sub_conflicts)
         unique_products = list(dict.fromkeys(cob.product_supplier for cob in cobs_out if cob.product_supplier))
         suppliers = [
             Sub(supplier_name=sub.supplier_name, score=sub.score, is_winner=bool(sub.is_winner),
+                supplier_award_amount=sub.supplier_award_amount,
+                bid_amount=sub.bid_amount, review_status=sub.review_status,
+                review_failure_reason=sub.review_failure_reason,
                 cooperative_product_suppliers=unique_products if sub.is_winner else [])
             for sub in subs
         ]
@@ -1435,7 +1547,7 @@ def merge_projects(run_id: str, understanding: AnnouncementUnderstanding, candid
             project_id=package.project_id,
             source_project_no=understanding.source_project_no,
             project_name=understanding.project_name or "",
-            package_no=package.package_no,
+            **package_context(package),
             purchaser=understanding.purchaser,
             package_total_amount=None if suspect is not None else amount,
             cobs=cobs_out,
@@ -1452,7 +1564,7 @@ def merge_projects(run_id: str, understanding: AnnouncementUnderstanding, candid
         )
 
     for entry in prepared:
-        projects.append(finish_one(entry, asked.get(entry["package"].package_no, [])))
+        projects.append(finish_one(entry, asked.get(entry["package"].package_no)))
         trace = entry["trace"]
         repairs.extend(trace.repairs)
         decisions.extend(trace.decisions)
@@ -1460,7 +1572,7 @@ def merge_projects(run_id: str, understanding: AnnouncementUnderstanding, candid
         unmatched.extend(trace.unmatched)
 
     open_conflicts = [item for item in conflicts if item["field"] != "price_bundle"]
-    status = "partial" if open_conflicts or unassigned else "success"
+    status = "partial" if open_conflicts or unassigned or unresolved else "success"
     return MergedProjects(
         run_id=run_id,
         status=status,
@@ -1475,7 +1587,12 @@ def merge_projects(run_id: str, understanding: AnnouncementUnderstanding, candid
         repairs=repairs,
         merge_decisions=decisions,
         merge_notes=notes,
+        merge_attempts={number: plan.get("_validation_attempts", []) for number, plan in asked.items() if plan is not None},
         failures=[],
+        protocol_version="delta-v5" if llm is not None else None,
+        sub_merge_decisions=sub_decisions,
+        field_bindings=field_bindings,
+        unresolved=unresolved,
     )
 
 
@@ -1503,6 +1620,17 @@ def _merge_entity(items: list[Candidate], entity_type: str):
     conflicts: list[dict] = []
     unmatched: list[dict] = []
     keys = SUB_FIELDS
+    # Preserve all new observations before the old fallback mutates its selected candidate.
+    observed = {}
+    for item in items:
+        if item.entity_type != entity_type:
+            continue
+        identity = (MEMBER_RE.sub("", _norm_name(_value(item, "supplier_name"))),)
+        values = observed.setdefault(identity, {field: [] for field in SUB_FIELDS[4:]})
+        for field in SUB_FIELDS[4:]:
+            value = _value(item, field)
+            if value not in (None, "", "unknown") and value not in values[field]:
+                values[field].append(value)
     for candidate in items:
         if candidate.entity_type != entity_type:
             continue
@@ -1546,11 +1674,26 @@ def _merge_entity(items: list[Candidate], entity_type: str):
         if not _value(candidate, "supplier_name"):
             continue
         winner = _value(candidate, "is_winner")
+        new_values = {}
+        for field, values in observed[key].items():
+            new_values[field] = values[0] if len(values) == 1 else None
+            if len(values) > 1:
+                conflicts.append({"field": field, "supplier_name": _value(candidate, "supplier_name"),
+                                  "values": values, "reason": "sub_fallback_new_field_unresolved"})
+        new_values["review_status"] = new_values["review_status"] or "unknown"
+        if new_values["review_status"] != "failed":
+            new_values["review_failure_reason"] = None
+        if new_values["review_status"] == "failed" and winner:
+            conflicts.append({"field": "is_winner", "supplier_name": _value(candidate, "supplier_name"),
+                              "reason": "winner_review_conflict"})
+            winner = False
         merged.append(
             Sub(
                 supplier_name=str(_value(candidate, "supplier_name")),
                 score=_value(candidate, "score"),
                 is_winner=bool(winner) and str(winner).lower() not in {"false", "否", "0"},
+                supplier_award_amount=_value(candidate, "supplier_award_amount"),
+                **new_values,
             )
         )
     return merged, ids, conflicts, unmatched

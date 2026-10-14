@@ -32,6 +32,7 @@ class Peek:
     table_headers: list[list[str]] = field(default_factory=list)
     media_count: int = 0
     reason: str = ""
+    segments: list[dict] = field(default_factory=list)
 
     def short(self) -> dict:
         return {"file_id": self.file_id, "format": self.fmt, "readable": self.readable,
@@ -39,7 +40,7 @@ class Peek:
                 "view_chars": len(self.view), "headers": self.table_headers[:2], "reason": self.reason}
 
 
-def _pdf_text(path, limit_pages: int = 40) -> tuple[str, list[list[str]]]:
+def _pdf_text(path, limit_pages: int = 40, segments: list | None = None) -> tuple[str, list[list[str]]]:
     import pymupdf
 
     parts: list[str] = []
@@ -48,7 +49,10 @@ def _pdf_text(path, limit_pages: int = 40) -> tuple[str, list[list[str]]]:
     try:
         for index in range(min(document.page_count, limit_pages)):
             page = document[index]
-            parts.append(page.get_text() or "")
+            page_text = page.get_text() or ""
+            parts.append(page_text)
+            if segments is not None:
+                segments.append({"page_no": index + 1, "text": page_text})
             if len(headers) < 3:
                 try:
                     for table in page.find_tables().tables[:1]:
@@ -132,7 +136,12 @@ def peek_entry(entry: FileEntry, view_chars: int = 3000) -> Peek:
     try:
         # Reading a native document is the CPU work the two cores actually pay for.
         with LOCAL_GATE:
-            text, headers = loader(entry.path)
+            raw_segments: list[dict] = []
+            if entry.fmt == "pdf":
+                text, headers = _pdf_text(entry.path, segments=raw_segments)
+            else:
+                text, headers = loader(entry.path)
+                raw_segments = [{"page_no": 1, "text": text}]
     except Exception as exc:  # noqa: BLE001 - a broken file must not stop the run
         peek.reason = "peek_failed:" + type(exc).__name__
         return peek
@@ -140,6 +149,15 @@ def peek_entry(entry: FileEntry, view_chars: int = 3000) -> Peek:
     peek.price_hints = len(PRICE_HINT.findall(text))
     peek.table_headers = headers
     peek.view = text[:view_chars]
+    remaining = view_chars
+    for segment in raw_segments:
+        if remaining <= 0:
+            break
+        visible = segment["text"][:remaining]
+        peek.segments.append({"source_ref": f"file:{entry.file_id}:native:p{segment['page_no']}",
+                              "file_id": entry.file_id, "page_no": segment["page_no"],
+                              "text": visible, "coordinate_kind": "pdf_page" if entry.fmt == "pdf" else "native_segment"})
+        remaining -= len(visible) + 1
     if entry.fmt == "pdf" and text.strip():
         density = peek.full_chars // max(1, entry.pages or 1)
         peek.readable = density >= 20

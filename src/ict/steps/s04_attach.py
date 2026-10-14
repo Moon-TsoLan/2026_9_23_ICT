@@ -16,6 +16,7 @@ import re
 from pathlib import Path
 
 from ict.candidates import seal_candidate
+from ict.packages import package_context, hint_reference, reference_matches
 from ict.concurrency import PARSE_QUEUE, parallel_map
 from ict.config import (
     ATTACHMENTS_ROOT,
@@ -36,6 +37,7 @@ from ict.config import (
 )
 from ict.documents import read_native
 from ict.ids import make_project_id
+from ict.evidence import page_segments, resolve_context
 from ict.llm import LLMClient, LLMError, complete_json
 from ict.parse.client import ParseClient, ParseError, as_pages, contiguous_runs
 from ict.parse.peek import page_profiles, peek_entry
@@ -68,19 +70,30 @@ KIND_TO_CLASS = {
 }
 PARSE_KINDS = {"award_detail", "bid_quote", "winner_detail"}
 PARSE_METHOD_FORCED = "forced"
-def page_packages(text: str, known: list[str]) -> set[str]:
+def page_packages(text: str, known: list[str], package_registry=None) -> set[str]:
     known_set = set(known)
     found = set()
     for match in PAGE_PACKAGE_RE.finditer(text or ""):
         found.add(next(group for group in match.groups() if group))
-    return found & known_set
+    if package_registry is None:
+        return found & known_set
+    return {ref for number in found for ref in reference_matches(number, package_registry)} & known_set
 
 
-def coerce_package_scope(scope: str, possible: list[str], known: list[str], file_name: str) -> str:
+def coerce_package_scope(scope: str, possible: list[str], known: list[str], file_name: str,
+                         package_registry=None) -> str:
     """Keep a page on a package the announcement actually has."""
     known_set = set(known)
     possible_known = list(dict.fromkeys(package for package in possible if package in known_set))
     filename_package = _package_from_filename(file_name or "")
+    if package_registry is not None:
+        filename_package = hint_reference(filename_package, package_registry)
+        if scope not in known_set and scope not in {"announcement", "unknown", ""}:
+            matches = reference_matches(scope, package_registry)
+            if len(matches) > 1:
+                return "announcement"
+            if len(matches) == 1:
+                scope = matches[0]
     if filename_package not in known_set:
         filename_package = None
     if scope in known_set or scope == "announcement":
@@ -156,7 +169,7 @@ def triage_files(run_id: str, plans: ProjectPlans, index: AttachmentIndex | None
         # said it saw in this file. The package hint is the single number the filename names, kept
         # only when the announcement really has that package. Both feed inputs that already exist
         # downstream; no new branch decides anything.
-        hint = _package_from_filename(entry.name)
+        hint = hint_reference(_package_from_filename(entry.name), plans.projects)
         possible = [hint] if hint and hint in package_set else []
         return (
             FileDecision(
@@ -171,6 +184,8 @@ def triage_files(run_id: str, plans: ProjectPlans, index: AttachmentIndex | None
                                            "pages": entry.pages, "view_chars": peek.full_chars},
                 quote_supplier=decision.quote_supplier or None,
                 is_award_notice=decision.is_award_notice,
+                native_segments=peek.segments,
+                evidence_refs=decision.evidence_refs,
             ),
             None,
         )
@@ -261,7 +276,7 @@ def parse_pages(run_id: str, files: FileDecisions, index: AttachmentIndex, failu
         cap = job["cap"]
         try:
             if job["local"]:
-                pages = read_native(entry.path)
+                pages = read_native(entry.path, entry.fmt)
             else:
                 response = job["future"].result()
                 pages = as_pages(response)
@@ -333,11 +348,17 @@ def locate_pages(run_id: str, plans: ProjectPlans, files: FileDecisions, parsed:
                          "tables": len(page["tables"]), "chars": page["chars"]})
         page_inputs.append({"file_id": decision.file_id, "display_name": display_names.get(decision.file_id, decision.file_id),
                             "file_class": decision.file_class, "possible_packages": decision.possible_packages,
-                            "found_fields": decision.expected_fields, "pages": slim[:PAGE_LOCATE_LIMIT]})
+                            "found_fields": decision.expected_fields, "pages": slim[:PAGE_LOCATE_LIMIT],
+                            "native_evidence": {"segments": [segment for segment in decision.native_segments
+                                                           if segment["source_ref"] in decision.evidence_refs],
+                                                "reuse_status": decision.reuse_status,
+                                                "needs": [need for plan in plans.projects for need in plan.needs
+                                                          if need["field"] in decision.expected_fields]}})
     try:
         produced = complete_json(
-            llm, step="locate_pages", prompt_version="locate-pages-v1",
+            llm, step="locate_pages", prompt_version="locate-pages-v4",
             user=json.dumps({"known_packages": known_packages,
+                             "package_registry": [package_context(p) for p in plans.projects],
                              "needs": [entry for project in plans.projects for entry in (project.needs or [])],
                              "files": page_inputs}, ensure_ascii=False),
             validate=_validate_pages, counter=counter)
@@ -350,7 +371,7 @@ def locate_pages(run_id: str, plans: ProjectPlans, files: FileDecisions, parsed:
     mentioned: dict[tuple[str, int], set[str]] = {}
     for file_id, pages in parsed.items():
         for page in pages:
-            mentioned[(file_id, page["page_no"])] = page_packages(page["text"], known_packages)
+            mentioned[(file_id, page["page_no"])] = page_packages(page["text"], known_packages, plans.projects)
     decisions: list[PageDecision] = []
     per_file: dict[str, int] = {}
     for item in produced.get("page_decisions") or []:
@@ -367,7 +388,7 @@ def locate_pages(run_id: str, plans: ProjectPlans, files: FileDecisions, parsed:
         meta = next((entry for entry in page_inputs if entry["file_id"] == file_id), {})
         scope = coerce_package_scope(str(item.get("package_scope") or "unknown"),
                                      list(meta.get("possible_packages") or []), known_packages,
-                                     name_by_file.get(file_id, ""))
+                                     name_by_file.get(file_id, ""), plans.projects)
         if len(mentioned.get((file_id, page_no), set())) >= 2:
             scope = "announcement"
         decisions.append(PageDecision(file_id=file_id, page_no=page_no,
@@ -382,12 +403,6 @@ def locate_pages(run_id: str, plans: ProjectPlans, files: FileDecisions, parsed:
 def _validate_candidates(parsed: dict) -> str:
     if not isinstance(parsed.get("candidates"), list):
         return "需要 candidates 数组"
-    amounts = parsed.get("package_amounts")
-    if amounts is not None and not isinstance(amounts, list):
-        return "package_amounts 必须是数组"
-    for item in amounts or []:
-        if not isinstance(item, dict) or not str(item.get("package_no") or "") or not str(item.get("raw_text") or ""):
-            return "package_amounts 每项需要 package_no 与 raw_text"
     return ""
 
 
@@ -404,7 +419,9 @@ def extract_attachment_candidates(run_id: str, project_name: str, plans: Project
                                 package_amounts: list | None = None,
                                 file_quote_suppliers: dict[str, str] | None = None,
                                 winner_suppliers: dict[str, list[str]] | None = None,
-                                file_award_notices: dict[str, bool] | None = None):
+                                file_award_notices: dict[str, bool] | None = None,
+                                need_resolutions: list | None = None,
+                                reception: list | None = None):
     """Step 6. Extract from parsed pages, one call per package scope, chunked not truncated."""
     failures = failures if failures is not None else []
     candidates: list[Candidate] = []
@@ -438,6 +455,9 @@ def extract_attachment_candidates(run_id: str, project_name: str, plans: Project
             "found_fields": (file_found_fields or {}).get(decision.file_id, []),
             "source_type": {"vl": "pdf", "docx": "docx", "xlsx": "xlsx", "pdf": "pdf"}.get(page.get("source"), "pdf"),
             "quote_supplier": (file_quote_suppliers or {}).get(decision.file_id),
+            "source_segments": page.get("source_segments") or page_segments(decision.file_id, {
+                **page, "text": page["text"][:PAGE_CONTEXT_CHARS],
+                "tables": page["tables"][:PAGE_CONTEXT_TABLES]}),
         })
 
     plans_by_no = {project.package_no: project for project in plans.projects}
@@ -448,18 +468,27 @@ def extract_attachment_candidates(run_id: str, project_name: str, plans: Project
         plan = plans_by_no.get(package_no)
         payload = {"current_package": {
             "project_id": None if plan is None else plan.project_id,
+            **({} if plan is None else package_context(plan)),
             "package_no": None if package_no in {"unknown", "announcement"} else package_no,
-            "missing_fields": [] if plan is None else plan.missing_fields,
-            "needs": [] if plan is None else (plan.needs or []),
+            "missing_fields": list(dict.fromkeys(field for item in plans.projects for field in item.missing_fields))
+                              if plan is None else plan.missing_fields,
+            "needs": [need for item in plans.projects for need in item.needs]
+                     if plan is None else (plan.needs or []),
             # Already established upstream, so step 6 copies it instead of re-deriving it.
             # Empty means nobody knows yet and the page is the only place left to look.
             "winner_supplier": _known_winner(package_no, chunk, winner_suppliers,
                                              file_quote_suppliers, file_award_notices)},
-            "page_contexts": chunk}
+            "page_contexts": chunk,
+            "known_packages": [{**package_context(project), "project_id": project.project_id,
+                                 "needs": project.needs} for project in plans.projects]}
+        payload["native_reuse"] = any(":native:" in segment["source_ref"] for context in chunk
+                                      for segment in context["source_segments"])
         try:
+            from ict.receiving import ExtractionReceiver
             produced = complete_json(
-                llm, step="extract_attachment_candidates", prompt_version="attachment-extract-v1",
-                user=json.dumps(payload, ensure_ascii=False), validate=_validate_candidates, counter=counter)
+                llm, step="extract_attachment_candidates", prompt_version="attachment-extract-v4",
+                user=json.dumps(payload, ensure_ascii=False), validate=_validate_candidates, counter=counter,
+                receiver=ExtractionReceiver(chunk))
         except (LLMError, ValueError) as exc:
             code = "llm_call_failed" if isinstance(exc, LLMError) else "llm_schema_invalid"
             return {**job, "payload": payload, "produced": None,
@@ -489,16 +518,30 @@ def extract_attachment_candidates(run_id: str, project_name: str, plans: Project
         if produced is None:
             failures.append(asked["failure"])
             continue
+        receipt = {"package_scope": package_no,
+                   "source_refs": [segment["source_ref"] for context in chunk for segment in context["source_segments"]],
+                   **produced.get("reception", {})}
+        if reception is not None:
+            reception.append(receipt)
+        if receipt.get("rejected_items") or receipt.get("unrepaired"):
+            failures.append(Failure(failure_code="llm_schema_invalid", location=package_no,
+                failure_message="独立输出已保留；接收审计含结构错误或未归属金额"))
         for entry in produced.get("candidates") or []:
             entity = entry.get("entity_type")
             if entity not in {"cob", "sub"}:
                 continue
             file_id = entry.get("file_id") or (chunk[0]["file_id"] if chunk else None)
-            context = next((item for item in chunk if item["file_id"] == file_id), chunk[0] if chunk else {})
+            context = resolve_context(entry, chunk)
+            if context is None:
+                failures.append(Failure(failure_code="llm_schema_invalid", location=str(file_id),
+                                        failure_message="候选未引用唯一来源页或片段"))
+                continue
+            file_id = context["file_id"]
             file_class = (file_classes or {}).get(file_id or "", DEFAULT_FILE_CLASS)
-            item_package = entry.get("package_no") or payload["current_package"]["package_no"] or \
-                _package_from_filename(context.get("file_name", ""))
+            item_package = entry.get("package_no") or payload["current_package"]["package_no"]
             project_id = make_project_id(project_name, str(item_package)) if item_package and project_name else None
+            segment = next((item for item in context["source_segments"]
+                            if item["source_ref"] == entry.get("source_ref")), None)
             candidates.append(seal_candidate(
                 candidate_id="cand_%06d" % seq, entity_type=entity, project_id=project_id,
                 package_no=None if item_package is None else str(item_package),
@@ -506,8 +549,10 @@ def extract_attachment_candidates(run_id: str, project_name: str, plans: Project
                 source_priority=int(CLASS_PRIORITY.get(file_class, DEFAULT_SOURCE_PRIORITY)),
                 raw_fields=entry.get("fields") or {}, issues=entry.get("issues") or [],
                 source_class=file_class, page_no=context.get("page_no"),
-                table_index=_int_or_none(entry.get("table_index")),
-                row_text=_row_text_of(entry),
+                table_index=segment.get("table_index") if segment else _int_or_none(entry.get("table_index")),
+                row_index=segment.get("row_index") if segment else None,
+                row_text=segment.get("text") if segment else _row_text_of(entry),
+                source_refs=[segment["source_ref"]] if segment else [],
                 quote_supplier=entry.get("quote_supplier") or context.get("quote_supplier"),
                 bidder_supplier=entry.get("bidder_supplier"),
                 winner_supplier=entry.get("winner_supplier")
@@ -516,7 +561,89 @@ def extract_attachment_candidates(run_id: str, project_name: str, plans: Project
         if package_amounts is not None:
             package_amounts.extend(_package_amount_records(
                 produced.get("package_amounts"), chunk, package_no, file_classes, file_names))
+        if need_resolutions is not None:
+            need_resolutions.extend(item for item in produced.get("need_resolutions", []) if isinstance(item, dict))
     return candidates, failures, quality, seq
+
+
+def extract_screen_evidence(run_id, project_name, plans, decisions, index, llm, seq, counter=None,
+                            package_amounts=None, winners=None, reception=None):
+    """Feed only model-cited, already seen native text to the regular extraction function."""
+    parsed, selected = {}, []
+    for decision in decisions.file_decisions:
+        if not decision.evidence_refs or decision.read_strategy != "target_pages":
+            continue
+        for segment in decision.native_segments:
+            if segment["source_ref"] not in decision.evidence_refs:
+                continue
+            page = {"page_no": segment["page_no"], "text": segment["text"], "tables": [],
+                "chars": len(segment["text"]), "source": (getattr(decision, "screen", None) or {}).get("format", "pdf"),
+                    "source_segments": [segment]}
+            parsed.setdefault(decision.file_id, []).append(page)
+            selected.append(PageDecision(file_id=decision.file_id, page_no=page["page_no"], relevance=1,
+                                         package_scope="announcement", extraction_mode="text",
+                                         expected_fields=decision.expected_fields, reason="model_cited_native_evidence"))
+    resolutions = []
+    candidates, failures, quality, seq = extract_attachment_candidates(
+        run_id, project_name, plans, PageDecisions(run_id=run_id, status="success", page_decisions=selected),
+        parsed, llm, seq, counter=counter,
+        file_classes={item.file_id: item.file_class for item in decisions.file_decisions},
+        file_names=file_names_of(index),
+        file_found_fields={item.file_id: item.expected_fields for item in decisions.file_decisions},
+        file_quote_suppliers={item.file_id: item.quote_supplier for item in decisions.file_decisions if item.quote_supplier},
+        winner_suppliers=winners, package_amounts=package_amounts, need_resolutions=resolutions,
+        reception=reception)
+    return candidates, failures, quality, seq, parsed, resolutions
+
+
+def apply_native_resolutions(plans, decisions, candidates, resolutions):
+    """Found evidence is not final resolution: require extracted values and matching ownership."""
+    needs = {need.get("need_id"): need for plan in plans.projects for need in plan.needs}
+    resolved = set()
+    coverage = {}
+    for resolution in resolutions:
+        need = needs.get(resolution.get("need_id"))
+        if need is None or need.get("purpose") != "fill_field" or need["field"] != resolution.get("field"):
+            continue
+        target = resolution.get("target_candidate_id")
+        if target not in need.get("target_candidate_ids", []):
+            continue
+        sources = [item for item in candidates if item.evidence and
+                       resolution.get("source_ref") in item.evidence.source_refs and
+                       item.package_no == need["package_no"] and need["field"] in item.fields and
+                       item.fields[need["field"]].status == "present"]
+        # SUB resolutions must identify a unique observation, not any supplier on the same page.
+        if need.get("target_entity") == "sub":
+            sources = [item for item in sources if resolution.get("source_candidate_ref") in item.evidence.source_refs
+                       and item.entity_type == "sub"
+                       and (item.fields[need["field"]].normalized_value if item.fields[need["field"]].normalized_value is not None
+                            else item.fields[need["field"]].raw_value) not in (None, "", "unknown")]
+        source = sources[0] if len(sources) == 1 else None
+        if source is not None:
+            coverage.setdefault(need["need_id"], {})[target] = resolution["source_ref"]
+    for need_id, targets in coverage.items():
+        need = needs[need_id]
+        need["source_refs"] = list(dict.fromkeys(targets.values()))
+        need["covered_target_candidate_ids"] = list(targets)
+        if set(need["target_candidate_ids"]) <= set(targets):
+            need["state"] = "evidence_ready"
+            resolved.add(need_id)
+    for decision in decisions.file_decisions:
+        if not decision.evidence_refs:
+            continue
+        relevant = [need for need in needs.values() if need["field"] in decision.expected_fields
+                    and need.get("purpose") != "discover_objects"]
+        # A discovery or binding task cannot be declared done by an ordinary field observation.
+        complete = bool(relevant) and all(need.get("need_id") in resolved for need in relevant)
+        if complete and not (getattr(decision, "screen", None) or {}).get("requires_deep_parse", True):
+            decision.read_strategy = "skip"
+            decision.reuse_status = "native_evidence_ready"
+            # Discovery stays pending. This file was judged by the model not to need deeper parsing;
+            # that does not certify the announcement's complete object inventory.
+            decision.reason += ":native_evidence_ready"
+        else:
+            decision.reuse_status = "native_evidence_partial"
+    return resolved
 
 
 def _known_winner(package_no: str, chunk: list[dict], winner_suppliers: dict[str, list[str]] | None,
@@ -529,7 +656,7 @@ def _known_winner(package_no: str, chunk: list[dict], winner_suppliers: dict[str
     is already known and re-deriving it from the page would only risk a different spelling.
     """
     known = (winner_suppliers or {}).get(package_no) or []
-    if known:
+    if len(known) == 1:
         return known[0]
     for context in chunk:
         file_id = context.get("file_id")
@@ -572,12 +699,13 @@ def _package_amount_records(items, chunk: list[dict], group_package: str,
     for item in items or []:
         if not isinstance(item, dict):
             continue
-        package_no = str(item.get("package_no") or group_package or "").strip()
+        package_no = str(item.get("package_no") or "").strip()
         raw_text = str(item.get("raw_text") or "").strip()
         if not package_no or not raw_text:
             continue
-        context = next((entry for entry in chunk if entry["file_id"] == item.get("file_id")),
-                       chunk[0] if chunk else {})
+        context = resolve_context(item, chunk)
+        if context is None:
+            continue
         value, _ = parse_amount(raw_text)
         key = (package_no, raw_text, context.get("file_id"), context.get("page_no"))
         if key in seen:
@@ -589,5 +717,6 @@ def _package_amount_records(items, chunk: list[dict], group_package: str,
             source_type=context.get("source_type", "pdf"), file_id=file_id,
             file_name=(file_names or {}).get(file_id or "", ""),
             page_no=context.get("page_no"),
-            file_class=(file_classes or {}).get(file_id or "", DEFAULT_FILE_CLASS)))
+            file_class=(file_classes or {}).get(file_id or "", DEFAULT_FILE_CLASS),
+            amount_kind=item.get("amount_kind", "unknown"), source_ref=item.get("source_ref")))
     return out

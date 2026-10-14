@@ -39,6 +39,6 @@ def extract_announcement(html_source: Path | bytes, attachment_dir: Path | None 
 
         report = run_announcement(announcement_id, html_dir=html_dir,
                                   attachments_root=attachments_root, persist=persist)
-        return {"report": report, "projects": report.projects, "announcement_id": announcement_id}
+        return {"report": report, "result": report.result, "projects": report.projects, "announcement_id": announcement_id}
     finally:
         shutil.rmtree(scratch, ignore_errors=True)

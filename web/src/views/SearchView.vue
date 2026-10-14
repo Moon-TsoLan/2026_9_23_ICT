@@ -56,10 +56,15 @@ const chips = computed(() => {
   }
   if (query.price_min != null || query.price_max != null) {
     const field = query.price_field === 'unit_price' ? '单价' : '总价'
-    list.push({ key: 'price', label: `${field} ${query.price_min ?? 0} ~ ${query.price_max ?? '∞'}` })
+    list.push({ key: 'price', label: `${field} ${query.price_min ?? 0} ~ ${query.price_max ?? '∞'} 万元` })
   }
   return list
 })
+
+function yuanQuery(): CobSearchQuery {
+  return { ...query, price_min: query.price_min == null ? null : query.price_min * 10000,
+    price_max: query.price_max == null ? null : query.price_max * 10000 }
+}
 
 let seq = 0
 
@@ -68,7 +73,7 @@ async function load() {
   state.value = 'loading'
   errorMsg.value = ''
   try {
-    const res = await api.searchObjects({ ...query })
+    const res = await api.searchObjects(yuanQuery())
     if (my !== seq) return
     rows.value = res.items
     total.value = res.total
@@ -128,7 +133,7 @@ function gotoPage(p: number) {
   void load()
 }
 
-const exportHref = computed(() => api.exportUrl({ ...query }))
+const exportHref = computed(() => api.exportUrl(yuanQuery()))
 
 // 关键词防抖：只触发关键词，不动其他条件
 let kwTimer = 0
@@ -191,9 +196,9 @@ async function onNoticeRun() {
           <p class="kicker">任务一 · 提取结果</p>
           <h1 class="h-serif">标的检索</h1>
         </div>
-        <a class="btn-ghost" :href="exportHref" download>
+        <a class="btn-ghost" :href="exportHref" title="导出筛选命中公告的完整三表" download>
           <Download :size="14" />
-          导出 CSV
+          导出 XLSX
         </a>
       </header>
 
@@ -219,9 +224,9 @@ async function onNoticeRun() {
               <option value="total_price">总价</option>
               <option value="unit_price">单价</option>
             </select>
-            <input v-model.number="query.price_min" class="input" type="number" min="0" placeholder="最低" @keydown.enter="applyFilters" />
+            <input v-model.number="query.price_min" class="input" type="number" min="0" placeholder="最低（万元）" @keydown.enter="applyFilters" />
             <span class="text-faint">—</span>
-            <input v-model.number="query.price_max" class="input" type="number" min="0" placeholder="最高" @keydown.enter="applyFilters" />
+            <input v-model.number="query.price_max" class="input" type="number" min="0" placeholder="最高（万元）" @keydown.enter="applyFilters" />
           </div>
           <div class="flex gap-2">
             <button class="btn" @click="applyFilters">查询</button>
@@ -283,12 +288,12 @@ async function onNoticeRun() {
                 </template>
               </td>
               <td class="left">
-                <span class="block max-w-[240px] truncate">{{ row.project_name }} · 包{{ row.package_no }}</span>
+                <span class="block max-w-[240px] truncate">{{ row.project_name }} · {{ row.package_label ?? row.package_name ?? "采购单元 " + row.package_no }}</span>
                 <span class="block max-w-[240px] truncate text-muted">{{ orDash(row.purchaser) }}</span>
               </td>
               <td class="left">{{ orDash(row.category_name) }}</td>
               <td class="left">
-                <span class="block max-w-[140px] truncate">{{ orDash(row.brand) }}</span>
+                <span class="block max-w-[140px] truncate" >{{ orDash(row.brand) }}</span>
                 <span class="block max-w-[140px] truncate text-muted">{{ orDash(row.spec_model) }}</span>
               </td>
               <td class="right num">{{ fmtYuan(row.unit_price) }}</td>

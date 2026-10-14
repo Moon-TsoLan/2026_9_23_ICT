@@ -6,7 +6,7 @@ import re
 
 from ict.catalog import Catalog
 from ict.money import parse_price_cell, parse_quantity
-from ict.schemas import Candidate, CandidateFile, Failure
+from ict.schemas import Candidate, CandidateFile, Failure, FieldObservation
 
 PRICE_FIELDS = ("unit_price", "total_price")
 # Half-width applies to the round brackets and the ideographic space only. The enumeration comma,
@@ -120,7 +120,7 @@ def _normalize_cob(candidate: Candidate, catalog: Catalog, errors: list[str], wa
             warnings.append("total_price_mismatch")
     name = fields["object_name"]
     if name.status != "present":
-        errors.append("missing_object_name")
+        warnings.append("missing_object_name_pending_merge")
     else:
         name.normalized_value = norm_text(name.raw_value)
     for key in ("brand", "product_supplier", "spec_model", "category_name", "category_code"):
@@ -135,12 +135,11 @@ def _normalize_cob(candidate: Candidate, catalog: Catalog, errors: list[str], wa
         if code:
             errors.append("category_code_not_found")
     elif hit.get("matched_code"):
-        if fields["category_code"].status == "missing":
-            fields["category_code"].normalized_value = hit["matched_code"]
-            fields["category_code"].status = "present"
-        if fields["category_name"].status == "missing":
-            fields["category_name"].normalized_value = hit["matched_name"]
-            fields["category_name"].status = "present"
+        if not hit.get("conflict"):
+            for key, value in (("category_code", hit["matched_code"]), ("category_name", hit["matched_name"])):
+                fields[key].normalized_value = value
+                fields[key].status = "present"
+                fields[key].normalization = hit
         if hit.get("conflict"):
             errors.append("category_conflict")
         if fields["category_type"].status == "missing" and hit.get("category_type"):
@@ -161,6 +160,26 @@ def _normalize_cob(candidate: Candidate, catalog: Catalog, errors: list[str], wa
 
 
 def _normalize_sub(candidate: Candidate, errors: list[str]) -> None:
+    for key in ("supplier_award_amount", "bid_amount"):
+        amount = candidate.fields.setdefault(key, FieldObservation(status="missing"))
+        if amount.status == "present":
+            parsed = parse_price_cell(amount.raw_value, (candidate.evidence.column_units if candidate.evidence else {}).get(key))
+            amount.normalization = {"currency": "CNY", "unit": "yuan", "multiplied_by_10000": parsed["multiplied_by_10000"]}
+            if parsed["invalid"] or parsed["ambiguous"]:
+                amount.status = "unparsable" if parsed["invalid"] else "low_confidence"
+                errors.append("invalid_" + key)
+            else:
+                amount.normalized_value = parsed["value"]
+    review = candidate.fields.setdefault("review_status", FieldObservation(status="missing"))
+    if review.status == "present":
+        if review.raw_value in ("passed", "failed", "unknown"):
+            review.normalized_value = review.raw_value
+        else:
+            review.status = "unparsable"
+            errors.append("invalid_review_status")
+    reason = candidate.fields.setdefault("review_failure_reason", FieldObservation(status="missing"))
+    if reason.status == "present":
+        reason.normalized_value = norm_text(reason.raw_value)
     name = candidate.fields["supplier_name"]
     if name.status != "present" or not str(name.raw_value or "").strip():
         errors.append("missing_supplier_name")

@@ -30,9 +30,12 @@ class Catalog:
         code = (raw_code or "").strip().upper()
         name = (raw_name or "").strip()
         found_code = CODE_RE.search(code) or CODE_RE.search(name)
-        if found_code and found_code.group(1) in self.entries:
-            entry = self.entries[found_code.group(1)]
-            conflict = bool(name) and _norm(name) not in {_norm(entry["name"]), _norm(entry["path"])}
+        selected_code = found_code.group(1) if found_code else _norm(name)[:9]
+        if selected_code in self.entries:
+            entry = self.entries[selected_code]
+            allowed = {_norm(entry["name"]), _norm(entry["path"]), selected_code,
+                       selected_code + _norm(entry["name"]), selected_code + _norm(entry["path"])}
+            conflict = bool(name) and _norm(name) not in allowed
             return self._hit("exact_code", entry, conflict)
         if "/" in name or "／" in name:
             entry = self.by_path.get(_norm(name))

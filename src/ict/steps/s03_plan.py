@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ict.config import COB_FIELDS, OFFICIAL_SEVEN
+from ict.packages import package_context
 from ict.schemas import AnnouncementUnderstanding, Candidate, Failure, FieldStat, ProjectPlan, ProjectPlans
 
 
@@ -114,14 +115,55 @@ def plan_projects(
         if not any(item.fields["score"].normalized_value is not None or item.fields["score"].raw_value not in (None, "")
                    for item in subs):
             targets.append({"field": "score", "reason": "absent", "package_no": package.package_no})
+        # Supplier tasks are distinct from COB coverage; never infer review from score/winner.
+        supplier_targets = []
+        for sub in subs:
+            for field in ("bid_amount", "review_status", "review_failure_reason"):
+                obs = sub.fields.get(field)
+                value = None if obs is None else (obs.normalized_value if obs.normalized_value is not None else obs.raw_value)
+                review = sub.fields.get("review_status")
+                status = None if review is None else (review.normalized_value if review.normalized_value is not None else review.raw_value)
+                if field == "review_failure_reason" and status != "failed":
+                    continue
+                if value in (None, "", "unknown") or obs.status != "present":
+                    supplier_targets.append({"field": field, "reason": "absent", "package_no": package.package_no,
+                        "target_entity": "sub", "target_candidate_ids": [sub.candidate_id]})
+        targets.extend(supplier_targets)
+        # Inventory completeness is not established by one observed supplier.
+        targets.append({"field": "supplier_name", "reason": "maybe_more_objects",
+                        "package_no": package.package_no, "target_entity": "sub"})
+        if has_attachment:
+            needs = True
         # Standing target: the announcement's own object list is often one summary row plus
         # 详见附件, so attachments may still hold objects the announcement never named.
         targets.append({"field": "object_name", "reason": "maybe_more_objects",
                         "package_no": package.package_no})
+        for target in targets:
+            target.update(package_context(package))
+            suffix = ":" + ":".join(target.get("target_candidate_ids", [])) if target.get("target_candidate_ids") else ""
+            target["need_id"] = f"need:{package.package_no}:{target['field']}:{target['reason']}" + suffix
+            target["purpose"] = "discover_objects" if target["reason"] == "maybe_more_objects" else "fill_field"
+            target["target_candidate_ids"] = target.get("target_candidate_ids", [item.candidate_id for item in (subs if target.get("target_entity") == "sub" else cobs)
+                                               if target["field"] in item.fields
+                                               and item.fields[target["field"]].status != "present"])
+            target["target_observations"] = [{"candidate_id": item.candidate_id, "supplier_name": item.fields["supplier_name"].raw_value}
+                for item in subs if item.candidate_id in target["target_candidate_ids"]]
+            target["state"] = "pending"
+        pending = [item for item in candidates if item.package_no is None]
+        if pending:
+            targets.append({"need_id": f"need:{package.package_no}:binding", "field": "package_binding",
+                            "reason": "absent", "purpose": "resolve_binding", "state": "pending",
+                            "package_no": package.package_no,
+                            "target_candidate_ids": [item.candidate_id for item in pending],
+                            "target_observations": [{"candidate_id": item.candidate_id,
+                                                     "fields": {key: obs.raw_value for key, obs in item.fields.items()
+                                                                if obs.raw_value not in (None, "")}}
+                                                    for item in pending]})
+            needs = has_attachment
         projects.append(
             ProjectPlan(
                 project_id=package.project_id,
-                package_no=package.package_no,
+                **package_context(package),
                 cob_candidate_ids=[item.candidate_id for item in cobs],
                 sub_candidate_ids=[item.candidate_id for item in subs],
                 field_stats=stats,

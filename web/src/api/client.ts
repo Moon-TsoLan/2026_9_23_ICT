@@ -80,8 +80,9 @@ export const api = {
 
   objectDetail: (cobId: number) => http<CobRecord>(`/objects/${cobId}`),
 
-  /** CSV 导出直接走浏览器下载，不需要经过 fetch */
+  /** 三表 XLSX 导出（按筛选命中的公告导出完整结果）直接走浏览器下载，不需要经过 fetch */
   exportUrl: (query: CobSearchQuery) => `${BASE}/objects/export${qs(searchParams(query))}`,
+  announcementExportUrl: (aid: string) => `${BASE}/announcements/${encodeURIComponent(aid)}/export`,
 
   sceneQuery: (scene: SceneId, subjects: string[], limit = 5) =>
     http<SceneResult>(`/scenes/${scene}/query`, {

@@ -19,7 +19,7 @@ const CATEGORY_TYPE_LABEL: Record<string, string> = { A: '货物', B: '工程', 
   <div v-else-if="record" class="pad">
     <p class="kicker">标的物全量信息</p>
     <h2 class="h-serif mt-2 text-[20px] leading-snug">{{ record.object_name }}</h2>
-    <p class="mt-1 text-[12px] text-muted">{{ record.project_name }} · 包{{ record.package_no }}</p>
+    <p class="mt-1 text-[12px] text-muted">{{ record.project_name }} · {{ record.package_label ?? record.package_name ?? "采购单元 " + record.package_no }}</p>
 
     <section>
       <h3>标的字段</h3>
@@ -27,7 +27,7 @@ const CATEGORY_TYPE_LABEL: Record<string, string> = { A: '货物', B: '工程', 
         <div><dt>品目</dt><dd>{{ orDash(record.category_name) }}<span v-if="record.category_type" class="text-muted">（{{ CATEGORY_TYPE_LABEL[record.category_type] ?? record.category_type }}）</span></dd></div>
         <div><dt>品目编码</dt><dd class="num">{{ orDash(record.category_code) }}</dd></div>
         <div><dt>品牌</dt><dd>{{ orDash(record.brand) }}</dd></div>
-        <div><dt>产品供应商</dt><dd>{{ orDash(record.product_supplier) }}</dd></div>
+        <div><dt>产品供应商</dt><dd>{{ orDash(record.product_supplier) }}<small v-if="record.field_origins?.product_supplier?.method === 'inferred'">（模型推断）</small></dd></div>
         <div><dt>规格型号</dt><dd>{{ orDash(record.spec_model) }}</dd></div>
         <div><dt>单价</dt><dd class="num">{{ fmtYuan(record.unit_price) }}</dd></div>
         <div><dt>数量</dt><dd class="num">{{ fmtQty(record.quantity) }} {{ record.unit ?? '' }}</dd></div>
@@ -47,7 +47,7 @@ const CATEGORY_TYPE_LABEL: Record<string, string> = { A: '货物', B: '工程', 
             <template v-else>—</template>
           </dd>
         </div>
-        <div><dt>包金额</dt><dd class="num">{{ fmtYuan(record.package_total_amount) }}</dd></div>
+        <div><dt>标段／合同包金额</dt><dd class="num">{{ fmtYuan(record.package_total_amount) }}</dd></div>
       </dl>
     </section>
 
@@ -68,8 +68,11 @@ const CATEGORY_TYPE_LABEL: Record<string, string> = { A: '货物', B: '工程', 
       <ul v-if="record.bidders?.length" class="bidders">
         <li v-for="b in record.bidders" :key="b.supplier_name" :class="{ win: b.is_winner }">
           <span class="truncate">{{ b.supplier_name }}</span>
-          <em v-if="b.is_winner">中标</em>
-          <span v-else class="num text-muted">{{ b.score ?? '—' }}</span>
+          <span v-if="b.supplier_award_amount != null" class="num text-muted">成交金额 {{ fmtYuan(b.supplier_award_amount) }}</span>
+          <span v-if="b.bid_amount != null" class="num text-muted">报价 {{ fmtYuan(b.bid_amount) }}</span>
+          <span v-if="b.review_display" class="text-muted">{{ b.review_display }}</span>
+          <em>{{ b.category ?? (b.is_winner ? '中标人' : '参与人') }}</em>
+          <span class="num text-muted">{{ b.score ?? '—' }}</span>
         </li>
       </ul>
     </section>

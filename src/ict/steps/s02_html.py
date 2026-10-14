@@ -11,11 +11,12 @@ from ict.concurrency import parallel_map
 from ict.config import SOURCE_PRIORITY
 from ict.html_context import ParsedNotice, ParsedTable, step2a_payload
 from ict.ids import make_project_id
+from ict.evidence import html_rows
 from ict.llm import LLMClient, LLMError, complete_json
-from ict.package_resolve import promote_object_tables, resolve_table_packages
+from ict.package_resolve import promote_object_tables
 from ict.schemas import Candidate, Failure, FieldObservation, HtmlTable, HtmlTables
 
-TABLE_ROLES = {"cob_detail", "cob_summary", "sub_score", "winner", "agency_fee", "other"}
+TABLE_ROLES = {"cob_detail", "cob_summary", "sub_score", "sub_info", "winner", "agency_fee", "other"}
 ROW_GRAINS = {"cob", "supplier", "project", "other"}
 LINE_KEYS = ("brand", "spec_model", "quantity", "unit_price", "total_price")
 POINTER_RE = re.compile(r"详见|见附件")
@@ -52,6 +53,7 @@ def understand_tables(
     package_nos: list[str],
     llm: LLMClient | None,
     counter: Counter | None = None,
+    package_registry: list[dict] | None = None,
 ) -> HtmlTables:
     failures: list[Failure] = []
     tables: list[HtmlTable] = []
@@ -75,8 +77,8 @@ def understand_tables(
             parsed = complete_json(
                 llm,
                 step="understand_html_tables",
-                prompt_version="html-tables-v1",
-                user=json.dumps(step2a_payload(table, package_nos, siblings), ensure_ascii=False),
+                prompt_version="html-tables-v5",
+                user=json.dumps((step2a_payload(table, package_nos, siblings) | {"package_registry": package_registry or []}), ensure_ascii=False),
                 validate=lambda item: _validate_table(item, package_nos),
                 counter=counter,
             )
@@ -122,9 +124,23 @@ def understand_tables(
         if failure is not None:
             failures.append(failure)
     promote_object_tables(notice, HtmlTables(run_id=run_id, status="success", tables=tables))
-    resolve_table_packages(notice, HtmlTables(run_id=run_id, status="success", tables=tables), package_nos, llm, counter)
+    # Row assignment is adjudicated after extraction, including previously "known" table scopes.
     status = "failed" if not tables else ("partial" if failures else "success")
     return HtmlTables(run_id=run_id, status=status, tables=tables, failures=failures)
+
+
+def _validate_source_candidates(parsed, sources):
+    entries = parsed.get("candidates")
+    if not isinstance(entries, list):
+        return "需要 candidates 数组"
+    references = {row["source_ref"] for row in sources}
+    for entry in entries:
+        if not isinstance(entry, dict) or not isinstance(entry.get("fields", {}), dict):
+            return "候选及 fields 必须为对象"
+        refs = entry.get("source_refs", [])
+        if not isinstance(refs, list) or any(not isinstance(ref, str) or ref not in references for ref in refs):
+            return "source_refs 只能引用输入提供的来源编号"
+    return ""
 
 
 def extract_html_candidates(
@@ -136,6 +152,7 @@ def extract_html_candidates(
     seq_start: int = 1,
     counter: Counter | None = None,
     known_packages: list[str] | None = None,
+    package_registry: list[dict] | None = None,
 ) -> tuple[list[Candidate], list[Failure], int]:
     failures: list[Failure] = []
     candidates: list[Candidate] = []
@@ -148,7 +165,7 @@ def extract_html_candidates(
     def ask(understood: HtmlTable) -> dict:
         """One table's model call and the read-only facts its candidates need. No shared writes."""
         table = by_index[understood.table_index]
-        entity = "sub" if understood.table_role in {"sub_score", "winner"} else "cob"
+        entity = "sub" if understood.table_role in {"sub_score", "sub_info", "winner"} else "cob"
         package_no = None if understood.package_scope in {"unknown", "announcement"} else understood.package_scope
         project_id = make_project_id(project_name, package_no) if package_no and project_name else None
         priority = SOURCE_PRIORITY.get(understood.table_role, 30)
@@ -161,14 +178,19 @@ def extract_html_candidates(
             "column_mapping": understood.column_mapping,
             "headers": table.headers,
             "rows": table.rows,
+            "source_rows": html_rows(table),
+            "known_packages": known_packages or [],
+            "package_registry": package_registry or [],
+            "section": table.section,
+            "before_text": table.before_text,
         }
         try:
             parsed = complete_json(
                 llm,
                 step="extract_html_candidates",
-                prompt_version="html-candidates-v1",
+                prompt_version="html-candidates-v5",
                 user=json.dumps(payload, ensure_ascii=False),
-                validate=lambda item: "" if isinstance(item.get("candidates"), list) else "需要 candidates 数组",
+                validate=lambda item: _validate_source_candidates(item, payload["source_rows"]),
                 counter=counter,
             )
         except (LLMError, ValueError) as exc:
@@ -231,8 +253,8 @@ def extract_html_candidates(
     # 原来是 bidder_body_sections() 按"公司/供应商 + （数字"挑段落，实测把 65% 的公告挑成 0 段，
     # 而 t20260206_26155241 的「八、其它补充事宜」里明明写着「（第1包）…中标人…：宁夏隆昆…85.32分」。
     # 全篇正文中位只有 533 字、最长 5583 字，一次给的代价可以忽略。
-    body_sections = [{"title": section["title"], "text": section["text"]}
-                     for section in notice.sections]
+    body_sections = [{"source_ref": f"html:body:{index}", "title": section["title"], "text": section["text"]}
+                     for index, section in enumerate(notice.sections)]
     if body_sections:
         payload = {
             "entity_type": "sub",
@@ -242,14 +264,16 @@ def extract_html_candidates(
             "headers": [],
             "rows": [],
             "body_sections": body_sections,
+            "known_packages": known_packages or [],
+            "package_registry": package_registry or [],
         }
         try:
             parsed = complete_json(
                 llm,
                 step="extract_html_candidates",
-                prompt_version="html-candidates-v1",
+                prompt_version="html-candidates-v5",
                 user=json.dumps(payload, ensure_ascii=False),
-                validate=lambda item: "" if isinstance(item.get("candidates"), list) else "需要 candidates 数组",
+                validate=lambda item: _validate_source_candidates(item, body_sections),
                 counter=counter,
             )
         except (LLMError, ValueError) as exc:
@@ -265,6 +289,7 @@ def extract_html_candidates(
                 SOURCE_PRIORITY["sub_score"],
                 seq,
                 known_packages,
+                body_sources=body_sections,
             )
     if not candidates:
         failures.append(Failure(failure_code="no_candidate_extracted", failure_message="HTML 未抽出候选"))
@@ -290,9 +315,9 @@ def _line_fields_point(table: ParsedTable, mapping: dict[str, str]) -> bool:
 def _column_units(mapping: dict) -> dict:
     """The header text behind each amount field, straight out of step 2A's column mapping.
 
-    Only the two price fields matter: a quantity or a unit never carries a 万元.
+    All monetary columns carry their own unit; quantities never inherit it.
     """
-    return {key: str(mapping[key]).strip() for key in ("unit_price", "total_price")
+    return {key: str(mapping[key]).strip() for key in ("unit_price", "total_price", "supplier_award_amount", "bid_amount")
             if mapping.get(key) not in (None, "")}
 
 
@@ -317,7 +342,7 @@ def _row_text(table: ParsedTable | None, raw_fields: dict) -> str | None:
 
 def _append_candidates(candidates, items, entity, package_no, project_name, priority, seq, known_packages=None,
                        table: ParsedTable | None = None, table_index: int | None = None,
-                       column_mapping: dict | None = None) -> int:
+                       column_mapping: dict | None = None, body_sources: list | None = None) -> int:
     for item in items:
         item_type = item.get("entity_type") or entity
         if item_type not in {"cob", "sub"}:
@@ -328,6 +353,19 @@ def _append_candidates(candidates, items, entity, package_no, project_name, prio
         if item_package in (None, "", "null") and known_packages and len(known_packages) == 1:
             item_package = known_packages[0]
         item_project = make_project_id(project_name, str(item_package)) if item_package and project_name else None
+        addressed = {row["source_ref"]: row for row in html_rows(table)} if table is not None else {}
+        addressed.update({item["source_ref"]: {"cells": [item["text"]], "row_index": None}
+                          for item in (body_sources or [])})
+        refs = item.get("source_refs") or ([item["source_ref"]] if item.get("source_ref") else [])
+        refs = [ref for ref in refs if isinstance(ref, str) and ref in addressed]
+        source_rows = [addressed[ref] for ref in refs]
+        row = source_rows[0] if len(source_rows) == 1 else None
+        bidder = None
+        header = (column_mapping or {}).get("supplier_name")
+        if row is not None and table is not None and header in table.headers:
+            column = table.headers.index(header)
+            if column < len(row["cells"]):
+                bidder = row["cells"][column]
         candidates.append(
             seal_candidate(
                 candidate_id=f"cand_{seq:06d}",
@@ -340,9 +378,16 @@ def _append_candidates(candidates, items, entity, package_no, project_name, prio
                 raw_fields=item.get("fields") or {},
                 issues=item.get("issues") or [],
                 table_index=table_index,
-                row_text=_row_text(table, align_fields(item_type, item.get("fields") or {})),
-                column_units=_column_units(column_mapping or {}) if item_type == "cob" else None,
+                row_text=("\n".join(" | ".join(str(cell or "") for cell in source_row["cells"])
+                                     for source_row in source_rows) if source_rows else
+                          _row_text(table, align_fields(item_type, item.get("fields") or {}))),
+                row_index=None if row is None else row["row_index"],
+                source_refs=refs,
+                bidder_supplier=bidder if item_type == "cob" else None,
+                column_units=_column_units(column_mapping or {}),
             )
         )
+        if table is not None and not refs:
+            candidates[-1].warnings.append("legacy_source_reference_missing")
         seq += 1
     return seq

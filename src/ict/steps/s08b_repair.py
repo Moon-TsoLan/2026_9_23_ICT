@@ -12,6 +12,7 @@ from collections import Counter
 from ict.llm import LLMClient, LLMError, complete_json
 from ict.concurrency import parallel_map
 from ict.schemas import Failure, MergedProjects, Project, Sub
+from ict.packages import package_context
 from ict.steps.s08_merge import _norm_name, amount_checked, consistency_checks, package_checks
 
 PRICE_KEYS = ("unit_price", "quantity", "unit", "total_price")
@@ -29,7 +30,7 @@ def _score(project: Project, amount_ok: bool = True) -> tuple[int, float]:
 def _mark_winners(project: Project, names: list[str], repairs: list[dict]) -> None:
     wanted = {_norm_name(name) for name in names}
     for sub in project.subs:
-        if _norm_name(sub.supplier_name) in wanted and not sub.is_winner:
+        if _norm_name(sub.supplier_name) in wanted and not sub.is_winner and sub.review_status != "failed":
             sub.is_winner = True
             repairs.append({"package_no": project.package_no, "action": "winner_from_award_text", "supplier_name": sub.supplier_name})
     if not any(sub.is_winner for sub in project.subs):
@@ -69,6 +70,7 @@ def _apply(project: Project, alternatives: list[dict], choices: list[dict]) -> P
 
 def _ask_model(project: Project, alternatives: list[dict], violations: list[dict], llm: LLMClient, counter: Counter | None) -> list[dict]:
     payload = {
+        **package_context(project),
         "package_no": project.package_no,
         "package_total_amount": project.package_total_amount,
         "violations": violations,
@@ -125,7 +127,9 @@ def repair_packages(
                   if item["level"] in {"hard", "medium"}]
         if not checks:
             return project, repairs, failures
-        if any(item["check"] == "missing_winner" for item in checks):
+        sub_protected = any(item.get("package_no") == project.package_no and item.get("accepted")
+                            for item in merged.sub_merge_decisions)
+        if any(item["check"] == "missing_winner" for item in checks) and not sub_protected:
             _mark_winners(project, winner_hints.get(project.package_no, []), repairs)
         # Only an overflow can be repaired by picking another reading. A shortfall is not a defect
         # (the object list may simply be partial) and a row with no price has no reading to pick,

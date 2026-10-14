@@ -15,8 +15,10 @@ STEP_FILES = {
     "understand_announcement": "01_announcement_understanding.json",
     "understand_html_tables": "02_html_tables.json",
     "extract_html_candidates": "03_html_candidates.json",
+    "bind_packages": "03b_package_bindings.json",
     "plan_project_gaps": "04_project_plans.json",
     "triage_files": "05_file_decisions.json",
+    "extract_native_evidence": "05c_native_extraction.json",
     "parse_pages": "05b_parsed_pages.json",
     "locate_pages": "06_page_decisions.json",
     "extract_attachment_candidates": "07_attachment_extraction.json",
@@ -26,6 +28,7 @@ STEP_FILES = {
     "merge_evidence": "08b_merge_evidence.json",
     "merge_candidates": "09_merged_projects.json",
     "repair_packages": "09_merged_projects.json",
+    "complete_suppliers": "09_merged_projects.json",
     "persist_and_report": "10_run_report.json",
 }
 

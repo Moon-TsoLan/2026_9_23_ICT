@@ -67,7 +67,8 @@ COB_FIELDS = (
     "unit",
     "total_price",
 )
-SUB_FIELDS = ("supplier_name", "score", "is_winner")
+SUB_FIELDS = ("supplier_name", "score", "is_winner", "supplier_award_amount",
+              "bid_amount", "review_status", "review_failure_reason")
 OFFICIAL_SEVEN = (
     "object_name",
     "category_name",
@@ -83,6 +84,7 @@ SOURCE_PRIORITY = {
     "winner": 80,
     "cob_detail": 70,
     "sub_score": 70,
+    "sub_info": 70,
     "cob_summary": 60,
     "tender_requirement": 40,
     "other": 30,

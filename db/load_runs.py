@@ -8,9 +8,9 @@ supplier, bid, winner_coop_supplier. Structure and column meanings stay exactly 
 demo database defines them, so the frontend and db/queries.sql work unchanged. The demo
 database is never touched: this writes only into the database named on the command line.
 
-project 的唯一键是「项目编号 + 包号 + 轮次」：包号只在单则公告内唯一，重新采购时公告
-会沿用或重排包号，所以同一 (项目编号, 包号) 被多则公告复用时用 round_no 区分
-（project_id = <编号>|<包号> 或 <编号>|<包号>|rN）。轮次按公告号里的日期戳排序，
+project 的唯一键是「业务键 + 轮次」：旧未知记录沿用项目编号与包号；新记录使用类型与
+原编号，缺号或同类型重号限定在本公告内，内部引用不直接用于跨公告关联。
+同一业务键被多则公告复用时用 round_no 区分（第2轮起追加 |rN）。轮次按公告号里的日期戳排序，
 因为 announcement.created_at 是入库时间，不是公告发布日。
 
 Column notes worth knowing when reading the UI:
@@ -96,11 +96,27 @@ def _date_key(aid: str) -> str:
     return match.group(1) if match else "\uffff"
 
 
-def _package_base_key(project: dict) -> str:
-    """包的业务键：<项目编号>|<包号>；模型没抽到编号时退回项目名（与 002 迁移里的回填一致）。"""
-    package_no = str(project.get("package_no"))
-    number = project.get("source_project_no")
-    return f"{number}|{package_no}" if number else f"{project.get('project_name') or '?'}|{package_no}"
+def _package_base_key(project: dict, announcement_id: str | None = None,
+                      packages: list[dict] | None = None) -> str:
+    """Cross-announcement identity uses original numbers, never allocated local references.
+
+    Missing or same-type duplicate numbers are announcement-local. Old records without
+    the new metadata retain their existing key; no historical records are rewritten.
+    """
+    kind = project.get("package_kind", "unknown")
+    base = project.get("source_project_no") or project.get("project_name") or "?"
+    if "source_package_no" not in project and kind == "unknown":
+        return f"{base}|{project.get('package_no')}"
+    number = project.get("source_package_no")
+    duplicates = sum(p.get("package_kind", "unknown") == kind and p.get("source_package_no") == number
+                     for p in (packages or [project]))
+    prefix = f"{base}|{kind}" if kind != "unknown" else str(base)
+    if number not in (None, "") and duplicates == 1:
+        return f"{prefix}|{number}"
+    aid = announcement_id or project.get("announcement_id")
+    if not aid:
+        raise ValueError("缺号或重号采购单元的业务键需要 announcement_id，不能使用公告内序号跨公告关联")
+    return f"{prefix}|local:{aid}|{project['package_no']}"
 
 
 def _desired_id(package_key: str, round_no: int) -> str:
@@ -118,7 +134,7 @@ def target_entries(targets: list[Path]) -> list[dict]:
         aid = _announcement_id(run, understanding, report)
         for index, project in enumerate(merged.get("projects") or []):
             entries.append({"aid": aid, "date": _date_key(aid), "index": index,
-                            "package_key": _package_base_key(project)})
+                            "package_key": _package_base_key(project, aid, merged.get("projects"))})
     return entries
 
 
@@ -199,16 +215,31 @@ def load_run(cur, run: Path, inserts: dict[tuple[str, int], tuple[str, int, str]
          json.dumps({"report": {k: report.get(k) for k in
                                 ("status", "counts", "llm_calls", "failure_summary", "duration_ms")},
                      "merge_decisions": merged.get("merge_decisions") or [],
+                     "merge_attempts": merged.get("merge_attempts") or {},
                      "amount_audit": audit, "unmatched_summary_rows": merged.get("unmatched_summary_rows") or [],
                      "conflicts": merged.get("conflicts") or [], "checks": merged.get("checks") or [],
                      "repairs": merged.get("repairs") or [],
+                     "protocol_version": merged.get("protocol_version"),
+                     "field_bindings": merged.get("field_bindings") or [],
+                     "supplier_inferences": merged.get("supplier_inferences") or [],
+                     "sub_merge_decisions": merged.get("sub_merge_decisions") or [],
+                     "official_result": {"schema_version": "announcement-v2", "announcement_id": aid,
+                                         "packages": merged.get("projects", [])},
+                     "project_map": {inserts.get((aid, seq), (p["project_id"], 1, ""))[0]: p.get("package_no")
+                                     for seq, p in enumerate(merged.get("projects", []))},
+                     "sub_results": {str(p.get("package_no")): p.get("subs", []) for p in merged.get("projects", [])},
+                     "extraction_reception": (read("07_attachment_extraction.json") or {}).get("reception", []),
+                     "unmapped_candidate_fields": {cid: c.get("unmapped_fields") for cid, c in candidates.items()
+                                                   if c.get("unmapped_fields")},
+                     "unresolved": merged.get("unresolved") or [],
+                     "package_bindings": read("03b_package_bindings.json") or {},
                      "package_amount_observations": {k: (v or {}).get("observations") for k, v in audit.items()}},
                     ensure_ascii=False)))
     stats = Counter()
     rounds = Counter()
     for seq, project in enumerate(merged.get("projects") or []):
         project_id, round_no, package_key = inserts.get(
-            (aid, seq), (project["project_id"], 1, _package_base_key(project))
+            (aid, seq), (project["project_id"], 1, _package_base_key(project, aid, merged.get("projects")))
         )
         rounds[round_no] += 1
         prov = project.get("provenance") or {}

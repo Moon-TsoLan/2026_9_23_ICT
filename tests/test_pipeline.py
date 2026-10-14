@@ -43,7 +43,7 @@ def test_fake_llm_writes_run_files(monkeypatch):
                             "package_amount": None,
                         }
                     ],
-                    "summary_amount": {"raw_text": "￥10 万元", "amount_yuan": 1, "scope": "announcement"},
+                    "summary_amount": {"raw_text": "￥10 万元", "amount_yuan": 1, "scope": "announcement", "amount_kind": "award"},
                 },
                 ensure_ascii=False,
             ),
@@ -77,6 +77,8 @@ def test_fake_llm_writes_run_files(monkeypatch):
     assert (run_dir / "09_merged_projects.json").exists()
     assert (run_dir / "10_run_report.json").exists()
     projects = json.loads((run_dir / "projects.json").read_text(encoding="utf-8"))
+    assert projects["project_name"] == report.result["project_name"]
+    projects = projects["packages"]
     assert projects[0]["cobs"][0]["object_name"] == "显示屏"
     assert projects[0]["package_total_amount"] == 100000
     assert "provenance" not in projects[0]

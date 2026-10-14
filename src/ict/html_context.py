@@ -340,10 +340,11 @@ def winner_hints(notice: ParsedNotice, package_nos: list[str]) -> dict[str, list
 
 def fill_package_amounts(understanding, notice: ParsedNotice) -> None:
     from ict.schemas import Amount
+    from ict.packages import hint_reference
 
     found: dict[str, dict] = {}
     for anchor in notice.package_anchors:
-        package_no = anchor.get("package_no")
+        package_no = hint_reference(anchor.get("package_no"), understanding.packages)
         if package_no and anchor.get("amount_yuan") is not None:
             found.setdefault(package_no, anchor)
     for package in understanding.packages:

@@ -22,6 +22,12 @@ export interface CobBidder {
   supplier_name: string
   score: number | null
   is_winner: boolean
+  supplier_award_amount?: number | null
+  bid_amount?: number | null
+  review_status?: 'passed' | 'failed' | 'unknown'
+  review_failure_reason?: string | null
+  category?: string
+  review_display?: string | null
 }
 
 /** 一条标的物视图记录（Project + COB + 中标方 展平） */
@@ -30,6 +36,9 @@ export interface CobRecord {
   project_id: string
   project_name: string
   package_no: string
+  package_kind?: 'lot' | 'contract_package' | 'unpartitioned' | 'unknown'
+  package_name?: string | null
+  package_label?: string | null
   purchaser: string | null
   package_total_amount: number | null
   object_name: string
@@ -37,6 +46,8 @@ export interface CobRecord {
   category_name: string | null
   category_type: 'A' | 'B' | 'C' | null
   brand: string | null
+  brand_display?: string | null
+  brand_display_source?: 'brand' | 'product_supplier' | null
   product_supplier: string | null
   spec_model: string | null
   unit_price: number | null
@@ -48,6 +59,7 @@ export interface CobRecord {
   provenance: { source_type: string | null; file_id: string | null }
   /** 详情接口才有：该包全部投标方 */
   bidders?: CobBidder[]
+  field_origins?: Record<string, { method: string; source?: string; reason?: string }>
 }
 
 export type CobSearchResult = Page<CobRecord>
