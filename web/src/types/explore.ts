@@ -31,6 +31,7 @@ export interface SceneCombo {
 
 /** 统一场景查询响应：graph 给星图，narrative 给叙事面板 */
 export interface SceneResult {
+  data_version?: string
   scene: SceneId
   elapsed_ms: number
   graph: {
@@ -55,6 +56,7 @@ export interface OverviewResult {
     highlight_ids: string[]
   }
   meta: {
+    data_version?: string
     purchasers: number
     projects: number
     suppliers_total: number
@@ -67,6 +69,14 @@ export interface PartyHit {
   id: string
   name: string
   kind: NodeKind
+  identity_kind?: 'company' | 'brand'
+}
+
+export interface GraphSlice {
+  node: GraphNode
+  data_version: string
+  graph: { nodes: GraphNode[]; edges: GraphEdge[] }
+  pagination: { offset: number; limit: number; total: number; has_more: boolean }
 }
 
 export interface PartyProfile {

@@ -1,16 +1,20 @@
 # 数据库（PostgreSQL · Docker）
 
-演示库与生产库**结构完全相同**，区别只在库名与数据。换库 = 改 `.env` 里的 `DATABASE_URL` / `PGDATABASE`，代码与查询语句都不用动。
+更新于2026-10-15。项目总览见[README](../README.md)。提取业务新字段及审计仍通过公告raw_json兼容；本次账号功能需额外执行[002迁移](002_accounts.sql)：新增账号/会话两表，project与supplier各加tenant_id，并调整公告主键及关联约束。旧公告ID、项目ID、金额和raw_json保留。完整操作见[账号部署说明](../doc/账号隔离与部署迁移-20261015.md)。
+
+后端以 `DATABASE_URL` 为连接依据（进程环境变量优先于 `.env`）。换库后重启后端，不能只改 `PGDATABASE` 而保留指向旧库的 `DATABASE_URL`。工作进程的默认连接同样优先读取 `DATABASE_URL`；手工执行 `db/load_runs.py` 时则使用必填的 `--db` 选择目标库，并读取PG参数构建连接，两者不要混淆。
 
 ## 现有数据库
 
 | 库名 | 内容 | 用途 |
 |---|---|---|
-| `ict_demo` | 110 则公告（演示数据） | 离线演示 |
-| `ict_batch20261004` | 40 则（2026-10-04 那批，万元修复前） | 旧批次 |
-| `ict_report20261006` | **10 则真实抽取结果**（含建表 + 数据 + 序列归位） | 阶段性汇报 |
+| `ict_demo` | 历史演示数据（原记录110则，本次未核对计数） | 离线演示 |
+| `ict_batch20261004` | 10月14日只读检查为41则公告 | 当前前端检查使用的旧批次库 |
+| `ict_report20261006` | 历史10则真实抽取结果（本次未核对计数） | 阶段性汇报 |
+| `ict_opt50_20261011` | 上一轮测试结果 | 历史对照，保留 |
+| `ict_opt50_20261012` | 10月12日50例真实抽取结果 | 后续离线比较，非10月13/14新版抽取成绩 |
 
-切库只改 `.env` 的 `DATABASE_URL` 与 `PGDATABASE`，或者用进程级变量临时覆盖：
+切库修改 `.env` 的 `DATABASE_URL`（如同时维护PG参数，保持一致），或者用进程级变量临时覆盖：
 
 ```powershell
 $env:DATABASE_URL = "postgresql://ict:ict_dev_pw@localhost:15432/ict_report20261006"
@@ -28,7 +32,7 @@ docker exec ict-pg rm -f /tmp/seed.sql
 
 ## 0. 前置：安装 Docker
 
-本机当前**未安装 Docker**。Windows 上安装：
+当前机器Docker Desktop已安装，10月14日启动检查中 `ict-pg` 容器healthy。新机器尚未安装时，可使用：
 
 ```powershell
 winget install Docker.DockerDesktop
@@ -44,7 +48,7 @@ docker compose version
 ## 1. 启动 / 停止
 
 ```bash
-docker compose up -d          # 启动（首次会自动执行 db/001_schema.sql 建表）
+docker compose up -d db       # 启动（空数据卷首次初始化时执行 db/001_schema.sql）
 docker compose ps             # 看状态，db 应为 healthy
 docker compose logs -f db     # 看日志
 docker compose down           # 停止（保留数据）
@@ -53,7 +57,7 @@ docker compose down -v        # 停止并删除数据卷（清库重建，谨慎
 
 ## 2. 验证连接
 
-`.env` 里已写好 `PGHOST/PGPORT/PGUSER/PGDATABASE`，可直接无参连接：
+本机端口15432，容器内端口5432。`.env.example`中的旧5432需要在本机 `.env` 中改为15432；容器内psql使用显式库名。下面命令检查演示库，检查其它库时替换 `-d` 参数：
 
 ```bash
 docker compose exec -T db psql -U ict -d ict_demo -c "\dt"      # 列出自建的表

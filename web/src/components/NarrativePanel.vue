@@ -53,7 +53,7 @@ const emit = defineEmits<{
   (e: 'select-node', id: string): void
   (e: 'open-party', id: string): void
   (e: 'retry-overview'): void
-  (e: 'remove-subject', name: string): void
+  (e: 'remove-subject', id: string): void
   (e: 'clear-subjects'): void
   (e: 'run-subjects'): void
   (e: 'ask', scene: SceneId): void
@@ -408,7 +408,8 @@ function tableVal(v: string | number | null, key: string): string {
       <div v-if="subjects?.length" class="bs-list">
         <span v-for="s in subjects" :key="s.id" class="chip">
           {{ s.name }}
-          <button aria-label="移除" @click="emit('remove-subject', s.name)"><X :size="12" /></button>
+          <button class="bs-locate" @click="emit('select-node', s.id)">定位</button>
+          <button aria-label="移除" @click="emit('remove-subject', s.id)"><X :size="12" /></button>
         </span>
       </div>
       <p v-else class="bs-hint">点星图上亮着的供应商加进篮子，凑够 2 家就能查交集。</p>

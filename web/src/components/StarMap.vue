@@ -16,8 +16,9 @@ import * as THREE from 'three'
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import type { LayoutMode } from '@/composables/useGraphLayout'
 import { SLOT_CSS, SLOT_HEX } from '@/constants/slots'
-import { hash, homeEye, placeStars, visualScale } from '@/composables/useGraphLayout'
-import type { DisplayKind, GraphEdge, GraphNode, NodeKind } from '@/types/graph'
+import { hash, homeEye, placeStars, visualScale, capturePositions, restorePositions, resetLayoutCache } from '@/composables/useGraphLayout'
+import type { DisplayKind, GraphEdge, GraphNode, NodeKind, Placed, StarSnapshot } from '@/types/graph'
+import { fitDistance } from '@/utils/exploreGraph'
 import { DISPLAY_KIND, EDGE_ROLE_LABEL } from '@/types/graph'
 import { disambiguate, rankMark, wrapTwo } from '@/utils/label'
 
@@ -25,6 +26,9 @@ const props = withDefaults(
   defineProps<{
     nodes: GraphNode[]
     edges: GraphEdge[]
+    ambientNodes?: GraphNode[]
+    ambientEdges?: GraphEdge[]
+    restored?: StarSnapshot | null
     focusId?: string | null
     highlightIds?: string[]
     /** 场景答案涉及的节点：只提亮，不替换底图 */
@@ -45,7 +49,7 @@ const props = withDefaults(
      *  scene    场景态：主体 + 答案集亮，其余暗
      *  pool     多选态：供应商池亮（可选对象），其余暗
      */
-    displayMode?: 'overview' | 'picked' | 'scene' | 'pool' | 's6'
+    displayMode?: 'overview' | 'picked' | 'scene' | 'compared' | 'pool' | 's6'
     /** 场景态锁定：非答案节点不可点，悬停仍可看全名 */
     locked?: boolean
     /** 对比主体（S4/S5）的节点 id，顺序即配色顺序 */
@@ -171,6 +175,8 @@ let frameFn: (animated?: boolean) => void = () => {}
 let frameToFn: (ids: string[]) => void = () => {}
 let flyToFn: (id: string) => void = () => {}
 let hasNodeFn: (id: string) => boolean = () => false
+let snapshotFn: () => StarSnapshot | null = () => null
+let waitNodesFn: (ids: string[]) => Promise<void> = () => Promise.reject(new Error('星图尚未初始化'))
 
 defineExpose({
   frame: (animated?: boolean) => frameFn(animated),
@@ -178,11 +184,15 @@ defineExpose({
   hasNode: (id: string) => hasNodeFn(id),
   /** 框住一组节点（场景答案集） */
   frameTo: (ids: string[]) => frameToFn(ids),
+  snapshot: () => snapshotFn(),
+  waitForNodes: (ids: string[]) => waitNodesFn(ids),
 })
 
 onMounted(() => {
   const el = host.value
   if (!el) return
+  if (props.restored?.mode === props.layoutMode) restorePositions(props.restored.positions, props.layoutMode)
+  else resetLayoutCache()
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
   /* ---- 渲染器与场景 ---- */
@@ -477,11 +487,11 @@ onMounted(() => {
     c.multiplyScalar(1 / picked.length)
     let r = 8
     for (const p of picked) r = Math.max(r, p.base.distanceTo(c) + p.scale * sizeMul[p.dk])
-    // 上下限都夹一下：太近会只剩答案看不见宇宙，太远又回到原来那种"一小坨"
-    const dist = THREE.MathUtils.clamp(r * 2.1, graphRadius * 0.2, graphRadius * 1.05)
+    // 按视口较窄的轴框住全部答案；不能用整图距离上限裁掉分散的主体。
+    const dist = Math.max(fitDistance(r, camera.fov, camera.aspect), graphRadius * 0.2)
     controls.minDistance = Math.max(6, r * 0.5)
     controls.maxDistance = Math.max(dist * 2.4, graphRadius * 4.2)
-    camera.far = Math.max(2000, graphRadius * 8)
+    camera.far = Math.max(2000, graphRadius * 8, dist + r * 2)
     camera.updateProjectionMatrix()
     const dir = camera.position.clone().sub(controls.target).normalize()
     const pos = c.clone().add(dir.multiplyScalar(dist))
@@ -572,43 +582,27 @@ onMounted(() => {
     return (a * 2 + (el > 0 ? 1 : 0)) % groups
   }
 
-  async function rebuild() {
-    const my = ++rebuildSeq
-    clearDynamic()
-    const t0 = performance.now()
-    // 让出一帧：叙事面板等纯 DOM 先渲染（"数字先出、星图后补"）
-    await new Promise((r) => setTimeout(r, 0))
-    if (my !== rebuildSeq) return
-
-    // scale 基准固定为"底图规模"，不随场景层增删变化。
-    // 场景层只是在底图上**追加**节点，若基准跟着总数走，多几个节点就会让整张图
-    // 重新缩放（数据层一个点没动、渲染层整体位移，即用户看到的"图抖了一下"）。
-    // 判定底图换了的依据：本次节点数不比基准多 —— 说明场景层被清掉或底图重采样了。
-    if (graphScaleBase === null || props.nodes.length < graphScaleBase) {
-      graphScaleBase = props.nodes.length
+  function syncNodes(placed: Placed[]) {
+    const keep = new Set(props.nodes.map(n => n.id))
+    for (let i = nodes.length - 1; i >= 0; i--) {
+      const n = nodes[i]!
+      if (keep.has(n.id)) continue
+      world.remove(n.sprite, n.haze, n.pick, n.labelObj)
+      ;(n.sprite.material as THREE.Material).dispose()
+      ;(n.haze.material as THREE.Material).dispose()
+      const pickIndex = picks.indexOf(n.pick)
+      if (pickIndex >= 0) picks.splice(pickIndex, 1)
+      nodeById.delete(n.id)
+      nodes.splice(i, 1)
     }
-    const placed = placeStars(props.nodes, props.edges, props.layoutMode, graphScaleBase)
     shortById.clear()
-    for (const [id, t] of disambiguate(props.nodes)) shortById.set(id, t)
-    const placeMap = new Map(placed.map((p) => [p.id, p]))
-    const vs = visualScale(placed)
-    ;(world.fog as THREE.FogExp2).density = 0.007 / vs
-    buildDust(vs)
-
-    let maxR = 8
-    for (const p of placed) maxR = Math.max(maxR, Math.hypot(p.x, p.y, p.z))
-    graphRadius = maxR
-    // 只有真的拿到数据才允许 seed，否则空图会把机位锁死在 maxR=8
-    if (!camSeeded && placed.length) {
-      camSeeded = true
-      frame(false)
-    } else if (placed.length) {
-      frame(true)
-    }
-
+    for (const [id, text] of disambiguate(props.nodes)) shortById.set(id, text)
+    const placeMap = new Map(placed.map(p => [p.id, p]))
     for (const body of props.nodes) {
       const p = placeMap.get(body.id)
       if (!p) continue
+      const existing = nodeById.get(body.id)
+      if (existing) { existing.kind = body.kind; continue }
       const base = new THREE.Vector3(p.x, p.y, p.z)
       const sprite = new THREE.Sprite(
         new THREE.SpriteMaterial({
@@ -687,13 +681,63 @@ onMounted(() => {
       nodeById.set(body.id, live)
     }
 
-    /* 静态边 → 粒子雾：亮度包络（中段亮两端暗）烧进顶点色，帧循环只动各组透明度。
-       与旧版的差别只有两点：分组按天区（见 sectorOf）、外加一层不参与呼吸的常驻骨架。
-       注意：场景答案边**不参与**这一层，它们由下面独立的 sceneLines 层按 role 绘制。 */
-    const edgeKey = (e: GraphEdge) => e.a + '|' + e.b + '|' + e.role
-    const sceneEdgeKeys = new Set(props.sceneEdges.map(edgeKey))
-    if (props.edges.length > 0) {
-      const samples = Math.max(6, Math.min(36, Math.round(60000 / props.edges.length)))
+  }
+
+  let ambientReady = false
+  let restoreCamera = !!props.restored
+  const waiters = new Set<{ ids: string[]; resolve: () => void; reject: (error: Error) => void }>()
+  function settleNodes() {
+    for (const waiter of waiters) if (waiter.ids.every(id => nodeById.has(id))) {
+      waiters.delete(waiter)
+      waiter.resolve()
+    }
+  }
+  waitNodesFn = (ids) => {
+    if (ambientReady && ids.every(id => nodeById.has(id))) return Promise.resolve()
+    return new Promise((resolve, reject) => {
+      const waiter = { ids, resolve: () => { clearTimeout(timer); resolve() },
+        reject: (error: Error) => { clearTimeout(timer); reject(error) } }
+      const timer = setTimeout(() => { waiters.delete(waiter); reject(new Error('星图节点未能就绪，请重试')) }, 10000)
+      waiters.add(waiter)
+    })
+  }
+  function syncGraph() {
+    if (!ambientReady) return
+    syncNodes(placeStars(props.nodes, props.edges, props.layoutMode, graphScaleBase ?? undefined))
+    applyEmphasis()
+    labelDirty = true
+    settleNodes()
+  }
+
+  async function rebuild() {
+    const my = ++rebuildSeq
+    ambientReady = false
+    clearDynamic()
+    const t0 = performance.now()
+    // 让出一帧：叙事面板等纯 DOM 先渲染（"数字先出、星图后补"）
+    await new Promise((r) => setTimeout(r, 0))
+    if (my !== rebuildSeq) return
+
+    const ambientNodes = props.ambientNodes ?? props.nodes
+    const ambientEdges = props.ambientEdges ?? props.edges
+    graphScaleBase = props.restored && restoreCamera ? props.restored.scaleBase : ambientNodes.length
+    if (camSeeded) resetLayoutCache()
+    const placed = placeStars(ambientNodes, ambientEdges, props.layoutMode, graphScaleBase ?? undefined)
+    const placeMap = new Map(placed.map(p => [p.id, p]))
+    const vs = visualScale(placed)
+    ;(world.fog as THREE.FogExp2).density = 0.007 / vs
+    buildDust(vs)
+    graphRadius = Math.max(8, ...placed.map(p => Math.hypot(p.x, p.y, p.z)))
+    syncNodes(placed)
+    if (!camSeeded && placed.length) {
+      camSeeded = true
+      frame(false)
+    }
+
+    /* 固定底图边 → 粒子雾。补载边不参与重采样；答案边走独立曲线层，
+       阅读结果时背景雾按原强调态压暗。 */
+    if (ambientEdges.length > 0) {
+      const samples = Math.max(6, Math.min(36, Math.round(60000 / ambientEdges.length)))
       const buckets: Array<{ pos: number[]; col: number[] }> = Array.from({ length: MIST_GROUPS }, () => ({
         pos: [],
         col: [],
@@ -703,10 +747,9 @@ onMounted(() => {
       const endB = new THREE.Vector3()
       const mid = new THREE.Vector3()
       // 权重前若干的边进骨架层：信息量最大的关系常驻，长尾才呼吸
-      const sorted = [...props.edges].sort((x, y) => y.weight - x.weight)
-      const backboneSet = new Set(sorted.slice(0, Math.min(260, Math.round(props.edges.length * 0.06))))
-      for (const e of props.edges) {
-        if (sceneEdgeKeys.has(edgeKey(e))) continue // 场景边走独立层，避免重复绘制
+      const sorted = [...ambientEdges].sort((x, y) => y.weight - x.weight)
+      const backboneSet = new Set(sorted.slice(0, Math.min(260, Math.round(ambientEdges.length * 0.06))))
+      for (const e of ambientEdges) {
         const pa = placeMap.get(e.a)
         const pb = placeMap.get(e.b)
         if (!pa || !pb) continue
@@ -759,8 +802,23 @@ onMounted(() => {
       if (bb.pos.length) backbone = mkPoints(bb, BACKBONE_OP, MIST_PX * vs * 0.8)
     }
 
-    applyEmphasis()
-    labelDirty = true
+    ambientReady = true
+    syncGraph()
+    if (restoreCamera && props.restored) {
+      camera.position.fromArray(props.restored.camera.position)
+      controls.target.fromArray(props.restored.camera.target)
+      controls.minDistance = props.restored.camera.minDistance
+      controls.maxDistance = props.restored.camera.maxDistance
+      camera.far = Math.max(2000, camera.position.distanceTo(controls.target) * 8)
+      camera.updateProjectionMatrix()
+      controls.update()
+      for (const group of mistGroups) {
+        const saved = props.restored.mist?.find(g => g.phase === group.phase)
+        if (saved) { group.op = saved.opacity; group.mat.opacity = saved.opacity }
+      }
+      if (backbone && props.restored.backboneOpacity !== undefined) backbone.mat.opacity = props.restored.backboneOpacity
+      restoreCamera = false
+    }
     pendingReadyAt = t0
   }
 
@@ -777,6 +835,7 @@ onMounted(() => {
     const showRelations = props.displayMode === 'scene' || props.displayMode === 'compared' || props.displayMode === 's6'
     const highlights = new Set(props.highlightIds.filter((id) => nodeById.has(id)))
     const inScene = new Set(props.sceneIds.filter((id) => nodeById.has(id)))
+    const pinned = new Set([...props.subjectIds, ...(focus ? [focus] : [])])
     const hidden = new Set<DisplayKind>(props.hiddenKinds)
 
     relatedIds = new Set<string>()
@@ -810,7 +869,7 @@ onMounted(() => {
     // 亮度完全由 displayMode 决定
     const mode = props.displayMode
     for (const n of nodes) {
-      if (hidden.has(n.dk)) {
+      if (hidden.has(n.dk) && !pinned.has(n.id)) {
         n.target = 0
         continue
       }
@@ -818,7 +877,7 @@ onMounted(() => {
       else if (mode === 'picked') n.target = n.id === focus ? 1 : 0.14
       else if (mode === 'pool') n.target = n.dk === 'supplier' ? 1 : 0.16
       // s6 / scene / compared：主体与答案亮，其余暗
-      else n.target = relatedIds.has(n.id) ? 1 : 0.18
+      else n.target = relatedIds.has(n.id) || pinned.has(n.id) ? 1 : 0.18
     }
     litIds =
       mode === 'overview'
@@ -828,27 +887,29 @@ onMounted(() => {
           : mode === 'pool'
             ? new Set(nodes.filter((n) => n.dk === 'supplier').map((n) => n.id))
             : relatedIds
+    for (const id of pinned) litIds.add(id)
 
     // 标签文字与优先级：答案集(榜单) > 聚焦邻域 > 高亮 > 采购方 > 中标 > 供应商 > 投标 > 项目
     const KIND_PRIO: Record<DisplayKind, number> = { buyer: 20, supplier: 24, project: 40 }
     const weightOf = new Map(props.nodes.map((n) => [n.id, n.weight]))
     const kindOf = new Map(props.nodes.map((n) => [n.id, n.kind]))
+    const labelOf = new Map(props.nodes.map(n => [n.id, n.label]))
     const ambientMode = props.displayMode === 'overview' && nodes.length > OVERVIEW_MIN_KIND
     for (const n of nodes) {
       const kind = kindOf.get(n.id) ?? n.kind
-      const raw = shortById.get(n.id) ?? ''
+      const raw = shortById.get(n.id) || (pinned.has(n.id) || props.ranks[n.id] ? labelOf.get(n.id) ?? '' : '')
       const mark = rankMark(props.ranks[n.id])
       n.text = raw ? mark + raw : ''
       const rank = props.ranks[n.id]
       let prio = KIND_PRIO[DISPLAY_KIND[kind]] ?? 30
       if (rank) prio = rank
-      else if (focus && n.id === focus) prio = 5
+      else if (pinned.has(n.id)) prio = 5
       else if (focus && relatedIds.has(n.id)) prio = 8
       else if (highlights.has(n.id)) prio = 10
       else if (ambientMode && DISPLAY_KIND[kind] !== 'buyer') prio = 999 // 总览=氛围层：只给采购单位的星团命名，其余靠悬停
       n.prio = prio
-      n.mustShow = !!rank || (!!focus && n.id === focus)
-      if (!n.text || hidden.has(DISPLAY_KIND[kind]) || (n.target < 0.5 && !n.mustShow)) n.prio = 999
+      n.mustShow = !!rank || pinned.has(n.id)
+      if (!n.text || (hidden.has(DISPLAY_KIND[kind]) && !pinned.has(n.id)) || (n.target < 0.5 && !n.mustShow)) n.prio = 999
     }
 
 
@@ -864,7 +925,7 @@ onMounted(() => {
      * 必须在画边之前填好——上一版填在画边之后，等于永远用的是上一次的表。
      */
     slotIndex.clear()
-    if (props.displayMode === 'compared') props.subjectIds.forEach((id, i) => slotIndex.set(id, i))
+    if (props.displayMode === 'compared' || props.displayMode === 'pool') props.subjectIds.forEach((id, i) => slotIndex.set(id, i))
 
     clearSceneLines()
     if (props.sceneEdges.length) {
@@ -911,10 +972,11 @@ onMounted(() => {
     const emblemSpecs: Array<{ id: string; color: number; radius: number; soft?: boolean }> = []
     if (props.displayMode === 'pool') {
       for (const n of nodes) {
-        if (n.kind !== 'winner') continue
+        if (n.kind !== 'winner' || props.subjectIds.includes(n.id)) continue
         emblemSpecs.push({ id: n.id, color: WIN_GOLD, radius: Math.max(2.6, n.scale * sizeMul[n.dk] * 1.55), soft: true })
       }
-    } else if (props.displayMode === 'compared') {
+    }
+    if (props.displayMode === 'compared' || props.displayMode === 'pool') {
       for (const id of props.subjectIds) {
         const n = nodeById.get(id)
         if (!n) continue
@@ -1107,7 +1169,7 @@ onMounted(() => {
 
     // 写 DOM：两行内容、锚位（center+margin 必须与碰撞框一致）、随距离的字号
     for (const n of nodes) {
-      const on = ok.has(n) && (n.pass >= 2 || !n.everShown)
+      const on = ok.has(n) && (n.mustShow || n.pass >= 2 || !n.everShown)
       if (on) n.everShown = true
       if (!on) {
         if (n.shown) {
@@ -1275,20 +1337,28 @@ onMounted(() => {
   /* ---- 帧循环 ---- */
   let raf = 0
   let lastT = performance.now()
-  let time = 0
+  let time = props.restored?.time ?? 0
+  snapshotFn = () => ({
+    positions: capturePositions(props.nodes.map(n => n.id)), mode: props.layoutMode,
+    scaleBase: graphScaleBase ?? props.nodes.length,
+    camera: { position: camera.position.toArray(), target: controls.target.toArray(),
+              minDistance: controls.minDistance, maxDistance: controls.maxDistance }, time,
+    mist: mistGroups.map(g => ({ phase: g.phase, opacity: g.op })), backboneOpacity: backbone?.mat.opacity,
+  })
   const endA = new THREE.Vector3()
   const endB = new THREE.Vector3()
 
   function frameLoop() {
     raf = requestAnimationFrame(frameLoop)
     const now = performance.now()
-    const dt = Math.min(0.05, (now - lastT) / 1000)
+    const elapsed = (now - lastT) / 1000
+    const dt = Math.min(0.05, elapsed)
     lastT = now
     time += reduce ? 0 : dt
 
     // 取景补间
     if (camTween) {
-      camTween.t = Math.min(1, camTween.t + dt / 0.5)
+      camTween.t = Math.min(1, camTween.t + elapsed / 0.5)
       const k = 1 - Math.pow(1 - camTween.t, 3)
       camera.position.lerpVectors(camTween.fromP, camTween.toP, k)
       controls.target.lerpVectors(camTween.fromT, camTween.toT, k)
@@ -1480,7 +1550,9 @@ onMounted(() => {
   raf = requestAnimationFrame(frameLoop)
 
   /* ---- 数据与强调态监听 ---- */
-  watch(() => [props.nodes, props.edges, props.layoutMode], () => void rebuild(), { deep: false })
+  watch(() => [props.ambientNodes ?? props.nodes, props.ambientEdges ?? props.edges, props.layoutMode],
+    () => void rebuild(), { deep: false })
+  watch(() => [props.nodes, props.edges], syncGraph, { deep: false })
   watch(
     () => [props.focusId, props.highlightIds, props.sceneIds, props.ranks, props.dimOthers, props.hiddenKinds, props.sceneEdges, props.displayMode, props.locked, props.subjectIds],
     () => applyEmphasis(),
@@ -1489,6 +1561,9 @@ onMounted(() => {
   void rebuild()
 
   cleanup = () => {
+    for (const waiter of waiters) waiter.reject(new Error('星图已离开'))
+    waiters.clear()
+    snapshotFn = () => null
     cancelAnimationFrame(raf)
     ro.disconnect()
     renderer.domElement.removeEventListener('pointerdown', onDown)

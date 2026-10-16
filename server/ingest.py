@@ -22,6 +22,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 from ict.config import DATA_ROOT, DEFAULT_TENANT, tenant_paths  # noqa: E402
+from server.tenant import current_tenant, validate_tenant
+from ict import config as ict_config
 from ict.state import STEP_TOTAL  # noqa: E402
 
 TZ = timezone(timedelta(hours=8))
@@ -78,41 +80,54 @@ def plan_pairs(filenames: list[str]) -> PairPlan:
     return PairPlan(items=items, zip_only=zip_only, invalid=invalid)
 
 
-def job_path(job_id: str) -> Path:
-    return tenant_paths(DEFAULT_TENANT).jobs / f"{job_id}.json"
+def job_path(job_id: str, tenant_id: str | None = None) -> Path:
+    if not ID_RE.fullmatch(job_id):
+        raise ValueError("无效任务编号")
+    return tenant_paths(validate_tenant(tenant_id or current_tenant())).jobs / f"{job_id}.json"
 
 
-def incoming_dir(job_id: str) -> Path:
-    return tenant_paths(DEFAULT_TENANT).incoming / job_id
+def incoming_dir(job_id: str, tenant_id: str | None = None) -> Path:
+    if not ID_RE.fullmatch(job_id):
+        raise ValueError("无效任务编号")
+    return tenant_paths(validate_tenant(tenant_id or current_tenant())).incoming / job_id
 
 
-def load_job(job_id: str) -> dict | None:
-    path = job_path(job_id)
+def load_job(job_id: str, tenant_id: str | None = None) -> dict | None:
+    if not ID_RE.fullmatch(job_id):
+        return None
+    tenant = tenant_id or current_tenant()
+    path = job_path(job_id, tenant)
     if not path.exists():
         return None
-    return json.loads(path.read_text(encoding="utf-8"))
+    job = json.loads(path.read_text(encoding="utf-8"))
+    return job if job.get("tenant_id", DEFAULT_TENANT) == tenant else None
 
 
-def load_all_jobs() -> list[dict]:
-    """全部任务，新→旧。工作进程靠它找 queued。"""
-    directory = tenant_paths(DEFAULT_TENANT).jobs
+def load_all_jobs(tenant_id: str | None = None, *, all_tenants: bool = False) -> list[dict]:
+    """API reads current account only. The single worker explicitly scans all accounts."""
+    if all_tenants:
+        root = ict_config.JOBS_ROOT
+        tenants = [p.name for p in root.iterdir() if p.is_dir()] if root.exists() else []
+        return [job for tenant in sorted(tenants) for job in load_all_jobs(tenant)]
+    tenant = validate_tenant(tenant_id or current_tenant())
+    directory = tenant_paths(tenant).jobs
     if not directory.exists():
         return []
-    return [json.loads(path.read_text(encoding="utf-8"))
-            for path in sorted(directory.glob("*.json"), reverse=True)]
+    jobs = [load_job(path.stem, tenant) for path in sorted(directory.glob("*.json"), reverse=True)]
+    return [job for job in jobs if job is not None]
 
 
-def runs_roots(tenant_id: str = DEFAULT_TENANT) -> list[Path]:
+def runs_roots(tenant_id: str | None = None) -> list[Path]:
     """提取产物只在租户目录下：`tenants/<t>/runs`（工作进程写这里）。
 
     不再回落到 work/runs：那是开发期批量跑批的产物，正式链路接通后一切都在租户目录里。
     查找顺序只有这一处定义，`/api/runs/{id}` 与列表的 run_started 判断共用它。
     """
-    return [tenant_paths(tenant_id).runs]
+    return [tenant_paths(validate_tenant(tenant_id or current_tenant())).runs]
 
 
 def find_run_state(announcement_id: str, extra_roots: list[Path] | None = None,
-                   tenant_id: str = DEFAULT_TENANT) -> Path | None:
+                   tenant_id: str | None = None) -> Path | None:
     for root in list(extra_roots or []) + runs_roots(tenant_id):
         path = root / announcement_id / "run_state.json"
         if path.exists():
@@ -121,7 +136,7 @@ def find_run_state(announcement_id: str, extra_roots: list[Path] | None = None,
 
 
 def run_state_of(announcement_id: str, extra_roots: list[Path] | None = None,
-                 tenant_id: str = DEFAULT_TENANT) -> dict | None:
+                 tenant_id: str | None = None) -> dict | None:
     """读某个公告的 run_state.json；没有就是还没跑过。"""
     path = find_run_state(announcement_id, extra_roots, tenant_id)
     if path is None:
@@ -152,7 +167,7 @@ def _progress(announcement_id: str, extra_roots: list[Path] | None,
 
 
 def run_is_current(announcement_id: str, since: str | None, extra_roots: list[Path] | None = None,
-                   tenant_id: str = DEFAULT_TENANT) -> bool:
+                   tenant_id: str | None = None) -> bool:
     """磁盘上那份 run_state 是不是「这次尝试」产生的。
 
     重新上传一则提取过的公告时，旧 run_state 还在原地 —— 不比对时间的话，
@@ -178,7 +193,7 @@ def job_detail(job: dict) -> dict:
 
 def save_job(job: dict) -> None:
     job["updated_at"] = now()
-    path = job_path(job["job_id"])
+    path = job_path(job["job_id"], job.get("tenant_id") or DEFAULT_TENANT)
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + ".tmp")
     tmp.write_text(json.dumps(job, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -203,13 +218,13 @@ def disk_error(path: Path) -> str | None:
 
 def create_job(items: list[dict], overwrite: set[str]) -> dict:
     """建任务并落元数据。items 来自确认过的 precheck 结果。"""
-    reason = disk_error(tenant_paths(DEFAULT_TENANT).root)
+    reason = disk_error(tenant_paths(current_tenant()).root)
     if reason:
         raise UploadRejected(507, reason)
     job_id = new_job_id()
     job = {
         "job_id": job_id,
-        "tenant_id": DEFAULT_TENANT,
+        "tenant_id": current_tenant(),
         "created_at": now(),
         "updated_at": now(),
         "status": "draft",
@@ -253,7 +268,7 @@ def store_upload(job: dict, filename: str | None, stream) -> dict:
         raise UploadRejected(422, "该公告不在本次任务里：%s" % stem)
 
     limit = MAX_HTML_BYTES if ext == HTML_SUFFIX else MAX_ZIP_BYTES
-    target = incoming_dir(job["job_id"]) / f"{stem}{ext}"
+    target = incoming_dir(job["job_id"], job.get("tenant_id") or DEFAULT_TENANT) / f"{stem}{ext}"
     if target.exists():
         return {"announcement_id": stem, "kind": ext.lstrip("."), "skipped": True,
                 "size": target.stat().st_size}
@@ -289,7 +304,7 @@ def store_upload(job: dict, filename: str | None, stream) -> dict:
 def missing_files(job: dict) -> list[str]:
     """列出还缺的上传文件。"""
     missing: list[str] = []
-    directory = incoming_dir(job["job_id"])
+    directory = incoming_dir(job["job_id"], job.get("tenant_id") or DEFAULT_TENANT)
     for item in job["items"]:
         aid = item["announcement_id"]
         if not (directory / f"{aid}{HTML_SUFFIX}").exists():
@@ -312,7 +327,7 @@ def start_job(job: dict) -> dict:
 
 
 def list_jobs(page: int, page_size: int) -> dict:
-    directory = tenant_paths(DEFAULT_TENANT).jobs
+    directory = tenant_paths(current_tenant()).jobs
     files = sorted(directory.glob("*.json"), reverse=True) if directory.exists() else []
     total = len(files)
     start = (page - 1) * page_size
@@ -337,7 +352,7 @@ def summarize(job: dict) -> dict:
 
 
 def merge_records(jobs: list[dict], done_rows: list[dict], page: int, page_size: int,
-                  roots: list[Path] | None = None, tenant_id: str = DEFAULT_TENANT) -> dict:
+                  roots: list[Path] | None = None, tenant_id: str | None = None) -> dict:
     """把「进行中的任务项」与「已入库公告」合成一张表：**一行一则公告**，四种状态。
 
     - 库里有 → 已完成（带项目/标的数）
@@ -424,5 +439,5 @@ def delete_job(job: dict) -> None:
     """
     if any(item["status"] != "waiting" for item in job["items"]):
         raise UploadRejected(409, "任务已经开始提取，不能丢弃")
-    shutil.rmtree(incoming_dir(job["job_id"]), ignore_errors=True)
-    job_path(job["job_id"]).unlink(missing_ok=True)
+    shutil.rmtree(incoming_dir(job["job_id"], job.get("tenant_id") or DEFAULT_TENANT), ignore_errors=True)
+    job_path(job["job_id"], job.get("tenant_id") or DEFAULT_TENANT).unlink(missing_ok=True)

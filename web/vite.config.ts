@@ -16,7 +16,8 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: 'http://localhost:8000',
-        changeOrigin: true,
+        // Keep the browser-facing Host for same-origin login/CSRF checks.
+        changeOrigin: false,
       },
     },
   },

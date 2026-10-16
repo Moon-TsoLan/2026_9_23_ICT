@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { X } from 'lucide-vue-next'
-import { ref, watch } from 'vue'
+import { onUnmounted, ref, watch } from 'vue'
 import { api } from '@/api/client'
 import type { PartyHit } from '@/types/explore'
 import { NODE_KIND_LABEL } from '@/types/graph'
@@ -10,6 +10,7 @@ function hitKind(k: PartyHit['kind']): string {
   if (k === 'buyer') return '采购单位'
   if (k === 'project') return '项目'
   if (k === 'winner') return '可查 S3/S4/S5'
+  if (k === 'vendor') return '产品供应商 / 品牌'
   return '仅投标方'
 }
 
@@ -34,6 +35,8 @@ const openList = ref(false)
 const loading = ref(false)
 let timer = 0
 let suppressSearch = false
+let searchSeq = 0
+onUnmounted(() => { window.clearTimeout(timer); ++searchSeq })
 
 watch(
   () => props.modelValue,
@@ -46,6 +49,7 @@ watch(
 )
 
 watch(text, (kw) => {
+  const seq = ++searchSeq
   window.clearTimeout(timer)
   if (suppressSearch) {
     suppressSearch = false
@@ -62,17 +66,18 @@ watch(text, (kw) => {
     loading.value = true
     try {
       const res = await api.parties(s)
+      if (seq !== searchSeq) return
       hits.value = res.items.filter((h) => {
         if (props.kind === 'any') return true
         if (props.kind === 'buyer') return h.kind === 'buyer'
         if (props.kind === 'winner') return h.kind === 'winner'
-        return h.kind !== 'buyer'
+        return h.kind === 'winner' || h.kind === 'bidder'
       })
       openList.value = true
     } catch {
-      hits.value = []
+      if (seq === searchSeq) hits.value = []
     } finally {
-      loading.value = false
+      if (seq === searchSeq) loading.value = false
     }
   }, 250)
 })

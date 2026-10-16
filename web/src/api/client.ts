@@ -8,6 +8,7 @@ import type {
   PartyHit,
   PartyProfile,
   SceneResult,
+  GraphSlice,
 } from '@/types/explore'
 import type { SceneId } from '@/types/explore'
 import type { AnnouncementItem, RunState } from '@/types/ingest'
@@ -17,12 +18,18 @@ import type { IngestRecords } from '@/types/ingest'
 const BASE = '/api'
 const TIMEOUT = 15_000
 
+export interface AccountUser { account_id: string; username: string; tenant_id: string }
+
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), TIMEOUT)
+  const abort = () => ctrl.abort()
+  if (init?.signal?.aborted) ctrl.abort()
+  init?.signal?.addEventListener('abort', abort, { once: true })
   try {
-    const res = await fetch(BASE + path, { ...init, signal: ctrl.signal })
+    const res = await fetch(BASE + path, { credentials: 'same-origin', ...init, signal: ctrl.signal })
     if (!res.ok) {
+      if (res.status === 401 && !path.startsWith('/auth/')) window.dispatchEvent(new Event('ict:unauthorized'))
       let detail = res.statusText
       let raw: unknown = undefined
       try {
@@ -40,6 +47,7 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
     return (await res.json()) as T
   } finally {
     clearTimeout(timer)
+    init?.signal?.removeEventListener('abort', abort)
   }
 }
 
@@ -72,6 +80,14 @@ function searchParams(query: CobSearchQuery): Record<string, string | number | n
 }
 
 export const api = {
+  me: () => http<{ user: AccountUser }>('/auth/me'),
+  login: (username: string, password: string) => http<{ user: AccountUser }>('/auth/login', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }),
+  }),
+  register: (username: string, password: string) => http<{ user: AccountUser }>('/auth/register', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }),
+  }),
+  logout: () => http<{ ok: boolean }>('/auth/logout', { method: 'POST' }),
   /** 健康检查：announcements 用来算"新增几则"，data_version 用来判断变没变 */
   health: () => http<Health>('/health'),
 
@@ -84,14 +100,16 @@ export const api = {
   exportUrl: (query: CobSearchQuery) => `${BASE}/objects/export${qs(searchParams(query))}`,
   announcementExportUrl: (aid: string) => `${BASE}/announcements/${encodeURIComponent(aid)}/export`,
 
-  sceneQuery: (scene: SceneId, subjects: string[], limit = 5) =>
+  sceneQuery: (scene: SceneId, subjects: string[], limit = 5, expectedVersion?: string, signal?: AbortSignal) =>
     http<SceneResult>(`/scenes/${scene}/query`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ subjects, limit }),
+      body: JSON.stringify({ subjects, limit, expected_version: expectedVersion }), signal,
     }),
 
   overview: () => http<OverviewResult>('/graph/overview'),
+  neighborhood: (id: string, version: string, offset = 0, signal?: AbortSignal) =>
+    http<GraphSlice>(`/graph/neighborhood/${encodeURIComponent(id)}${qs({ expected_version: version, offset })}`, { signal }),
 
   parties: (kw: string) => http<{ items: PartyHit[] }>(`/parties${qs({ q: kw })}`),
 
@@ -148,6 +166,7 @@ export const api = {
         if (event.lengthComputable) onProgress?.(event.loaded, event.total)
       }
       xhr.onload = () => {
+        if (xhr.status === 401) window.dispatchEvent(new Event('ict:unauthorized'))
         let body: { detail?: unknown } | UploadOutcome | null = null
         try {
           body = JSON.parse(xhr.responseText) as { detail?: unknown }

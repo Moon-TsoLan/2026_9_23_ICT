@@ -41,7 +41,8 @@ watch(
 )
 
 function goExplore() {
-  void router.push({ path: '/explore', query: { focus: partyId.value } })
+  void router.push({ path: '/explore', query: { focus: partyId.value },
+    state: { exploreIntent: crypto.randomUUID() } })
 }
 
 function goSearch() {

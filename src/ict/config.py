@@ -24,7 +24,7 @@ DEFAULT_TENANT = "default"
 
 @dataclass(frozen=True)
 class TenantPaths:
-    """一个租户的全部运行目录。现在只有一个租户，tenant_id 恒为 default。"""
+    """一个租户的全部运行目录。账号各有独立tenant_id，default保留历史数据空间。"""
 
     tenant_id: str
     root: Path

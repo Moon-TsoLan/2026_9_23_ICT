@@ -8,7 +8,7 @@ runs-current/
 /uploads/
 /doc/设计报告
 /_vllm_bench/result*.json
-
+outputs/
 # Local environment settings (keep configuration templates)
 .env
 .env.*

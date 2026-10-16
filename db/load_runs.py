@@ -1,4 +1,4 @@
-"""Load a batch of pipeline runs into a database built from db/001_schema.sql.
+"""Load runs into a database built from db/001_schema.sql + db/002_accounts.sql.
 
     python db/load_runs.py --db ict_batch20261004 --runs work/runs
     python db/load_runs.py --db ict_batch20261004 --runs work/runs --ids work/_step8_probe/heavy5.json
@@ -34,6 +34,7 @@ from pathlib import Path
 import psycopg
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src"))
 
 
@@ -176,15 +177,15 @@ def plan_rounds(entries: list[dict], existing: list[tuple] = ()) -> RoundPlan:
     return RoundPlan(inserts, renames)
 
 
-def fetch_existing(cur, package_keys: list[str], exclude_aids: list[str]) -> list[tuple]:
+def fetch_existing(cur, package_keys: list[str], exclude_aids: list[str], tenant: str = "default") -> list[tuple]:
     """库内已有的同键行；排除本次要覆盖的公告。"""
     if not package_keys:
         return []
     cur.execute(
         """SELECT package_key, announcement_id, project_id, round_no
              FROM project
-            WHERE package_key = ANY(%s) AND NOT (announcement_id = ANY(%s))""",
-        (package_keys, exclude_aids),
+            WHERE package_key = ANY(%s) AND NOT (announcement_id = ANY(%s)) AND tenant_id=%s""",
+        (package_keys, exclude_aids, tenant),
     )
     return cur.fetchall()
 
@@ -203,12 +204,12 @@ def load_run(cur, run: Path, inserts: dict[tuple[str, int], tuple[str, int, str]
         """INSERT INTO announcement (announcement_id, tenant_id, title, source_project_no, announcement_type,
                                       summary_amount_yuan, run_status, review_required, raw_json)
            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
-           ON CONFLICT (announcement_id) DO UPDATE
+           ON CONFLICT (tenant_id, announcement_id) DO UPDATE
              SET title = EXCLUDED.title, source_project_no = EXCLUDED.source_project_no,
                  announcement_type = EXCLUDED.announcement_type,
                  summary_amount_yuan = EXCLUDED.summary_amount_yuan,
                  run_status = EXCLUDED.run_status, review_required = EXCLUDED.review_required,
-                 raw_json = EXCLUDED.raw_json, tenant_id = EXCLUDED.tenant_id""",
+                 raw_json = EXCLUDED.raw_json""",
         (aid, tenant, understanding.get("project_name"), understanding.get("source_project_no"),
          understanding.get("announcement_type"), num(summary.get("amount_yuan"), 2),
          report.get("status"), bool(report.get("review_required")),
@@ -247,11 +248,11 @@ def load_run(cur, run: Path, inserts: dict[tuple[str, int], tuple[str, int, str]
         cur.execute(
             """INSERT INTO project (project_id, package_key, package_no, round_no,
                                     source_project_no, announcement_id, project_name,
-                                    purchaser, package_total_amount)
-               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                                    purchaser, package_total_amount, tenant_id)
+               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
             (project_id, package_key, str(project.get("package_no")), round_no,
              project.get("source_project_no"), aid, project.get("project_name"),
-             project.get("purchaser"), num(project.get("package_total_amount"), 2)))
+             project.get("purchaser"), num(project.get("package_total_amount"), 2), tenant))
         for index, cob in enumerate(project.get("cobs") or []):
             source = candidates.get(base_ids[index]) if index < len(base_ids) else None
             origin = ((source or {}).get("source") or {})
@@ -274,9 +275,9 @@ def load_run(cur, run: Path, inserts: dict[tuple[str, int], tuple[str, int, str]
             if not name:
                 continue
             row = cur.execute(
-                """INSERT INTO supplier (name, norm_name) VALUES (%s, norm_name(%s))
-                   ON CONFLICT (norm_name) DO UPDATE SET name = supplier.name
-                   RETURNING supplier_id""", (name, name)).fetchone()
+                """INSERT INTO supplier (name, norm_name, tenant_id) VALUES (%s, norm_name(%s), %s)
+                   ON CONFLICT (tenant_id, norm_name) DO UPDATE SET name = supplier.name
+                   RETURNING supplier_id""", (name, name, tenant)).fetchone()
             supplier_id = row[0]
             cur.execute(
                 """INSERT INTO bid (project_id, supplier_id, score, is_winner)
@@ -299,8 +300,8 @@ def main() -> None:
     parser.add_argument("--db", required=True)
     parser.add_argument("--runs", default="work/runs")
     parser.add_argument("--ids", help="optional JSON array of announcement ids to load")
-    parser.add_argument("--reset", action="store_true", help="truncate the target tables first")
-    parser.add_argument("--tenant", default="default", help="租户/账号，现在恒为 default")
+    parser.add_argument("--reset", action="store_true", help="先清理目标账号的数据，不影响其他账号")
+    parser.add_argument("--tenant", default="default", help="账号数据空间；赛题账号可绑定default")
     args = parser.parse_args()
 
     base = ROOT / args.runs
@@ -315,7 +316,8 @@ def main() -> None:
     with psycopg.connect(dsn(args.db)) as conn:
         cur = conn.cursor()
         if args.reset:
-            cur.execute("TRUNCATE winner_coop_supplier, bid, cob, supplier, project, announcement CASCADE")
+            cur.execute("DELETE FROM announcement WHERE tenant_id=%s", (args.tenant,))
+            cur.execute("DELETE FROM supplier WHERE tenant_id=%s", (args.tenant,))
         info = load_batch(cur, targets, args.tenant)
         counts = {table: cur.execute(f"SELECT count(*) FROM {table}").fetchone()[0]
                   for table in ("announcement", "project", "cob", "supplier", "bid", "winner_coop_supplier")}
@@ -328,20 +330,26 @@ def load_batch(cur, targets: list[Path], tenant: str = "default") -> dict:
     调用方负责事务边界（成功提交、失败回滚）。工作进程每则调一次也用这个函数，
     所以批量与实时的写库行为完全一致。
     """
+    from server.tenant import validate_tenant
+    validate_tenant(tenant)
     entries = target_entries(targets)
+    # Scope persistence identity only. Original extracted IDs and official UUIDs stay intact.
+    if tenant != "default":
+        for entry in entries:
+            entry["package_key"] = f"tenant:{tenant}|{entry['package_key']}"
     package_keys = sorted({entry["package_key"] for entry in entries})
     replace_aids = sorted({entry["aid"] for entry in entries})
-    existing = fetch_existing(cur, package_keys, replace_aids)
+    existing = fetch_existing(cur, package_keys, replace_aids, tenant)
     plan = plan_rounds(entries, existing)
 
     # ① 覆盖式入库：先删同号公告（级联删 project 与 cob/bid/winner_coop_supplier）
     if replace_aids:
-        cur.execute("DELETE FROM announcement WHERE announcement_id = ANY(%s)", (replace_aids,))
+        cur.execute("DELETE FROM announcement WHERE announcement_id = ANY(%s) AND tenant_id=%s", (replace_aids, tenant))
     # ② 要改名的已有行先停到临时 id + 负轮次：
     #    两阶段更新，交换时既不撞 (package_key, round_no)，也不撞主键。
     for old, _new, _round in plan.renames:
-        cur.execute("UPDATE project SET project_id = %s, round_no = -round_no WHERE project_id = %s",
-                    (old + "~park", old))
+        cur.execute("UPDATE project SET project_id = %s, round_no = -round_no WHERE project_id = %s AND tenant_id=%s",
+                    (old + "~park", old, tenant))
 
     totals: Counter = Counter()
     source_mix = Counter()
@@ -359,11 +367,12 @@ def load_batch(cur, targets: list[Path], tenant: str = "default") -> dict:
 
     # ③ 已有行落到目标 id 与轮次；子表靠 ON UPDATE CASCADE 自动跟随
     for old, new, round_no in plan.renames:
-        cur.execute("UPDATE project SET project_id = %s, round_no = %s WHERE project_id = %s",
-                    (new, round_no, old + "~park"))
+        cur.execute("UPDATE project SET project_id = %s, round_no = %s WHERE project_id = %s AND tenant_id=%s",
+                    (new, round_no, old + "~park", tenant))
     # ④ 清掉不再被任何投标引用的主体（覆盖式入库会留下它们）
     orphans = cur.execute(
-        "DELETE FROM supplier s WHERE NOT EXISTS (SELECT 1 FROM bid b WHERE b.supplier_id = s.supplier_id)"
+        "DELETE FROM supplier s WHERE s.tenant_id=%s AND NOT EXISTS (SELECT 1 FROM bid b WHERE b.supplier_id = s.supplier_id)",
+        (tenant,)
     ).rowcount
     return {"plan": plan, "per_run": per_run, "totals": totals, "round_mix": round_mix,
             "source_mix": source_mix, "orphans": orphans, "replace_aids": replace_aids}

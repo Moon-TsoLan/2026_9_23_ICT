@@ -3,6 +3,7 @@ import { Search } from 'lucide-vue-next'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '@/api/client'
+import { useAuth, sessionChanged } from '@/composables/useAuth'
 import type { PartyHit } from '@/types/explore'
 import { NODE_KIND_LABEL } from '@/types/graph'
 
@@ -17,6 +18,16 @@ const nav = [
 
 /** 双域主题：/explore 宇宙域（深），其余记录域（浅） */
 const domain = computed(() => (route.path.startsWith('/explore') ? 'void' : 'paper'))
+
+const { user } = useAuth()
+const leaving = ref(false)
+const logoutError = ref('')
+async function logout() {
+  if (leaving.value) return
+  leaving.value = true; logoutError.value = ''
+  try { await api.logout(); sessionChanged(); window.location.replace('/login') }
+  catch { logoutError.value = '退出失败，请重试'; leaving.value = false }
+}
 
 // ---------- 命令面板 ----------
 const open = ref(false)
@@ -67,6 +78,7 @@ function goParty(hit: PartyHit) {
 }
 
 function onKey(e: KeyboardEvent) {
+  if (route.path === '/login') return
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
     e.preventDefault()
     open.value = !open.value
@@ -82,7 +94,8 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
 </script>
 
 <template>
-  <div class="shell" :data-domain="domain">
+  <RouterView v-if="route.path === '/login'" />
+  <div v-else class="shell" :data-domain="domain">
     <header class="topbar">
       <RouterLink to="/ingest" class="brand">
         <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true">
@@ -105,6 +118,11 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
         <span class="hidden md:inline">搜索页面或主体</span>
         <kbd class="hidden sm:inline">Ctrl K</kbd>
       </button>
+      <div class="account-menu">
+        <span>{{ user?.username }}</span>
+        <button type="button" :disabled="leaving" @click="logout">退出</button>
+        <small v-if="logoutError" role="alert">{{ logoutError }}</small>
+      </div>
     </header>
     <main class="viewport">
       <RouterView v-slot="{ Component }">
@@ -141,6 +159,11 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
 </template>
 
 <style scoped>
+.account-menu{display:flex;align-items:center;gap:10px;font-size:12px;flex-shrink:0;color:var(--muted)}
+.account-menu span{max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.account-menu button{border:1px solid var(--line);border-radius:3px;background:none;color:var(--ink);padding:4px 8px;cursor:pointer}
+.account-menu small{color:#b03c2f}
+
 .shell {
   display: flex;
   height: 100%;

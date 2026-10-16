@@ -30,6 +30,25 @@ export interface Placed {
   scale: number
 }
 
+export interface StarSnapshot {
+  positions: Placed[]
+  mode: 'disc' | 'sphere'
+  scaleBase: number
+  camera: { position: number[]; target: number[]; minDistance: number; maxDistance: number }
+  time: number
+  mist?: Array<{ phase: number; opacity: number }>
+  backboneOpacity?: number
+}
+
+export interface StarMapHandle {
+  frame(animated?: boolean): void
+  flyTo(id: string): void
+  frameTo(ids: string[]): void
+  hasNode(id: string): boolean
+  waitForNodes(ids: string[]): Promise<void>
+  snapshot(): StarSnapshot | null
+}
+
 /**
  * 星图上的展示类别只有三种：采购单位 / 项目 / 供应商。
  * "中标"与"投标"只在某一条边上成立——同一家公司在 A 项目中标、在 B 项目只是陪标，

@@ -21,11 +21,14 @@ export function useDataVersion() {
   let baseline: string | null = null
   let baselineCount = 0
   let timer = 0
+  let running = false
+  let disposed = false
 
   /** 提示条是否该出现：有更新、且用户没手动关掉 */
   const show = computed(() => stale.value && !dismissed.value)
 
   async function tick() {
+    if (!running || disposed) return
     if (document.visibilityState === 'visible') {
       try {
         const health = await api.health()
@@ -40,17 +43,17 @@ export function useDataVersion() {
         /* 探测失败：下一次再说 */
       }
     }
-    timer = window.setTimeout(tick, POLL_MS)
+    if (running && !disposed) timer = window.setTimeout(tick, POLL_MS)
   }
 
   /** 本页数据加载完成后调用：把当前版本记为基线 */
-  async function mark() {
+  async function mark(expectedVersion?: string) {
     try {
       const health = await api.health()
-      baseline = health.data_version
-      baselineCount = health.announcements
-      stale.value = false
-      newCount.value = 0
+      baseline = expectedVersion || health.data_version
+      baselineCount = expectedVersion ? Number(expectedVersion.split(':')[0]) || 0 : health.announcements
+      stale.value = health.data_version !== baseline
+      newCount.value = Math.max(0, health.announcements - baselineCount)
       dismissed.value = false
     } catch {
       /* 没基线也不影响使用 */
@@ -58,8 +61,8 @@ export function useDataVersion() {
   }
 
   /** 刷新完成后调用：收起提示并把基线推到最新 */
-  function ack() {
-    void mark()
+  function ack(expectedVersion?: string) {
+    void mark(expectedVersion)
   }
 
   function dismiss() {
@@ -67,10 +70,13 @@ export function useDataVersion() {
   }
 
   function start() {
+    if (disposed) return
+    running = true
+    window.clearTimeout(timer)
     timer = window.setTimeout(tick, POLL_MS)
   }
 
-  onUnmounted(() => window.clearTimeout(timer))
+  onUnmounted(() => { disposed = true; running = false; window.clearTimeout(timer) })
 
   return { stale, newCount, show, mark, ack, dismiss, start }
 }

@@ -1,7 +1,7 @@
 """ICT 赛题五 · 可视化分析检索平台 —— 后端薄层。
 
-职责：把 db/queries.sql 里的只读查询包装成 REST API，供 Vue 前端消费。
-不做抽取、不做写入；上传/触发处理在本轮返回 501（接管线是下一轮的事）。
+职责：提供账号、上传任务与账号范围内的查询/导出API。
+提取由独立worker执行；业务查询统一经过当前账号作用域。
 
 启动：  D:\\python\\python.exe -m uvicorn server.app:app --port 8000
 """
@@ -15,7 +15,6 @@ from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
@@ -33,11 +32,12 @@ def q1(sql, params=()):
 
 from . import ingest
 from .scenes import SCENES, overview
+from .explore import neighborhood, supply_search, require_version
 
 ROOT = Path(__file__).resolve().parent.parent
 # 与 db/load_runs.py 同一做法：ict 包在 src/ 下，容器/本机都不装包也能 import。
 sys.path.insert(0, str(ROOT / "src"))
-from ict.config import DATA_ROOT, tenant_paths  # noqa: E402
+from ict.config import DATA_ROOT  # noqa: E402
 from ict.official import export_workbook, bidder_category, review_label
 from ict.packages import package_context
 
@@ -49,19 +49,17 @@ TMP_DIR.mkdir(parents=True, exist_ok=True)
 tempfile.tempdir = str(TMP_DIR)
 
 def _run_state_path(announcement_id: str) -> Path | None:
-    """运行记录先看租户目录（上线），再回落到 work/runs（开发与演示数据）。
+    """运行记录只读取当前账号的租户目录，不回落到开发目录。
 
     查找顺序只有一处定义：`ingest.find_run_state()`。
     """
     return ingest.find_run_state(announcement_id)
 
 app = FastAPI(title="ICT 标络 · 数据 API", version="0.1.0")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+from .auth import install_auth
+from .tenant import TENANT, current_tenant
+install_auth(app)
+
 
 SceneId = Literal["S1", "S2", "S3", "S4", "S5"]
 
@@ -69,13 +67,20 @@ SceneId = Literal["S1", "S2", "S3", "S4", "S5"]
 # ---------------------------------------------------------------------
 # 健康检查
 # ---------------------------------------------------------------------
+@app.get("/api/ping")
+def ping() -> dict:
+    return {"ok": True}
+
+
 @app.get("/api/health")
 def health() -> dict:
+    if TENANT.get() is None:
+        return {"ok": True}
     row = q1("SELECT count(*) AS n, max(created_at) AS ts FROM announcement")
     count = row["n"] if row else 0
     stamp = row["ts"].isoformat() if row and row["ts"] else ""
     # data_version 给检索/探索页判断"有新结果入库了"用（只需要变，不需要有意义）。
-    return {"ok": True, "announcements": count, "data_version": f"{count}:{stamp}"}
+    return {"ok": True, "announcements": count, "data_version": f"{count}:{stamp}:{current_tenant()}"}
 
 
 # ---------------------------------------------------------------------
@@ -277,30 +282,49 @@ def objects_detail(cob_id: int) -> dict:
 class SceneQuery(BaseModel):
     subjects: list[str] = Field(min_length=1)
     limit: int = Field(5, ge=1, le=50)
+    expected_version: str | None = None
 
 
 @app.post("/api/scenes/{scene_id}/query")
 def scene_query(scene_id: SceneId, body: SceneQuery) -> dict:
+    version = require_version(body.expected_version) if body.expected_version else None
+
+    def finish(result):
+        if version:
+            require_version(version)
+            result["data_version"] = version
+        return result
+
     subjects = [s.strip() for s in body.subjects if s.strip()]
     if not subjects:
         raise HTTPException(422, "subjects 不能为空")
     if scene_id in ("S1", "S2"):
         if len(subjects) != 1:
             raise HTTPException(422, f"{scene_id} 需要 1 个采购单位")
-        return SCENES[scene_id](subjects[0], body.limit)
+        return finish(SCENES[scene_id](subjects[0], body.limit))
     if scene_id == "S3":
         if len(subjects) != 1:
             raise HTTPException(422, "S3 需要 1 个中标供应商")
-        return SCENES["S3"](subjects[0], body.limit)
+        return finish(SCENES["S3"](subjects[0], body.limit))
     # S4 / S5 多主体
     if len(subjects) < 2:
         raise HTTPException(422, f"{scene_id} 需要至少 2 个中标供应商")
-    return SCENES[scene_id](subjects, max(body.limit, 20))
+    return finish(SCENES[scene_id](subjects, max(body.limit, 20)))
 
 
 @app.get("/api/graph/overview")
 def graph_overview() -> dict:
-    return overview()
+    version = require_version(None)
+    result = overview()
+    require_version(version)
+    result["meta"]["data_version"] = version
+    return result
+
+
+@app.get("/api/graph/neighborhood/{party_id:path}")
+def graph_neighborhood(party_id: str, offset: int = Query(0, ge=0), limit: int = Query(30, ge=1, le=100),
+                       expected_version: str | None = None):
+    return neighborhood(party_id, offset, limit, expected_version)
 
 
 # ---------------------------------------------------------------------
@@ -353,6 +377,8 @@ def parties_search(q_: str = Query("", alias="q")) -> dict:
         {"id": f"sup:{s['name']}", "name": s["name"], "kind": "winner" if s["has_win"] else "bidder"}
         for s in suppliers
     ]
+    seen = {item["id"] for item in items}
+    items.extend(item for item in supply_search(kw) if item["id"] not in seen)
     return {"items": items}
 
 
@@ -631,14 +657,12 @@ def announcements() -> dict:
         SELECT a.announcement_id, a.title, a.announcement_type, a.run_status,
                a.review_required, a.created_at,
                (a.raw_json ? '_synthetic') AS synthetic,
-               count(DISTINCT p.project_id) AS projects,
+               (SELECT count(*) FROM project p WHERE p.announcement_id=a.announcement_id) AS projects,
                (SELECT count(*) FROM cob c JOIN project p2 ON p2.project_id = c.project_id
                 WHERE p2.announcement_id = a.announcement_id) AS cobs,
                (SELECT p3.project_name FROM project p3
                 WHERE p3.announcement_id = a.announcement_id LIMIT 1) AS first_project
         FROM announcement a
-        LEFT JOIN project p ON p.announcement_id = a.announcement_id
-        GROUP BY a.announcement_id
         ORDER BY a.created_at DESC
         """
     )
@@ -777,12 +801,10 @@ def ingest_records(page: int = Query(1, ge=1),
     done_rows = q(
         """
         SELECT a.announcement_id, a.title, a.run_status, a.created_at,
-               count(DISTINCT p.project_id) AS projects,
+               (SELECT count(*) FROM project p WHERE p.announcement_id=a.announcement_id) AS projects,
                (SELECT count(*) FROM cob c JOIN project p2 ON p2.project_id = c.project_id
                  WHERE p2.announcement_id = a.announcement_id) AS cobs
           FROM announcement a
-          LEFT JOIN project p ON p.announcement_id = a.announcement_id
-         GROUP BY a.announcement_id
         """
     )
     rows = [
@@ -796,7 +818,7 @@ def ingest_records(page: int = Query(1, ge=1),
         for row in done_rows
     ]
     # 不给 roots：走 ingest.runs_roots() 的默认解析（只有租户运行目录）
-    return ingest.merge_records(ingest.load_all_jobs(), rows, page, page_size)
+    return ingest.merge_records(ingest.load_all_jobs(), rows, page, page_size, tenant_id=current_tenant())
 
 
 @app.delete("/api/ingest/jobs/{job_id}")

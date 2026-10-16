@@ -35,7 +35,8 @@ import db.load_runs as load_runs                                  # noqa: E402
 import prep.extract_attachments as attachments                    # noqa: E402
 from ict.config import DEFAULT_TENANT, concurrency_settings, tenant_paths  # noqa: E402
 from ict.pipeline import run_announcement                         # noqa: E402
-from server import ingest                                         # noqa: E402
+from server import ingest
+from ict import config as ict_config                                         # noqa: E402
 
 # 任务元数据在同一批里被多个线程改，写文件要串行；入库也要串行（轮次重排要看库内现状）。
 _SAVE_LOCK = threading.Lock()
@@ -60,7 +61,7 @@ def _close_job(job: dict) -> None:
 
 
 def lock_path() -> Path:
-    return tenant_paths(DEFAULT_TENANT).jobs / ".worker.lock"
+    return ict_config.JOBS_ROOT / ".worker.lock"
 
 
 def _pid_alive(pid: int) -> bool:
@@ -87,6 +88,14 @@ def _pid_alive(pid: int) -> bool:
 def acquire_lock(force: bool = False) -> None:
     path = lock_path()
     path.parent.mkdir(parents=True, exist_ok=True)
+    # An upgraded worker must not run alongside an old per-default worker.
+    for legacy in path.parent.glob("*/.worker.lock"):
+        try:
+            owner = int(legacy.read_text(encoding="utf-8").strip() or 0)
+        except (OSError, ValueError):
+            owner = 0
+        if owner and _pid_alive(owner):
+            raise SystemExit("旧版工作进程仍在运行，请先停止（pid=%d）" % owner)
     if path.exists() and not force:
         try:
             owner = int(path.read_text(encoding="utf-8").strip() or 0)
@@ -107,7 +116,7 @@ def release_lock() -> None:
 def heal_interrupted(verbose: bool = True) -> int:
     """上次进程被杀留下的 running：改成 failed，别让界面永远转圈。"""
     fixed = 0
-    for job in ingest.load_all_jobs():
+    for job in ingest.load_all_jobs(all_tenants=True):
         changed = False
         for item in job["items"]:
             if item["status"] == "running":
@@ -127,7 +136,7 @@ def heal_interrupted(verbose: bool = True) -> int:
 def claim_items() -> list[tuple[dict, dict]]:
     """把 queued 任务里 waiting 的项认领成本进程的 running。"""
     claimed: list[tuple[dict, dict]] = []
-    for job in ingest.load_all_jobs():
+    for job in ingest.load_all_jobs(all_tenants=True):
         if job["status"] not in ("queued", "running"):
             continue
         waiting = [item for item in job["items"] if item["status"] == "waiting"]
@@ -231,8 +240,8 @@ def main() -> None:
         if verbose:
             paths = tenant_paths()
             print("[worker] threads=%d poll=%.1fs data_root=%s" % (threads, args.poll, paths.root))
-            print("[worker] 任务目录 %s" % paths.jobs)
-            if not any(paths.jobs.glob("*.json")):
+            print("[worker] 任务根目录 %s（扫描所有账号）" % ict_config.JOBS_ROOT)
+            if not ingest.load_all_jobs(all_tenants=True):
                 print("[worker] 注意：这个任务目录下还没有任何任务。"
                       "如果后端用的不是同一个 ICT_DATA_ROOT，两边就对不上，"
                       "任务会一直停在“等待中”。")

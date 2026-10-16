@@ -1,6 +1,7 @@
 """数据库连接池与 .env 加载。
 
-只读薄层：所有查询走连接池 + dict_row，不做任何写操作。
+业务只读查询统一添加账号作用域；账号/会话读写走独立raw_q入口。
+连接池使用dict_row。
 换库只改 .env 里的 DATABASE_URL，本文件不用动。
 """
 from __future__ import annotations
@@ -41,10 +42,17 @@ pool = ConnectionPool(
 )
 
 
-def q(sql: str, params: tuple | list = ()) -> list[dict[str, Any]]:
+def raw_q(sql: str, params: tuple | list = ()) -> list[dict[str, Any]]:
+    """Account/session storage only. Business endpoints use the scoped q below."""
     with pool.connection() as conn, conn.cursor() as cur:
         cur.execute(sql, params)
         return cur.fetchall()
+
+
+def q(sql: str, params: tuple | list = ()) -> list[dict[str, Any]]:
+    from .tenant import scoped_read
+    statement, scoped_params = scoped_read(sql, params)
+    return raw_q(statement, scoped_params)
 
 
 def q1(sql: str, params: tuple | list = ()) -> dict[str, Any] | None:

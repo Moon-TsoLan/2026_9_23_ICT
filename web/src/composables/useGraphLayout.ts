@@ -501,6 +501,16 @@ export function resetLayoutCache() {
   cachedSizeRatio = 1
 }
 
+export function restorePositions(positions: Placed[], mode: LayoutMode) {
+  resetLayoutCache()
+  cacheMode = mode
+  for (const p of positions) posCache.set(p.id, { ...p })
+}
+
+export function capturePositions(ids: string[]): Placed[] {
+  return ids.flatMap(id => { const p = posCache.get(id); return p ? [{ ...p }] : [] })
+}
+
 /** 球面上均匀随机方向 */
 function randDir(seed: string, radius: number): V3 {
   const u = hash(seed) * 2 - 1
