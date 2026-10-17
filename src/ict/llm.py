@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import time
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import httpx
@@ -57,6 +57,7 @@ class LLMResult:
     latency_ms: int
     # Kept only where thinking is switched on, for the audit trail. No rule reads it.
     reasoning: str = ""
+    usage: dict = field(default_factory=dict)
 
 
 class LLMError(RuntimeError):
@@ -148,7 +149,7 @@ class OpenAICompatibleClient(LLMClient):
             # only when the visible text holds no JSON at all keeps a real answer untouched and
             # avoids the whole package silently falling back to the baseline.
             text = reasoning
-        return LLMResult(text, self.model, self.model, prompt_version, latency_ms, reasoning)
+        return LLMResult(text, self.model, self.model, prompt_version, latency_ms, reasoning, payload.get("usage") or {})
 
     def complete_with_images(self, *, step: str, prompt_version: str, images: list[str],
                              user_text: str) -> LLMResult:
@@ -172,7 +173,7 @@ class OpenAICompatibleClient(LLMClient):
             raise LLMError(f"{step} http {response.status_code}: {response.text[:300]}")
         payload = response.json()
         produced = payload["choices"][0]["message"]["content"]
-        return LLMResult(produced, self.model, self.model, prompt_version, latency_ms)
+        return LLMResult(produced, self.model, self.model, prompt_version, latency_ms, usage=payload.get("usage") or {})
 
 
 class FakeLLMClient(LLMClient):
@@ -259,6 +260,9 @@ def complete_json(
             return receiver.result(attempts)
         if notes is not None:
             notes["reasoning"] = (getattr(result, "reasoning", "") or "")[:1200]
+            notes.setdefault("calls", []).append({"attempt": attempt + 1,
+                "latency_ms": result.latency_ms, "usage": getattr(result, "usage", {}),
+                "prompt_version": prompt_version, "model_name": result.model_name})
         if counter is not None:
             bump_count(counter, step)
         try:

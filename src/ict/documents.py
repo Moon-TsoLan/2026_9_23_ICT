@@ -45,7 +45,7 @@ def read_xlsx(path: Path) -> list[dict]:
 
 
 def read_native(path: Path, fmt: str | None = None) -> list[dict]:
-    """docx and spreadsheets keep their own structure; no rasterising, no model."""
+    """DOCX, spreadsheets and text use their sniffed container; no rasterising or model."""
     suffix = "." + fmt if fmt else path.suffix.lower()
     # Reading a whole spreadsheet or tender document is CPU work, so it queues behind the same
     # gate as the other native readers.
@@ -56,4 +56,17 @@ def read_native(path: Path, fmt: str | None = None) -> list[dict]:
             # A stream prevents suffix checks from contradicting the sniffed container.
             with path.open("rb") as stream:
                 return read_xlsx(stream)
+        if suffix == ".text":
+            text = read_text(path)
+            return [{"page_no": 1, "text": text, "tables": [], "chars": len(text), "source": "text"}]
     raise ValueError("unsupported native document " + suffix)
+
+
+def read_text(path: Path) -> str:
+    raw = path.read_bytes()
+    for encoding in ("utf-8-sig", "utf-16" if raw.startswith((b"\xff\xfe", b"\xfe\xff")) else "gb18030"):
+        try:
+            return raw.decode(encoding)
+        except UnicodeError:
+            continue
+    return raw.decode("utf-8", errors="replace")

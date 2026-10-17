@@ -36,14 +36,21 @@ def _bidder_cells(table: ParsedTable, mapping: dict) -> list[str]:
     return [_compact(row[column]) for row in table.rows if column < len(row) and row[column]]
 
 
-def _validate_table(parsed: dict, package_nos: list[str]) -> str:
+def _validate_table(parsed: dict, package_nos: list[str]):
+    from ict.llm import ValidationIssue
     if parsed.get("table_role") not in TABLE_ROLES:
         return "table_role 不在允许值内"
     if parsed.get("row_grain") not in ROW_GRAINS and parsed.get("row_grain") not in (None, ""):
         return "row_grain 不在允许值内"
-    scope = str(parsed.get("package_scope") or "unknown")
+    scope = parsed.get("package_scope", "unknown")
+    if not isinstance(scope, str):
+        return ValidationIssue(f"期望字符串，实际为{type(scope).__name__}；单单元写内部引用字符串，"
+                               "跨单元写announcement，不能输出数组或取数组第一项", path="$.package_scope")
     if scope not in set(package_nos) | {"announcement", "unknown"}:
-        return "package_scope 不在公告包列表、announcement、unknown 之中"
+        return ValidationIssue("必须引用输入采购单元目录，跨单元写announcement，无法确定写unknown", path="$.package_scope")
+    mapping = parsed.get("column_mapping", {})
+    if not isinstance(mapping, dict) or any(not isinstance(value, str) for value in mapping.values()):
+        return ValidationIssue("column_mapping必须为字段名到原表头字符串的对象", path="$.column_mapping")
     return ""
 
 
@@ -77,7 +84,7 @@ def understand_tables(
             parsed = complete_json(
                 llm,
                 step="understand_html_tables",
-                prompt_version="html-tables-v5",
+                prompt_version="html-tables-v6",
                 user=json.dumps((step2a_payload(table, package_nos, siblings) | {"package_registry": package_registry or []}), ensure_ascii=False),
                 validate=lambda item: _validate_table(item, package_nos),
                 counter=counter,

@@ -66,7 +66,7 @@ def test_single_lot_original_number_survives_entire_pipeline(tmp_path, monkeypat
                 answer = {"project_name": "采购", "package_mode": "single",
                           "packages": [unit("lot", "1", "第1标段")]}
             elif step == "understand_html_tables":
-                assert prompt_version == "html-tables-v5"
+                assert prompt_version == "html-tables-v6"
                 answer = {"table_role": "cob_detail", "package_scope": "lot:1", "row_grain": "cob",
                           "column_mapping": {"object_name": "名称", "quantity": "数量", "unit_price": "单价"}}
             elif step == "extract_html_candidates":

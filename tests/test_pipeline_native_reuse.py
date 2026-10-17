@@ -41,6 +41,9 @@ class NativeModel:
                       "need_resolutions": [{"need_id": need["need_id"], "field": "object_name",
                                              "target_candidate_id": need["target_candidate_ids"][0],
                                              "source_ref": "file:a:native:p3"}]}
+        elif step == "review_native_continuation":
+            result = {"continuation": "finish", "needs_hit_ids": [], "evidence_refs": ["file:a:native:p3"],
+                      "kind": "native_continuation", "confidence": 0.9, "reason": "本文件所需原生证据已接收，不需后文"}
         elif step == "merge_candidates":
             native = next(row for row in payload["candidates"] if row.get("file_class") == "tender_requirement")
             html = next(row for row in payload["candidates"] if row["candidate_id"] != native["candidate_id"])
@@ -66,7 +69,7 @@ def test_native_overview_names_html_without_ocr_or_budget_leak(monkeypatch, tmp_
             native_segments=[{"source_ref": "file:a:native:p3", "file_id": "a", "page_no": 3,
                               "text": "包1：互联网接入服务，预算120万元"}], screen={"requires_deep_parse": False})])
 
-    def parse(run_id, decisions, index, failures):
+    def parse(run_id, decisions, index, failures, **kwargs):
         assert all(item.read_strategy == "skip" for item in decisions.file_decisions)
         return {}, []
 
@@ -106,7 +109,7 @@ def test_attempted_empty_native_extraction_is_partial_and_keeps_discovered_evide
             priority=20, read_strategy="target_pages", reason="model", expected_fields=["object_name"],
             evidence_refs=["file:a:native:p3"], native_segments=[{"source_ref": "file:a:native:p3", "file_id": "a",
             "page_no": 3, "text": "包1互联网接入服务"}], screen={"requires_deep_parse": True})]))
-    monkeypatch.setattr("ict.pipeline.parse_pages", lambda *args: ({}, []))
+    monkeypatch.setattr("ict.pipeline.parse_pages", lambda *args, **kwargs: ({}, []))
     report = run_announcement("demo", llm=EmptyNativeModel(), html_dir=tmp_path, runs_root=tmp_path / "runs")
     native = json.loads((tmp_path / "runs/demo/05c_native_extraction.json").read_text(encoding="utf-8"))
     assert native["status"] == "partial" and native["outcome"] == "attempted_empty"

@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import json
 import re
+import time
+from concurrent.futures import CancelledError
 from pathlib import Path
 
 from ict.candidates import seal_candidate
@@ -42,6 +44,7 @@ from ict.llm import LLMClient, LLMError, complete_json
 from ict.parse.client import ParseClient, ParseError, as_pages, contiguous_runs
 from ict.parse.peek import page_profiles, peek_entry
 from ict.parse.screen import ScreenDecision, gate_file, name_rule
+from ict.parse.census import ARCHIVE_FORMATS
 from ict.schemas import (
     AttachmentIndex,
     Candidate,
@@ -159,6 +162,15 @@ def triage_files(run_id: str, plans: ProjectPlans, index: AttachmentIndex | None
                                  failure_code="document_parse_failed", failure_message="附件文件不存在"),
                     Failure(failure_code="document_parse_failed", failure_message=item.display_name,
                             location=item.file_id))
+        if entry.fmt in ARCHIVE_FORMATS:
+            # An unexpanded container has no pages for the OCR endpoint. Keep its failure,
+            # not an upload job; successfully expanded members are independently indexed.
+            return (FileDecision(file_id=item.file_id, file_class="unknown", priority=0,
+                                 read_strategy="unsupported", reason="archive_not_expanded:" + entry.fmt,
+                                 failure_code="document_parse_failed",
+                                 failure_message="归档未完整展开，不能提交页解析接口"),
+                    Failure(failure_code="document_parse_failed",
+                            failure_message="archive_not_expanded:" + entry.name, location=item.file_id))
         peek = peek_entry(entry)
         decision: ScreenDecision = gate_file(entry, peek, llm, counter=counter, needs=needs)
         file_class = KIND_TO_CLASS.get(decision.kind, "unknown")
@@ -174,6 +186,7 @@ def triage_files(run_id: str, plans: ProjectPlans, index: AttachmentIndex | None
         return (
             FileDecision(
                 file_id=item.file_id,
+                needs_hit_ids=decision.needs_hit_ids,
                 file_class=file_class,
                 expected_fields=list(decision.found_fields),
                 possible_packages=possible,
@@ -181,7 +194,9 @@ def triage_files(run_id: str, plans: ProjectPlans, index: AttachmentIndex | None
                 read_strategy="target_pages" if keep else "skip",
                 reason="%s:%s:%s" % (decision.method, decision.reason or decision.kind, "%.2f" % decision.confidence),
                 screen=decision.short() | {"name_rule": decision.name_rule, "format": entry.fmt,
-                                           "pages": entry.pages, "view_chars": peek.full_chars},
+                                           "pages": entry.pages, "view_chars": len(peek.view),
+                                           "native_full_chars": peek.full_chars,
+                                           "view_is_truncated": sum(len(s["text"]) for s in peek.segments) < peek.full_chars},
                 quote_supplier=decision.quote_supplier or None,
                 is_award_notice=decision.is_award_notice,
                 native_segments=peek.segments,
@@ -236,11 +251,10 @@ def rank_budget(profiles: list[dict], cap: int) -> list[int]:
     return sorted(item["page_no"] for item in ranked[:cap])
 
 
-def parse_pages(run_id: str, files: FileDecisions, index: AttachmentIndex, failures: list[Failure]):
-    """Step 4b. One parsing call per kept file; pages stay in memory for steps 5 and 6.
+def parse_pages(run_id: str, files: FileDecisions, index: AttachmentIndex, failures: list[Failure], *, progress=None, owner=None):
+    """Step 4c. Read files still requiring depth; pages stay in memory for steps 5 and 6.
 
-    Every request is handed to the shared single-worker parse queue, so the GPU box sees one
-    document at a time and the next request is already waiting when the current one ends. The
+    Remote requests use the shared bounded queue, including upload and response waiting. The
     files are still collected in the order they were chosen, so the summary and the failure list
     read exactly as the serial loop wrote them.
     """
@@ -251,13 +265,33 @@ def parse_pages(run_id: str, files: FileDecisions, index: AttachmentIndex, failu
         return parsed, summary
     client = _client()
 
+    def emit(decision, event):
+        if progress is not None:
+            progress({"file_id": decision.file_id, "time": time.time(), **event})
+
+    def submit_parse(decision, entry, wanted, cap):
+        submitted = time.perf_counter()
+        emit(decision, {"event": "queued", "name": entry.name, "file_bytes": entry.size_bytes})
+
+        def invoke(*, cancel):
+            emit(decision, {"event": "dequeued", "queue_s": time.perf_counter() - submitted})
+            return client.parse(entry.path, pages=wanted, max_pages=cap, cancel=cancel,
+                                progress=lambda event: emit(decision, event))
+        return PARSE_QUEUE.submit_cancellable(owner or run_id, invoke)
+
     jobs: list[dict] = []
     for decision in chosen:
         item = next((entry for entry in index.files if entry.file_id == decision.file_id), None)
         if item is None:
             continue
         entry = _entry(index, item)
-        if entry.fmt in {"docx", "xlsx", "xlsm"} and not entry.needs_normalisation:
+        if entry.fmt in ARCHIVE_FORMATS:
+            decision.read_strategy = "unsupported"
+            decision.reason = "archive_not_expanded:" + entry.fmt
+            failures.append(Failure(failure_code="document_parse_failed", location=entry.file_id,
+                                    failure_message=decision.reason))
+            continue
+        if entry.fmt in {"docx", "xlsx", "xlsm", "text"} and not entry.needs_normalisation:
             jobs.append({"decision": decision, "entry": entry, "cap": None, "profiles": [],
                          "local": True, "future": None})
             continue
@@ -267,8 +301,7 @@ def parse_pages(run_id: str, files: FileDecisions, index: AttachmentIndex, failu
                      "local": False,
                      # The owner is the announcement: the queue rotates between announcements but
                      # keeps this one's own file order, which is already sorted by priority.
-                     "future": PARSE_QUEUE.submit(run_id, client.parse, entry.path, pages=wanted,
-                                                  max_pages=cap)})
+                     "future": submit_parse(decision, entry, wanted, cap)})
 
     for job in jobs:
         decision, entry = job["decision"], job["entry"]
@@ -286,6 +319,14 @@ def parse_pages(run_id: str, files: FileDecisions, index: AttachmentIndex, failu
             failures.append(Failure(failure_code=code, failure_message=str(exc.reason)[:200], location=decision.file_id))
             decision.read_strategy = "skip"
             decision.reason = "parse_failed:" + str(exc.reason)[:80]
+            emit(decision, {"event": "failed", "reason": exc.reason})
+            continue
+        except CancelledError:
+            failures.append(Failure(failure_code="document_parse_failed", location=decision.file_id,
+                                    failure_message="parse_cancelled_before_start"))
+            decision.read_strategy = "skip"
+            decision.reason = "parse_cancelled_before_start"
+            emit(decision, {"event": "cancelled_before_start"})
             continue
         except Exception as exc:  # noqa: BLE001 - one unreadable file must not stop the run
             failures.append(Failure(failure_code="document_parse_failed", failure_message=type(exc).__name__ + ":" + str(exc)[:120],
@@ -356,7 +397,7 @@ def locate_pages(run_id: str, plans: ProjectPlans, files: FileDecisions, parsed:
                                                           if need["field"] in decision.expected_fields]}})
     try:
         produced = complete_json(
-            llm, step="locate_pages", prompt_version="locate-pages-v4",
+            llm, step="locate_pages", prompt_version="locate-pages-v5",
             user=json.dumps({"known_packages": known_packages,
                              "package_registry": [package_context(p) for p in plans.projects],
                              "needs": [entry for project in plans.projects for entry in (project.needs or [])],
@@ -486,9 +527,9 @@ def extract_attachment_candidates(run_id: str, project_name: str, plans: Project
         try:
             from ict.receiving import ExtractionReceiver
             produced = complete_json(
-                llm, step="extract_attachment_candidates", prompt_version="attachment-extract-v4",
+                llm, step="extract_attachment_candidates", prompt_version="attachment-extract-v5",
                 user=json.dumps(payload, ensure_ascii=False), validate=_validate_candidates, counter=counter,
-                receiver=ExtractionReceiver(chunk))
+                receiver=ExtractionReceiver(chunk, needs=payload["current_package"]["needs"]))
         except (LLMError, ValueError) as exc:
             code = "llm_call_failed" if isinstance(exc, LLMError) else "llm_schema_invalid"
             return {**job, "payload": payload, "produced": None,
@@ -596,7 +637,7 @@ def extract_screen_evidence(run_id, project_name, plans, decisions, index, llm, 
     return candidates, failures, quality, seq, parsed, resolutions
 
 
-def apply_native_resolutions(plans, decisions, candidates, resolutions):
+def apply_native_resolutions(plans, decisions, candidates, resolutions, *, update_files=True):
     """Found evidence is not final resolution: require extracted values and matching ownership."""
     needs = {need.get("need_id"): need for plan in plans.projects for need in plan.needs}
     resolved = set()
@@ -628,11 +669,17 @@ def apply_native_resolutions(plans, decisions, candidates, resolutions):
         if set(need["target_candidate_ids"]) <= set(targets):
             need["state"] = "evidence_ready"
             resolved.add(need_id)
+    if not update_files:
+        return resolved
     for decision in decisions.file_decisions:
         if not decision.evidence_refs:
             continue
+        packages = {item.package_no for item in candidates if item.evidence and
+                    set(decision.evidence_refs) & set(item.evidence.source_refs) and item.package_no is not None}
+        hit_ids = getattr(decision, "needs_hit_ids", [])
         relevant = [need for need in needs.values() if need["field"] in decision.expected_fields
-                    and need.get("purpose") != "discover_objects"]
+                    and need.get("purpose") != "discover_objects" and need.get("package_no") in packages
+                    and (not hit_ids or need.get("need_id") in hit_ids)]
         # A discovery or binding task cannot be declared done by an ordinary field observation.
         complete = bool(relevant) and all(need.get("need_id") in resolved for need in relevant)
         if complete and not (getattr(decision, "screen", None) or {}).get("requires_deep_parse", True):
@@ -644,6 +691,138 @@ def apply_native_resolutions(plans, decisions, candidates, resolutions):
         else:
             decision.reuse_status = "native_evidence_partial"
     return resolved
+
+
+def review_native_continuation(before, after, decisions, candidates, amounts, llm, counter=None, *, reception=None):
+    """One file-local model review of a no-deep suggestion after reception and rebinding.
+
+    This never resolves any global need. Not-attempted, rejected and failed reviews keep the
+    deep path; a successful attempt with no new observations needs an explicit model decision.
+    """
+    from ict.llm import ValidationIssue
+    failures = []
+    before_needs = [need for plan in before.projects for need in plan.needs]
+    after_needs = [need for plan in after.projects for need in plan.needs]
+    known_ids = {need["need_id"] for need in before_needs + after_needs}
+    known_packages = {plan.package_no for plan in after.projects}
+    for decision in decisions.file_decisions:
+        if decision.read_strategy != "target_pages":
+            continue
+        screen = getattr(decision, "screen", {}) or {}
+        decision.reuse_status = "native_evidence_partial"
+        if not decision.evidence_refs or screen.get("requires_deep_parse", True):
+            decision.continuation_audit = {"continuation": "deep_parse", "reason": "screen_requires_deep_or_no_cited_evidence"}
+            continue
+        cited = set(decision.evidence_refs)
+        attempted_refs = set()
+        rejected_refs = set()
+        receipts = []
+        for receipt in reception or []:
+            if cited & set(receipt.get("source_refs", [])):
+                receipts.append(receipt)
+                for rejected in receipt.get("rejected_items", []):
+                    raw = rejected.get("raw")
+                    if isinstance(raw, dict) and str(rejected.get("path", "")).startswith(("candidates[", "package_amounts[")):
+                        refs = raw.get("source_refs")
+                        refs = refs if isinstance(refs, list) else []
+                        rejected_refs.update(ref for ref in [raw.get("source_ref")] + refs if isinstance(ref, str))
+                        if raw.get("file_id") == decision.file_id:
+                            rejected_refs.update(cited)
+                attempts = receipt.get("attempts", [])
+                if attempts and not attempts[-1].get("issues") and not receipt.get("unrepaired"):
+                    attempted_refs.update(receipt.get("source_refs", []))
+        observations = []
+        related = []
+        accepted_refs = set()
+        for candidate in candidates:
+            refs = set(candidate.evidence.source_refs if candidate.evidence else []) & cited
+            fields = {key: obs.model_dump() for key, obs in candidate.fields.items() if obs.status == "present"
+                      and (obs.normalized_value if obs.normalized_value is not None else obs.raw_value) not in (None, "")}
+            if refs and fields:
+                observations.append({"candidate_id": candidate.candidate_id, "entity_type": candidate.entity_type,
+                                     "package_no": candidate.package_no, "fields": fields, "source_refs": sorted(refs)})
+                if candidate.package_no in known_packages and candidate.binding.get("status") != "unresolved":
+                    accepted_refs.update(refs)
+            elif fields:
+                related.append({"candidate_id": candidate.candidate_id, "entity_type": candidate.entity_type,
+                                "package_no": candidate.package_no, "fields": fields,
+                                "source_refs": candidate.evidence.source_refs if candidate.evidence else []})
+        for amount in amounts:
+            if amount.file_id == decision.file_id and amount.source_ref in cited:
+                observations.append(amount.model_dump() | {"entity_type": "package_amount"})
+                if amount.package_no in known_packages and amount.amount_yuan is not None and amount.binding.get("status") != "unresolved":
+                    accepted_refs.add(amount.source_ref)
+        attempted_no_new = not observations and cited <= attempted_refs and not (cited & rejected_refs)
+        if (not accepted_refs and not attempted_no_new) or llm is None:
+            decision.continuation_audit = {"continuation": "deep_parse", "reason": "no_bound_accepted_evidence_or_model"}
+            continue
+        payload = {"file_id": decision.file_id, "package_registry": [package_context(p) for p in after.projects],
+                   "needs_before": before_needs, "needs_after": after_needs,
+                   "screen_observation": screen | {"source_segments": decision.native_segments},
+                   "accepted_observations": observations, "related_observations": related,
+                   "reception_status": {"source_refs_successfully_attempted": sorted(cited & attempted_refs),
+                                        "no_new_observation": attempted_no_new,
+                                        "receipts": receipts}}
+
+        def validate(value):
+            if value.get("continuation") not in {"finish", "deep_parse"}:
+                return ValidationIssue("只能为finish或deep_parse", path="$.continuation")
+            ids = value.get("needs_hit_ids", [])
+            if not isinstance(ids, list) or any(not isinstance(i, str) or i not in known_ids for i in ids):
+                return ValidationIssue("只能引用输入need_id", path="$.needs_hit_ids")
+            refs = value.get("evidence_refs", [])
+            basis = value.get("evidence_basis", "accepted_observation")
+            allowed_refs = accepted_refs
+            if basis == "attempted_no_new_observation":
+                if not attempted_no_new:
+                    return ValidationIssue("并非本文件成功尝试且无新观测，不能使用空结果依据", path="$.evidence_basis")
+                allowed_refs = cited & attempted_refs
+            elif basis != "accepted_observation":
+                return ValidationIssue("依据只能为accepted_observation或attempted_no_new_observation", path="$.evidence_basis")
+            if not isinstance(refs, list) or any(not isinstance(ref, str) or ref not in allowed_refs for ref in refs):
+                return ValidationIssue("只能引用本文件已接收且归属有效的观测来源", path="$.evidence_refs")
+            if value["continuation"] == "finish" and not refs:
+                return ValidationIssue("结束本文件须引用本文件已接收的证据", path="$.evidence_refs")
+            if not isinstance(value.get("reason"), str) or not value["reason"].strip():
+                return ValidationIssue("需要说明本文件是否还需读取", path="$.reason")
+            if not isinstance(value.get("kind"), str) or not isinstance(value.get("confidence"), (int, float)):
+                return ValidationIssue("需要kind与confidence供审计，confidence不参与取舍")
+            return ""
+
+        notes = {}
+        try:
+            answer = complete_json(llm, step="review_native_continuation", prompt_version="native-continuation-v1",
+                                   user=json.dumps(payload, ensure_ascii=False), validate=validate, counter=counter, notes=notes)
+            decision.continuation_audit = {"input": payload, "output": answer, "attempts": notes.get("attempts", []),
+                                           "calls": notes.get("calls", [])}
+            if answer["continuation"] == "finish":
+                decision.read_strategy = "skip"
+                decision.reuse_status = "native_evidence_ready"
+                decision.reason += ":model_native_complete"
+        except (LLMError, ValueError) as exc:
+            decision.continuation_audit = {"input": payload, "continuation": "deep_parse", "error": str(exc),
+                                           "attempts": notes.get("attempts", getattr(exc, "attempts", [])),
+                                           "calls": notes.get("calls", [])}
+            failures.append(Failure(failure_code="llm_call_failed" if isinstance(exc, LLMError) else "llm_schema_invalid",
+                                    failure_message="native_continuation:" + str(exc)[:180], location=decision.file_id))
+    return failures
+
+
+def carry_native_resolution_state(before, after):
+    """Carry only the same target references, without changing evidence/identity criteria."""
+    previous = {need["need_id"]: need for plan in before.projects for need in plan.needs}
+    for plan in after.projects:
+        for need in plan.needs:
+            old = previous.get(need["need_id"])
+            if not old or old.get("package_no") != need.get("package_no") or old.get("purpose") != need.get("purpose"):
+                continue
+            covered = set(old.get("covered_target_candidate_ids", [])) & set(need.get("target_candidate_ids", []))
+            if not covered:
+                continue
+            need["covered_target_candidate_ids"] = sorted(covered)
+            need["source_refs"] = list(old.get("source_refs", []))
+            if set(need["target_candidate_ids"]) <= covered:
+                need["state"] = "evidence_ready"
 
 
 def _known_winner(package_no: str, chunk: list[dict], winner_suppliers: dict[str, list[str]] | None,

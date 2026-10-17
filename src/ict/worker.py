@@ -169,7 +169,7 @@ def process_item(job: dict, item: dict, verbose: bool = True) -> None:
     try:
         _step(job, item, "解压附件")
         if zip_path.exists():
-            attachments.extract_announcement(zip_path, paths.attachments, force=True)
+            item["attachment_preparation"] = attachments.extract_announcement(zip_path, paths.attachments, force=True)
 
         _step(job, item, "提取")
         report = run_announcement(aid, html_dir=incoming, attachments_root=paths.attachments,

@@ -129,7 +129,9 @@ def peek_entry(entry: FileEntry, view_chars: int = 3000) -> Peek:
     if entry.needs_normalisation:
         peek.reason = "needs_normalisation:" + (entry.fmt + (":" + entry.note if entry.note else ""))
         return peek
-    loader = {"pdf": _pdf_text, "docx": _docx_text, "xlsx": _xlsx_text}.get(entry.fmt)
+    from ict.documents import read_text
+    loader = {"pdf": _pdf_text, "docx": _docx_text, "xlsx": _xlsx_text,
+              "text": lambda path: (read_text(path), [])}.get(entry.fmt)
     if loader is None:
         peek.reason = "no_text_reader:" + entry.fmt
         return peek

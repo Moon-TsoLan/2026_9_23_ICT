@@ -8,11 +8,12 @@ file, and text density cannot see a table that lives inside a picture.
 from __future__ import annotations
 
 import mimetypes
+import json
 from pathlib import Path
 
 from ict.config import ATTACHMENTS_ROOT
 from ict.ids import format_file_id
-from ict.parse.census import FileEntry, build_census
+from ict.parse.census import FileEntry, build_census, ARCHIVE_FORMATS
 from ict.schemas import AttachmentIndex, IndexedFile
 from ict.state import write_json
 
@@ -20,6 +21,8 @@ READABLE_BY_FORMAT = {"pdf": "text_extractable", "docx": "text_extractable", "xl
 
 
 def _readability(entry: FileEntry) -> str:
+    if entry.fmt in ARCHIVE_FORMATS:
+        return "unsupported"
     if entry.note.startswith("pdf_open_failed") or entry.note == "encrypted_pdf":
         return "parse_failed"
     if entry.fmt == "image":
@@ -56,9 +59,23 @@ def to_indexed(entry: FileEntry, seq: int) -> IndexedFile:
         fmt=entry.fmt,
         note=entry.note,
         digest=entry.digest,
+        size_bytes=entry.size_bytes,
         native_readable=entry.native_readable,
         needs_normalisation=entry.needs_normalisation,
     )
+
+
+def extraction_record(directory: Path) -> dict:
+    marker = directory / ".extract_complete"
+    if not marker.exists():
+        return {}
+    try:
+        record = json.loads(marker.read_text(encoding="utf-8"))
+        if isinstance(record, dict):
+            return record
+        raise ValueError("expected extraction record object")
+    except (OSError, ValueError) as exc:
+        return {"status": "partial", "failures": [{"reason": "invalid_extraction_record:" + type(exc).__name__}]}
 
 
 def build_index(announcement_id: str, root: Path | None = None) -> AttachmentIndex:
@@ -67,7 +84,8 @@ def build_index(announcement_id: str, root: Path | None = None) -> AttachmentInd
         return AttachmentIndex(announcement_id=announcement_id, attachment_directory=None, files=[])
     entries, duplicates = build_census(directory)
     files = [to_indexed(entry, index) for index, entry in enumerate(entries, start=1)]
-    index = AttachmentIndex(announcement_id=announcement_id, attachment_directory=str(directory), files=files)
+    index = AttachmentIndex(announcement_id=announcement_id, attachment_directory=str(directory), files=files,
+                            extraction=extraction_record(directory))
     payload = index.model_dump()
     payload["duplicate_files"] = duplicates
     write_json(directory / "index.json", payload)
@@ -79,4 +97,6 @@ def load_index(announcement_id: str, root: Path | None = None) -> AttachmentInde
     path = directory / "index.json"
     if not path.exists():
         return None
-    return AttachmentIndex.model_validate_json(path.read_text(encoding="utf-8"))
+    index = AttachmentIndex.model_validate_json(path.read_text(encoding="utf-8"))
+    index.extraction = extraction_record(directory) or index.extraction
+    return index

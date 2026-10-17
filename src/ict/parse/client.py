@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 import time
+import socket
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
@@ -26,15 +27,30 @@ class ParseError(RuntimeError):
         self.reason = reason
 
 
+class _UploadReader:
+    def __init__(self, handle, check, emit):
+        self.handle, self.check, self.emit = handle, check, emit
+        self.bytes_read = 0
+
+    def __getattr__(self, key):
+        return getattr(self.handle, key)
+
+    def read(self, size=-1):
+        self.check()
+        chunk = self.handle.read(size)
+        self.bytes_read += len(chunk)
+        # Count bytes read by the multipart encoder, not bytes acknowledged by the server.
+        self.emit("upload_read", bytes_read=self.bytes_read)
+        return chunk
+
+
 class ParseClient:
     def __init__(self, base_url: str, token: str = "", timeout: float = 600.0,
                  connect_timeout: float = 10.0) -> None:
         self.base_url = base_url.rstrip("/")
         self.token = token
         self.timeout = timeout
-        # How long one document may take is `timeout`; how long we wait to reach the box at all is
-        # this. Keeping them equal let one unreachable endpoint block the whole parse queue for
-        # ten minutes per file.
+        # timeout bounds each network read/write operation, not total document duration.
         self.connect_timeout = connect_timeout
 
     def health(self) -> dict:
@@ -43,8 +59,51 @@ class ParseClient:
         return response.json()
 
     def parse(self, path: Path, pages: list[int] | None = None, merge_tables: bool = True,
-              return_blocks: bool = True, max_pages: int = 40) -> dict:
+              return_blocks: bool = True, max_pages: int = 40, *, progress=None, cancel=None) -> dict:
         path = Path(path)
+        from ict.parse.census import sniff, ARCHIVE_FORMATS
+        fmt, _ = sniff(path)
+        if fmt in ARCHIVE_FORMATS or path.suffix.lower() in {".rar", ".7z"}:
+            raise ParseError("parse_refused:archive_not_expanded")
+        started = time.perf_counter()
+        timings = {}
+
+        def emit(event, **details):
+            elapsed = time.perf_counter() - started
+            timings[event] = elapsed
+            if progress is not None:
+                progress({"event": event, "elapsed_s": elapsed, **details})
+
+        def check():
+            if cancel is not None and cancel.is_set():
+                raise ParseError("parse_cancelled")
+
+        def abort_stream(stream):
+            try:
+                sock = stream.get_extra_info("socket")
+                if sock is not None:
+                    try:
+                        sock.shutdown(socket.SHUT_RDWR)
+                    except OSError:
+                        pass
+            finally:
+                stream.close()
+
+        def trace(event, info):
+            if cancel is not None and event.endswith(("connect_tcp.complete", "start_tls.complete")):
+                stream = info.get("return_value")
+                if stream is not None:
+                    cancel.bind(lambda: abort_stream(stream))
+            check()
+            if event.endswith("send_request_body.started"):
+                emit("upload_started")
+            elif event.endswith("send_request_body.complete"):
+                emit("upload_complete")
+            elif event.endswith("receive_response_headers.complete"):
+                emit("response_headers")
+
+        check()
+        emit("request_started", file_bytes=path.stat().st_size)
         spec = pages_to_spec(pages)
         data = {"merge_tables": str(merge_tables).lower(), "return_blocks": str(return_blocks).lower(),
                 "max_pages": str(max_pages)}
@@ -52,25 +111,53 @@ class ParseClient:
             data["x_parse_token"] = self.token
         if spec:
             data["pages"] = spec
-        with path.open("rb") as handle:
-            files = {"file": (path.name, handle, "application/octet-stream")}
-            try:
-                response = shared_client("parse").post(self.base_url + "/parse", files=files,
-                                                       data=data,
-                                                       timeout=httpx.Timeout(self.timeout,
-                                                                             connect=self.connect_timeout))
-            except Exception as exc:  # noqa: BLE001
-                raise ParseError("parse_unreachable:" + type(exc).__name__) from exc
+        # A cancellable request owns its sockets; interrupting it must not close another
+        # announcement's pooled connection. Ordinary non-cancellable callers keep the pool.
+        owned = httpx.Client() if cancel is not None else None
+        client = owned or shared_client("parse")
+        try:
+            with path.open("rb") as handle:
+                files = {"file": (path.name, _UploadReader(handle, check, emit), "application/octet-stream")}
+                try:
+                    with client.stream("POST", self.base_url + "/parse", files=files,
+                                                           data=data,
+                                                           extensions={"trace": trace},
+                                                           timeout=httpx.Timeout(self.timeout,
+                                                                                 connect=self.connect_timeout)) as response:
+                        # Mock transports may not emit low-level trace events; never invent upload
+                        # timings for them. The response body is timed independently in all cases.
+                        emit("download_started", status_code=response.status_code)
+                        chunks = []
+                        for chunk in response.iter_bytes():
+                            check()
+                            chunks.append(chunk)
+                        raw = b"".join(chunks)
+                        emit("download_complete", response_bytes=len(raw))
+                except Exception as exc:  # noqa: BLE001
+                    emit("request_failed", error=type(exc).__name__)
+                    check()
+                    if isinstance(exc, ParseError):
+                        raise
+                    raise ParseError("parse_unreachable:" + type(exc).__name__) from exc
+        finally:
+            if owned is not None:
+                owned.close()
+            if cancel is not None:
+                cancel.clear_callbacks()
         if response.status_code >= 400:
             detail = ""
             try:
-                detail = str(response.json().get("failure"))[:180]
+                import json
+                detail = str(json.loads(raw).get("failure"))[:180]
             except Exception:  # noqa: BLE001
-                detail = response.text[:180]
+                detail = raw.decode("utf-8", errors="replace")[:180]
             raise ParseError("parse_http_%d:%s" % (response.status_code, detail))
-        body = response.json()
+        import json
+        body = json.loads(raw)
         if not body.get("ok"):
             raise ParseError("parse_refused:" + str(body.get("failure"))[:180])
+        emit("request_complete")
+        body.setdefault("meta", {})["client_timing"] = timings
         return body
 
     def parse_runs(self, path: Path, runs: list[list[int]], workers: int = 3, **kwargs) -> dict:

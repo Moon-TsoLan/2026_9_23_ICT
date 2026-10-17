@@ -189,8 +189,8 @@ def extract_announcement(archive: Path, output_root: Path, force: bool) -> dict:
         if ok and not is_outer:
             current.unlink(missing_ok=True)
             nested_extracted += 1
-        if not ok:
-            continue
+        # A failed archive can still produce usable members, including nested archives.
+        # Recurse those members once; keep the failed input and its original failure record.
         for child in find_archives(outdir):
             child_key = str(child.resolve())
             if child_key in seen:
@@ -202,6 +202,7 @@ def extract_announcement(archive: Path, output_root: Path, force: bool) -> dict:
         "max_depth": max_depth,
         "nested_extracted": nested_extracted,
         "failures": failures,
+        "retained_archives": [str(path.relative_to(dest)) for path in find_archives(dest)],
         "skipped": False,
     }
     marker.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")

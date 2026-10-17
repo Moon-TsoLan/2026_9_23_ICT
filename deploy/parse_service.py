@@ -325,6 +325,7 @@ def run_range(source: Path, pages: list[int], workdir: Path, max_pages: int,
 async def parse_bytes(raw: bytes, name: str, pages: str, merge_tables: bool,
                       return_blocks: bool, max_pages: int):
     started = time.perf_counter()
+    started_at = time.time()
     warnings: list[str] = []
     workdir = Path(tempfile.mkdtemp(prefix="ict-parse-"))
     try:
@@ -395,6 +396,8 @@ async def parse_bytes(raw: bytes, name: str, pages: str, merge_tables: bool,
                 "parsed_pages": [item["page_no"] for item in payload_pages],
                 "layout_device": env("DEVICE", "cpu"),
                 "ms": int((time.perf_counter() - started) * 1000),
+                "started_at": started_at,
+                "timer_scope": "after_upload",
                 "markdown_chars": sum(len(item["markdown"]) for item in payload_pages),
                 "warnings": warnings,
             },

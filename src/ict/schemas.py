@@ -275,6 +275,7 @@ class IndexedFile(Model):
     fmt: str = "unknown"
     note: str = ""
     digest: str = ""
+    size_bytes: int = 0
     native_readable: bool = False
     needs_normalisation: bool = False
 
@@ -283,6 +284,7 @@ class AttachmentIndex(Model):
     announcement_id: str
     attachment_directory: str | None = None
     files: list[IndexedFile] = Field(default_factory=list)
+    extraction: dict[str, Any] = Field(default_factory=dict)
 
 
 class FileDecision(Model):
@@ -302,6 +304,8 @@ class FileDecision(Model):
     native_segments: list[dict[str, Any]] = Field(default_factory=list)
     evidence_refs: list[str] = Field(default_factory=list)
     reuse_status: str | None = None
+    needs_hit_ids: list[str] = Field(default_factory=list)
+    continuation_audit: dict[str, Any] = Field(default_factory=dict)
 
 
 class FileDecisions(Model):

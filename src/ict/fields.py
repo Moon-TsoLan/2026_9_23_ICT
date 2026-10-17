@@ -424,6 +424,36 @@ for _new, _old in (("html-tables-v5", "html-tables-v4"),
     STEP_FIELD_OVERRIDES[_new] = dict(STEP_FIELD_OVERRIDES.get(_old, {}))
 
 
+# Attachment continuation repairs (2026-10-16). Old versions remain available for audit.
+for _new, _old in (("html-tables-v6", "html-tables-v5"),
+                   ("screen-file-v4", "screen-file-v3"), ("screen-page-v4", "screen-page-v3"),
+                   ("locate-pages-v5", "locate-pages-v4"),
+                   ("attachment-extract-v5", "attachment-extract-v4")):
+    STEP_FIELDS[_new] = tuple(list(keys) for keys in STEP_FIELDS[_old])
+    STEP_FIELD_OVERRIDES[_new] = dict(STEP_FIELD_OVERRIDES.get(_old, {}))
+for _version in ("html-tables-v6", "locate-pages-v5"):
+    STEP_FIELDS[_version][1][:] = [key for key in STEP_FIELDS[_version][1]
+                                 if key not in ("bid_amount", "review_status", "review_failure_reason")]
+STEP_FIELD_OVERRIDES["html-tables-v6"]["package_scope"] = (
+    "JSON字符串：单单元为目录中一个内部引用，跨单元为announcement，无法确定为unknown。禁止数组、对象或裸数字。")
+FIELD_SEMANTICS.update({
+    "needs_hit_ids": "目检支持的具体输入need_id数组；只能引用给出的任务，归属不明不猜另一包。它不证明任务已解决。",
+    "needs_before": "本次目检/原生抽取收到的需求快照及证据状态；不因重算而删除已处理任务的记录。",
+    "needs_after": "原生观测接收并完成采购单元归属后重新计算的剩余需求；不是已看过文件仍能提供这些字段的结论。",
+    "accepted_observations": "本文件已经接收的候选/独立包金额、原文引用与有效采购单元；无效或未归属值不能作为已补字段。",
+    "continuation": "当前文件是否继续深入：finish结束本文件，deep_parse继续读取。不声明全局对象或供应商名单完整。",
+    "screen_observation": "当前文件目检的原文片段、命中需求及深入建议；不能用文件名代替内容。",
+    "related_observations": "其它原生片段已接收的观测，只供模型核对是否重复；不能冒充本文件的来源证据。",
+    "reception_status": "本文件引用的片段实际送入抽取的接收记录；成功尝试但没有新增观测，与未调用、失败、未归属不同。",
+    "evidence_basis": "文件结束依据：accepted_observation为本文件已接收且归属有效的观测；attempted_no_new_observation为片段已成功尝试、无本文件新观测并经模型复核确实无需再读。",
+})
+for _version in ("screen-file-v4", "screen-page-v4"):
+    STEP_FIELDS[_version][1].append("needs_hit_ids")
+STEP_FIELDS["native-continuation-v1"] = (
+    ["file_id", "package_registry", "needs_before", "needs_after", "screen_observation", "accepted_observations", "related_observations", "reception_status"],
+    ["continuation", "needs_hit_ids", "evidence_refs", "evidence_basis", "kind", "confidence", "reason"])
+
+
 def field_block(prompt_version: str) -> str:
     """Definitions this step needs: its own payload fields plus its output fields."""
     if prompt_version not in STEP_FIELDS:

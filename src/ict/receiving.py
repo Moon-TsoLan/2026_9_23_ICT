@@ -9,8 +9,9 @@ from ict.schemas import FieldObservation
 
 
 class ExtractionReceiver:
-    def __init__(self, contexts):
+    def __init__(self, contexts, needs=None):
         self.contexts = contexts
+        self.needs = None if needs is None else {item.get("need_id"): item for item in needs}
         self.received = False
         self.outputs = {"candidates": [], "package_amounts": [], "need_resolutions": []}
         self.seen = {key: set() for key in self.outputs}
@@ -78,6 +79,11 @@ class ExtractionReceiver:
             return "need_resolutions 需要 need_id、field、target_candidate_id、source_ref"
         elif row.get("source_candidate_ref") is not None and not isinstance(row["source_candidate_ref"], str):
             return "source_candidate_ref 必须为唯一来源片段引用字符串"
+        elif self.needs is not None:
+            need = self.needs.get(row["need_id"])
+            if (need is None or need.get("purpose") != "fill_field" or need.get("field") != row["field"]
+                    or row["target_candidate_id"] not in need.get("target_candidate_ids", [])):
+                return "只能解决输入fill_field任务给出的真实旧目标；新对象输出为候选，包金额走独立通道"
         return ""
 
     def result(self, attempts):

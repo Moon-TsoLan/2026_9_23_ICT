@@ -230,6 +230,11 @@ def load_run(cur, run: Path, inserts: dict[tuple[str, int], tuple[str, int, str]
                                      for seq, p in enumerate(merged.get("projects", []))},
                      "sub_results": {str(p.get("package_no")): p.get("subs", []) for p in merged.get("projects", [])},
                      "extraction_reception": (read("07_attachment_extraction.json") or {}).get("reception", []),
+                     "attachment_preparation": read("00_attachment_preparation.json") or {},
+                     "native_continuation": [{"file_id": f.get("file_id"), "reuse_status": f.get("reuse_status"),
+                                              "audit": f.get("continuation_audit", {})}
+                                             for f in (read("05_file_decisions.json") or {}).get("file_decisions", [])
+                                             if f.get("continuation_audit")],
                      "unmapped_candidate_fields": {cid: c.get("unmapped_fields") for cid, c in candidates.items()
                                                    if c.get("unmapped_fields")},
                      "unresolved": merged.get("unresolved") or [],

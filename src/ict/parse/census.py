@@ -19,7 +19,8 @@ IMAGE_MAGIC = {b"\x89PNG": "png", b"\xff\xd8\xff": "jpg", b"GIF8": "gif", b"BM":
 SKIP_NAMES = {".extract_complete", "index.json", "_extract_report.json", "peek.json"}
 
 NATIVE = {"pdf", "docx", "xlsx", "text"}
-NEEDS_NORMALISATION = {"ole", "image", "zip", "unknown"}
+ARCHIVE_FORMATS = {"zip", "rar", "7z"}
+NEEDS_NORMALISATION = {"ole", "image", "zip", "rar", "7z", "unknown"}
 
 
 def digest_of(path: Path) -> str:
@@ -39,7 +40,11 @@ def sniff(path: Path) -> tuple[str, str]:
         return "unknown", "unreadable"
     if head.startswith(PDF_MAGIC):
         return "pdf", ""
-    if head.startswith(ZIP_MAGIC):
+    if head.startswith(b"Rar!\x1a\x07"):
+        return "rar", "archive_rar"
+    if head.startswith(b"7z\xbc\xaf\x27\x1c"):
+        return "7z", "archive_7z"
+    if head.startswith((ZIP_MAGIC, b"PK\x05\x06", b"PK\x07\x08")):
         try:
             names = set(zipfile.ZipFile(path).namelist())
         except Exception:

@@ -54,6 +54,7 @@ class ScreenDecision:
     header: str = ""
     found_fields: list[str] = field(default_factory=list)
     needs_hit: list[str] = field(default_factory=list)
+    needs_hit_ids: list[str] = field(default_factory=list)
     # Whose document this is, and whether the document itself is an award notice. The gate reads
     # the file name and the first 3000 characters anyway; these only carry that reading forward.
     # Step 8 uses them to tell the winner's quote from a losing bidder's quote.
@@ -70,7 +71,8 @@ class ScreenDecision:
                 "name_rule": self.name_rule, "header": self.header, "found_fields": self.found_fields,
                 "needs_hit": self.needs_hit, "quote_supplier": self.quote_supplier,
                 "is_award_notice": self.is_award_notice, "ms": self.ms, "tokens": self.tokens,
-                "evidence_refs": self.evidence_refs, "requires_deep_parse": self.requires_deep_parse}
+                "evidence_refs": self.evidence_refs, "requires_deep_parse": self.requires_deep_parse,
+                "needs_hit_ids": self.needs_hit_ids}
 
 
 def name_rule(name: str) -> str:
@@ -156,12 +158,12 @@ def _ask_text(llm, entry: FileEntry, peek: Peek, counter, needs: list[dict] | No
                "content_view": peek.view[:SCREEN_TEXT_CHARS]}
     payload["source_segments"] = peek.segments
     parsed = complete_json(
-        llm, step="screen_files", prompt_version="screen-file-v3",
+        llm, step="screen_files", prompt_version="screen-file-v4",
         user=json.dumps(payload, ensure_ascii=False),
         validate=lambda value: _validate(value) or (
             "evidence_refs 必须引用给出的 source_segments" if any(
                 not isinstance(ref, str) or ref not in {segment["source_ref"] for segment in peek.segments}
-                for ref in value.get("evidence_refs", [])) else ""), counter=counter)
+                for ref in value.get("evidence_refs", [])) else "") or _validate_need_ids(value, needs), counter=counter)
     return parsed, 0
 
 
@@ -171,13 +173,16 @@ def _ask_images(llm, entry: FileEntry, images: list[str], counter, needs: list[d
     from ict.llm import parse_json_object
 
     try:
-        result = llm.complete_with_images(step="screen_images", prompt_version="screen-page-v3",
+        result = llm.complete_with_images(step="screen_images", prompt_version="screen-page-v4",
                                           images=images, user_text=json.dumps({"file_name": entry.name,
                                                                                "needs": needs or []}, ensure_ascii=False))
     except Exception:  # noqa: BLE001 - no vision on this model, or the call failed: keep the file
         return {}, 0
     try:
-        return parse_json_object((result.text or "").strip()), 0
+        parsed = parse_json_object((result.text or "").strip())
+        if _validate(parsed) or _validate_need_ids(parsed, needs):
+            return {}, 0
+        return parsed, 0
     except Exception:  # noqa: BLE001 - unparsable gate keeps the file, never drops it
         return {}, 0
 
@@ -207,11 +212,20 @@ def _validate(parsed: dict) -> str:
     return ""
 
 
+def _validate_need_ids(parsed, needs):
+    refs = parsed.get("needs_hit_ids", [])
+    allowed = {item.get("need_id") for item in (needs or [])}
+    if not isinstance(refs, list) or any(not isinstance(ref, str) or ref not in allowed for ref in refs):
+        return "needs_hit_ids必须为输入need_id的字符串数组"
+    return ""
+
+
 def _verdict(decision: ScreenDecision, parsed: dict, method: str, needs: list[dict] | None = None) -> ScreenDecision:
     wanted = [str(item.get("field")) for item in (needs or []) if isinstance(item, dict)]
     seen = [str(field) for field in (parsed.get("found_fields") or []) if field]
     decision.found_fields = seen
     decision.needs_hit = [field for field in wanted if field in seen]
+    decision.needs_hit_ids = list(parsed.get("needs_hit_ids") or [])
     decision.method = method
     decision.kind = str(parsed.get("kind") or "unknown")
     decision.confidence = float(parsed.get("confidence") or 0)

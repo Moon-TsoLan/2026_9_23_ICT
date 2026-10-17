@@ -111,10 +111,10 @@ def plan_projects(
             targets.append({"field": "package_total_amount", "reason": "absent", "package_no": package.package_no})
         if not any(item.fields["is_winner"].raw_value not in (None, "", False) or item.fields["is_winner"].normalized_value
                    for item in subs):
-            targets.append({"field": "is_winner", "reason": "absent", "package_no": package.package_no})
+            targets.append({"field": "is_winner", "reason": "absent", "package_no": package.package_no, "target_entity": "sub"})
         if not any(item.fields["score"].normalized_value is not None or item.fields["score"].raw_value not in (None, "")
                    for item in subs):
-            targets.append({"field": "score", "reason": "absent", "package_no": package.package_no})
+            targets.append({"field": "score", "reason": "absent", "package_no": package.package_no, "target_entity": "sub"})
         # Supplier tasks are distinct from COB coverage; never infer review from score/winner.
         supplier_targets = []
         for sub in subs:
@@ -146,6 +146,10 @@ def plan_projects(
             target["target_candidate_ids"] = target.get("target_candidate_ids", [item.candidate_id for item in (subs if target.get("target_entity") == "sub" else cobs)
                                                if target["field"] in item.fields
                                                and item.fields[target["field"]].status != "present"])
+            if target["field"] in COB_FIELDS and not cobs:
+                # There is no old object for a fill resolution to reference. Keep the requested
+                # field, but ask for discovery instead of an impossible old-target completion.
+                target["purpose"] = "discover_objects"
             target["target_observations"] = [{"candidate_id": item.candidate_id, "supplier_name": item.fields["supplier_name"].raw_value}
                 for item in subs if item.candidate_id in target["target_candidate_ids"]]
             target["state"] = "pending"

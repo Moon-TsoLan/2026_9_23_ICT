@@ -47,6 +47,8 @@ class ParseQueue:
         self._pending: dict[str, deque] = {}
         self._rotation: list[str] = []
         self._closed = False
+        self._cancellations = {}
+        self._cancelled_owners = set()
         self._threads = [threading.Thread(target=self._dispatch, daemon=True,
                                           name="ict-parse-%d" % index)
                          for index in range(self.workers)]
@@ -61,6 +63,9 @@ class ParseQueue:
         with self._lock:
             if self._closed:
                 raise RuntimeError("parse queue is closed")
+            if owner in self._cancelled_owners:
+                future.cancel()
+                return future
             if owner not in self._pending:
                 self._pending[owner] = deque()
                 self._rotation.append(owner)
@@ -76,6 +81,34 @@ class ParseQueue:
         if wait:
             for thread in self._threads:
                 thread.join(timeout=5)
+
+    def submit_cancellable(self, owner, func, *args, **kwargs):
+        from ict.cancellation import Cancellation
+        cancellation = Cancellation()
+        with self._lock:
+            future = self.submit(owner, func, *args, cancel=cancellation, **kwargs)
+            self._cancellations[future] = (owner, cancellation)
+
+        def finished(done):
+            with self._lock:
+                self._cancellations.pop(done, None)
+        future.add_done_callback(finished)
+        return future
+
+    def cancel_owner(self, owner):
+        """Cancel pending jobs and interrupt only this owner's active network streams."""
+        with self._lock:
+            self._cancelled_owners.add(owner)
+            jobs = [(future, token) for future, (name, token) in self._cancellations.items() if name == owner]
+        for future, token in jobs:
+            token.set()
+            future.cancel()
+        return len(jobs)
+
+    def begin_owner(self, owner):
+        """An explicitly started new run may reuse a previously cancelled announcement id."""
+        with self._lock:
+            self._cancelled_owners.discard(owner)
 
     # -- consumer side -------------------------------------------------------
 

@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import time
+import json
+import threading
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from uuid import uuid4
 
 from ict.catalog import Catalog
 from ict.packages import package_context
-from ict.concurrency import CallCounter, counts_snapshot
+from ict.concurrency import CallCounter, counts_snapshot, PARSE_QUEUE
 from ict.config import ATTACHMENTS_ROOT, DATA_HTML, concurrency_settings
 from ict.html_context import parse_notice
 from ict.bindings import bind_packages, winner_names
@@ -17,7 +20,7 @@ from ict.evidence import page_segments, html_rows
 from ict.index.build import build_index, load_index
 from ict.llm import LLMClient, build_client
 from ict.schemas import CandidateFile, Failure, MergeEvidence, RunReport
-from ict.state import RunStore, write_json
+from ict.state import RunStore, write_json, now_iso
 from ict.steps.s01_understand import understand
 from ict.steps.s02_html import extract_html_candidates, understand_tables
 from ict.steps.s03_plan import plan_projects
@@ -25,6 +28,8 @@ from ict.steps.s04_attach import (
     extract_attachment_candidates,
     extract_screen_evidence,
     apply_native_resolutions,
+    review_native_continuation,
+    carry_native_resolution_state,
     file_names_of,
     locate_pages,
     parse_pages,
@@ -52,6 +57,10 @@ def run_announcement(announcement_id: str, llm: LLMClient | None = None, html_di
     notice = parse_notice(html_path)
     client = build_client() if llm is None else llm
     store = RunStore(announcement_id, persist=persist, runs_root=runs_root)
+    # The same announcement id may run concurrently for different accounts. Queue cancellation
+    # owns one invocation, never the business id shared by those accounts.
+    store.state.parse_owner = f"{store.run_id}:{uuid4().hex}"
+    PARSE_QUEUE.begin_owner(store.state.parse_owner)
     catalog = Catalog()
     calls = CallCounter()
     all_failures: list[Failure] = []
@@ -103,6 +112,12 @@ def run_announcement(announcement_id: str, llm: LLMClient | None = None, html_di
     if index is None and attachments_dir.is_dir():
         index = build_index(announcement_id, attachments_root or ATTACHMENTS_ROOT)
     has_attachment = index is not None and index.attachment_directory is not None and bool(index.files)
+    if index is not None and index.extraction:
+        if persist:
+            write_json(store.directory / "00_attachment_preparation.json", index.extraction)
+        if index.extraction.get("status") == "partial" or index.extraction.get("failures"):
+            all_failures.append(Failure(failure_code="document_parse_failed", location="attachment_preparation",
+                                        failure_message="附件未完整解压；详见00_attachment_preparation.json"))
     store.begin("plan_project_gaps")
     plans = plan_projects(store.run_id, understanding, html_candidates, has_attachment)
     store.write_output("plan_project_gaps", plans)
@@ -140,6 +155,8 @@ def run_announcement(announcement_id: str, llm: LLMClient | None = None, html_di
         all_failures.extend(file_decisions.failures)
 
         store.begin("extract_native_evidence")
+        native_plan = plans.model_copy(deep=True)
+        native_input_snapshot = native_plan.model_dump()
         native_candidates, native_failures, native_quality, seq, native_pages, resolutions = extract_screen_evidence(
             store.run_id, understanding.project_name or "", plans, file_decisions, index, client, seq,
             counter=calls, package_amounts=package_amounts, winners=award_hints, reception=native_reception)
@@ -150,12 +167,20 @@ def run_announcement(announcement_id: str, llm: LLMClient | None = None, html_di
                                                  client, calls, native_sources, previous=binding_audit,
                                                  package_amounts=package_amounts)
             all_failures.extend(errors)
+            # Resolutions refer to the input task snapshot, before newly observed values remove
+            # those tasks or replace their target lists. Supplier evidence criteria are unchanged.
+            apply_native_resolutions(native_plan, file_decisions, native_candidates, resolutions, update_files=False)
             plans = plan_projects(store.run_id, understanding, html_candidates + native_candidates, has_attachment)
+            carry_native_resolution_state(native_plan, plans)
             award_hints = winner_names(html_candidates + native_candidates)
             store.write_output("bind_packages", binding_audit | {"effective_understanding": understanding.model_dump()})
             store.write_output("plan_project_gaps", plans)
-        apply_native_resolutions(plans, file_decisions, native_candidates, resolutions)
+        native_failures.extend(review_native_continuation(native_plan, plans, file_decisions, native_candidates,
+                                                          package_amounts, client, calls, reception=native_reception))
         store.write_output("plan_project_gaps", plans)
+        # Persist the actual decision before any slow upload. The paused failure round only had
+        # the pre-native screen record until parse_pages returned.
+        store.write_output("triage_files", file_decisions)
         native_outcome = ("candidates_extracted" if native_candidates else "amounts_only" if package_amounts else
                           "attempted_empty" if native_reception else "failed" if native_failures else "not_attempted")
         if native_outcome == "attempted_empty" and not native_failures:
@@ -168,14 +193,38 @@ def run_announcement(announcement_id: str, llm: LLMClient | None = None, html_di
                            status=native_status,
                            candidates=native_candidates, failures=native_failures,
                            page_quality=native_quality, need_resolutions=resolutions,
-                           package_amounts=list(package_amounts), reception=native_reception, outcome=native_outcome))
+                            package_amounts=list(package_amounts), reception=native_reception, outcome=native_outcome,
+                            needs_before=native_input_snapshot, needs_after=plans.model_dump(),
+                            need_resolution_state=native_plan.model_dump()))
         store.finish("extract_native_evidence", native_status)
         store.state.counts["native_extraction_attempts"] = sum(len(item.get("attempts", [])) for item in native_reception)
 
         parse_failures: list[Failure] = []
+        parse_log_lock = threading.Lock()
+        parse_latest = {}
+        parse_saved = {}
+
+        def parse_progress(event):
+            with parse_log_lock:
+                file_id = event["file_id"]
+                parse_latest.setdefault(file_id, {}).update(event)
+                # Operational telemetry only: don't rewrite run_state for each 64KiB encoder
+                # read. Phase boundaries are always durable; byte snapshots are at most 1/sec.
+                tick = time.monotonic()
+                if event["event"] == "upload_read" and tick - parse_saved.get(file_id, 0) < 1:
+                    return
+                parse_saved[file_id] = tick
+                store.state.parse_progress = dict(parse_latest)
+                store.state.updated_at = now_iso()
+                store.save()
+                if store.persist:
+                    with (store.directory / "05d_parse_events.jsonl").open("a", encoding="utf-8") as handle:
+                        handle.write(json.dumps(parse_latest[file_id], ensure_ascii=False) + "\n")
+
         store.begin("parse_pages")
-        parsed, parse_summary = parse_pages(store.run_id, file_decisions, index, parse_failures)
-        parsed_status = "skipped" if not parsed else ("partial" if parse_failures else "success")
+        parsed, parse_summary = parse_pages(store.run_id, file_decisions, index, parse_failures,
+                                            progress=parse_progress, owner=store.state.parse_owner)
+        parsed_status = "partial" if parse_failures else "success" if parsed else "skipped"
         store.write_output("parse_pages", {"run_id": store.run_id, "status": parsed_status, "files": parse_summary,
                                            "failures": [failure.model_dump() for failure in parse_failures]})
         store.finish("parse_pages", parsed_status)
