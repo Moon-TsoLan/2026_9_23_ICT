@@ -756,7 +756,9 @@ function tableVal(v: string | number | null, key: string): string {
 
 .panel {
   display: flex;
-  width: 380px;
+  width: clamp(420px, 34vw, 560px);
+  max-width: 46%;
+  min-width: 0;
   flex-shrink: 0;
   flex-direction: column;
   border-left: 1px solid var(--line);
@@ -772,6 +774,7 @@ function tableVal(v: string | number | null, key: string): string {
   margin-top: 8px;
   font-size: 19px;
   line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .stats {

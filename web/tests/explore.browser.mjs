@@ -12,7 +12,7 @@ const moduleRoot = process.env.PLAYWRIGHT_MODULE_ROOT || path.join(os.homedir(),
 const require = createRequire(path.join(moduleRoot, 'package.json'))
 const { chromium } = require('playwright')
 const root = path.resolve('web/dist')
-const out = path.resolve('work/explore-20261014')
+const out = path.resolve(process.env.EXPLORE_OUT || 'work/explore-20261014')
 await fs.mkdir(out, { recursive: true })
 const server = http.createServer(async (req, res) => {
   const requested = path.resolve(root, '.' + new URL(req.url, 'http://localhost').pathname)
@@ -45,11 +45,22 @@ const base = { nodes: [n('buyer:采购单位', '采购单位', 'buyer'), ...proj
     ...resident.map((s, i) => ({ a: projects[i % projects.length].id, b: s.id, role: 'win', weight: 1 }))] }
 const names = ['低频甲公司', '低频乙公司', '慢公司', '快公司', '分页公司']
 let version = '50:'
+const stepNames = ['understand_announcement', 'understand_html_tables', 'extract_html_candidates', 'bind_packages',
+  'plan_project_gaps', 'triage_files', 'extract_native_evidence', 'parse_pages', 'locate_pages',
+  'extract_attachment_candidates', 'normalize_candidates', 'merge_candidates', 'repair_packages',
+  'complete_suppliers', 'persist_and_report']
 await page.route('**/api/**', async route => {
   const url = new URL(route.request().url()); requests.push(url.pathname)
   const send = (body, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
   if (url.pathname === '/api/auth/me') return send({ user: { account_id: 'test', username: '测试账号', tenant_id: 'test' } })
-  if (url.pathname === '/api/health') return send({ ok: true, announcements: 50, data_version: version })
+  if (url.pathname === '/api/health') return send({ ok: true, announcements: Number(version.split(':')[0]), data_version: version })
+  if (url.pathname === '/api/ingest/records') return send({ total: 1, done_total: 1, page: 1, page_size: 20,
+    items: [{ announcement_id: 'test_labels', title: '步骤中文名检查', status: 'done', run_started: true,
+      projects: 1, cobs: 1, updated_at: '2026-10-17T12:00:00+08:00' }] })
+  if (url.pathname === '/api/runs/test_labels') return send({ announcement_id: 'test_labels', status: 'success',
+    steps: stepNames.map(step => ({ step, status: 'success', started_at: '2026-10-17T12:00:00+08:00',
+      ended_at: '2026-10-17T12:00:01+08:00' })),
+    counts: { projects: 1, final_cobs: 1, final_subs: 1, normalized_candidates: 1 } })
   if (url.pathname === '/api/stats/distribution') return send({ categories: [], brands: [], purchasers: [], winners: [] })
   if (url.pathname === '/api/graph/overview') return send({ elapsed_ms: 1, graph: { ...base, highlight_ids: [] },
     meta: { purchasers: 1, projects: projects.length, suppliers_total: resident.length + 5,
@@ -96,6 +107,16 @@ async function settled(text) {
   await page.waitForTimeout(650)
 }
 try {
+  await page.goto(origin + '/ingest')
+  await page.getByTitle('展开处理步骤').click()
+  await page.locator('.pipeline .steps .name').last().waitFor()
+  const stepLabels = await page.locator('.pipeline .steps .name').allTextContents()
+  assert.equal(stepLabels.length, 15)
+  assert.equal(stepLabels[3], '采购单元归属')
+  assert.equal(stepLabels[6], '原生证据复用')
+  assert.equal(stepLabels[13], '补全产品供应方')
+  assert.ok(stepLabels.every(label => !/[a-z_]/i.test(label)))
+  passed.push('01完整15步均展示中文名称')
   await page.goto(origin + '/explore')
   await page.locator('.star-label').first().waitFor({ state: 'attached' })
   await settled('未提问')
@@ -171,9 +192,57 @@ try {
   await page.getByText('资料库已更新。请点击刷新星图后再继续，当前问题暂时保留。').waitFor()
   assert.match(await state().textContent(), /分页公司/)
   passed.push('数据库版本变化拒绝混入新数据并保留当前问题')
+
+  await page.goto(origin + '/explore'); await settled('未提问')
+  const preservedBeforeNotice = await page.locator('.star-label').first().elementHandle()
+  const overviewCalls = requests.filter(p => p === '/api/graph/overview').length
+  version = '52:'
+  const notice = page.locator('.update-notice')
+  await notice.waitFor({ state: 'visible', timeout: 16000 })
+  assert.equal(await preservedBeforeNotice.evaluate(el => el.isConnected), true)
+  assert.equal(requests.filter(p => p === '/api/graph/overview').length, overviewCalls)
+  assert.equal(await notice.evaluate(el => getComputedStyle(el).position), 'relative')
+  const noticeBox = await notice.boundingBox()
+  const bodyBox = await page.locator('.explore .body').boundingBox()
+  assert.ok(noticeBox.y + noticeBox.height <= bodyBox.y + 1)
+  const rebuild = notice.getByRole('button', { name: '重建', exact: true })
+  assert.equal(await rebuild.evaluate(el => {
+    const b = el.getBoundingClientRect()
+    return el.contains(document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2))
+  }), true)
+  await page.screenshot({ path: path.join(out, '04-update-notice.png') })
+  await rebuild.click()
+  await notice.waitFor({ state: 'hidden' })
+  assert.equal(requests.filter(p => p === '/api/graph/overview').length, overviewCalls + 1)
+  passed.push('留在03时轮询发现新数据，提示位于星图上方且重建可点击，不自动重采样')
+
+  version = '53:'
+  await notice.waitFor({ state: 'visible', timeout: 16000 })
+  await notice.getByRole('button', { name: '关闭提示' }).click()
+  await notice.waitFor({ state: 'hidden' })
+  assert.equal(requests.filter(p => p === '/api/graph/overview').length, overviewCalls + 1)
+  passed.push('关闭更新提示可点击，关闭不会重建星图')
+
+  await page.goto(origin + '/explore'); await settled('未提问')
+  await pick('低频甲公司'); await settled('低频甲公司')
+  const widths = []
+  for (const width of [1024, 1440, 1920]) {
+    await page.setViewportSize({ width, height: 950 })
+    await page.waitForTimeout(200)
+    const box = await page.locator('.explore .panel').boundingBox()
+    assert.ok(box.width >= 420 && box.width <= 560)
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true)
+    widths.push({ viewport: width, panel: box.width })
+  }
+  assert.ok(widths[0].panel < widths[1].panel && widths[1].panel < widths[2].panel)
+  await page.screenshot({ path: path.join(out, '05-wider-panel.png') })
+  await page.setViewportSize({ width: 800, height: 950 })
+  assert.equal(await page.locator('.explore .panel').isVisible(), false)
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true)
+  passed.push('选中节点的详情面板随屏宽增至420–560px，窄屏沿用原收起行为且无横向溢出')
   assert.deepEqual(errors, [])
   await fs.writeFile(path.join(out, stress ? 'stress-browser-report.json' : 'browser-report.json'),
-    JSON.stringify({ base_nodes: base.nodes.length, passed, requests, errors }, null, 2))
+    JSON.stringify({ base_nodes: base.nodes.length, passed, requests, widths, errors }, null, 2))
   console.log(JSON.stringify({ passed, errors }, null, 2))
 } catch (error) {
   await page.screenshot({ path: path.join(out, 'failure.png') })

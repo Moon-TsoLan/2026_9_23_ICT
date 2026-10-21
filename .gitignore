@@ -7,8 +7,13 @@ runs-current/
 /runtime/
 /uploads/
 /doc/设计报告
+/doc/PPT
+/doc/过程性文件
 /_vllm_bench/result*.json
 outputs/
+v0_eval_50/
+源码及配套资料/
+one_shot_baseline/
 # Local environment settings (keep configuration templates)
 .env
 .env.*

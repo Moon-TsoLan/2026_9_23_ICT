@@ -32,8 +32,31 @@ def annotate_units(rows, query):
     ids = list(dict.fromkeys(r["project_id"] for r in rows if "project_id" in r and "package_no" in r))
     if not ids:
         return rows
-    stored = query("""SELECT p.project_id, p.package_no, a.raw_json FROM project p
-                      JOIN announcement a USING (announcement_id) WHERE p.project_id = ANY(%s)""", (ids,))
+    # Labels need only unit metadata. Returning the complete audit/result JSON for
+    # every project can exhaust API memory when loading the full relationship map.
+    # Preserve the adapter's input shape and official-result/legacy precedence.
+    stored = query("""SELECT p.project_id, p.package_no,
+        jsonb_build_object(
+            'project_map', COALESCE(a.raw_json->'project_map', '{}'::jsonb),
+            'official_result', jsonb_build_object('packages', COALESCE((
+                SELECT jsonb_agg(jsonb_build_object(
+                    'package_no', unit->'package_no',
+                    'package_kind', unit->'package_kind',
+                    'package_name', unit->'package_name',
+                    'source_package_no', unit->'source_package_no'
+                ) ORDER BY position)
+                FROM jsonb_array_elements(COALESCE(
+                    CASE WHEN COALESCE(a.raw_json->'official_result', 'null'::jsonb)
+                              IN ('null'::jsonb, '{}'::jsonb, '[]'::jsonb,
+                                  'false'::jsonb, '0'::jsonb, '\"\"'::jsonb)
+                         THEN a.raw_json#>'{package_bindings,effective_understanding,packages}'
+                         ELSE a.raw_json#>'{official_result,packages}' END,
+                    '[]'::jsonb
+                )) WITH ORDINALITY AS units(unit, position)
+            ), '[]'::jsonb))
+        ) AS raw_json
+        FROM project p JOIN announcement a USING (announcement_id)
+        WHERE p.project_id = ANY(%s)""", (ids,))
     metadata = {}
     for p in stored:
         raw = p.get("raw_json") or {}

@@ -480,6 +480,8 @@ onBeforeUnmount(() => {
 }
 
 .body {
+  position: relative;
+  z-index: 0;
   display: flex;
   min-height: 0;
   flex: 1;

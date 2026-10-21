@@ -15,7 +15,7 @@ const emit = defineEmits<{ run: []; dismiss: [] }>()
 </script>
 
 <template>
-  <div class="notice" :class="{ heavy: mode === 'rebuild' }">
+  <div class="update-notice" :class="{ heavy: mode === 'rebuild' }" role="status" aria-live="polite">
     <span class="dot" />
     <p v-if="mode === 'append'">
       资料库已更新<template v-if="newCount > 0">（新增 {{ newCount }} 则）</template>
@@ -29,19 +29,22 @@ const emit = defineEmits<{ run: []; dismiss: [] }>()
 </template>
 
 <style scoped>
-.notice {
+.update-notice {
+  position: relative;
+  z-index: 2;
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 10px;
   border-bottom: 1px solid var(--line);
-  background: color-mix(in srgb, var(--info) 7%, transparent);
+  background: color-mix(in srgb, var(--info) 7%, var(--surface));
   padding: 7px 16px;
   font-size: 13px;
   color: var(--ink);
 }
 
-.notice.heavy {
-  background: color-mix(in srgb, var(--warn) 10%, transparent);
+.update-notice.heavy {
+  background: color-mix(in srgb, var(--warn) 10%, var(--surface));
 }
 
 .dot {
@@ -56,7 +59,8 @@ const emit = defineEmits<{ run: []; dismiss: [] }>()
   background: var(--warn);
 }
 
-.notice p {
+.update-notice p {
+  min-width: 0;
   flex: 1;
 }
 

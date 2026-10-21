@@ -135,14 +135,17 @@ export const STEP_LABEL: Record<string, string> = {
   understand_announcement: '读入公告',
   understand_html_tables: '理解表格',
   extract_html_candidates: '抽候选',
+  bind_packages: '采购单元归属',
   plan_project_gaps: '规划缺口',
   triage_files: '筛附件',
+  extract_native_evidence: '原生证据复用',
   parse_pages: '解析页面',
   locate_pages: '定页',
   extract_attachment_candidates: '抽附件',
   normalize_candidates: '规范化',
   merge_candidates: '合并去重',
   repair_packages: '检查修复',
+  complete_suppliers: '补全产品供应方',
   persist_and_report: '入库',
 }
 
