@@ -1,0 +1,103 @@
+{
+  "date": "2026-11-09",
+  "reason": "用户要求将此前待优化事项归档，当前收敛为四项字段与阶段提示词问题",
+  "files": [
+    {
+      "path": "eval/待优化清单.md",
+      "sha256": "64c2d5e403d33286d50e4a63259fdd47ecc00218d3bda43197cad73d39865d8f"
+    },
+    {
+      "path": "doc/字段含义对照草稿-20261105.md",
+      "sha256": "de07f3868af46446561d336d2e7fb8440f68d211e41ee90c87f9db66bfcae9c5"
+    },
+    {
+      "path": "doc/当前主流程提示词与步骤衔接审计-20261105.md",
+      "sha256": "f03125d578c768856c7f8cae89b074b1e32fe28e50489da125e516a8ac97803f"
+    },
+    {
+      "path": "doc/步骤衔接审计附件-20261105/接收与变换函数快照.md",
+      "sha256": "d51def9e1c0f5ebf07a654abafe5a0b03a58e04ea38d7ee28edf01fb512b4126"
+    },
+    {
+      "path": "doc/步骤衔接审计附件-20261105/call_sites.json",
+      "sha256": "e2cc31b79699eb8db02bf3a2131b16cd04ed21e25cea1307ace30c82c6b38212"
+    },
+    {
+      "path": "doc/步骤衔接审计附件-20261105/payload与调用快照.md",
+      "sha256": "3ac48edd373b8ee3f68410e2b514437c7c9e8034795f6ed297981c255f4f8806"
+    },
+    {
+      "path": "doc/步骤衔接审计附件-20261105/prompt_fields.json",
+      "sha256": "eee80483207b6c92767b33e651646d2df2a8c71c8816ae064e46fa6876721f02"
+    },
+    {
+      "path": "doc/步骤衔接审计附件-20261105/README.md",
+      "sha256": "dfbfbd29c34953231b9460fc16bb19962265e9d8bcf68088ecd5b0495979c41d"
+    },
+    {
+      "path": "doc/步骤衔接审计附件-20261105/schemas_snapshot.json",
+      "sha256": "d66f2c7f1806f53d2de149b062613cb2d9f8c780006e6b1ed8f4338b14d12d67"
+    },
+    {
+      "path": "doc/步骤衔接审计附件-20261105/source_sha256.json",
+      "sha256": "2f8161ee64f77728df8a2848b22a859a78c8000143135dcc8361b72b83dede3b"
+    },
+    {
+      "path": "doc/步骤衔接审计附件-20261105/stage_files.json",
+      "sha256": "fbd152ac4b1bdf588d1cd00041cb41192e03daa423e9e4887523f76a70630edf"
+    },
+    {
+      "path": "doc/步骤衔接审计附件-20261105/effective_prompts/announcement-v4.md",
+      "sha256": "1f0dedd6ee5123f9423f145eb3bf5cf9317b743b1bbc0d9083a34ad053115f2c"
+    },
+    {
+      "path": "doc/步骤衔接审计附件-20261105/effective_prompts/attachment-extract-v5.md",
+      "sha256": "562b79b5f2294f93ebe29e72a50a68b04eef016db55eda23783e6c04b884af4d"
+    },
+    {
+      "path": "doc/步骤衔接审计附件-20261105/effective_prompts/html-candidates-v5.md",
+      "sha256": "1166b49966749d4a24460b800715a337b56c5ba3f65e29c7296fecb5c9a36a2d"
+    },
+    {
+      "path": "doc/步骤衔接审计附件-20261105/effective_prompts/html-tables-v6.md",
+      "sha256": "a9d4ded1c5f712ed9119b0d05927948daab41a8e304352d833a434529d8b094f"
+    },
+    {
+      "path": "doc/步骤衔接审计附件-20261105/effective_prompts/locate-pages-v5.md",
+      "sha256": "9af51927c3efb388ff795c2b7a91419049d4c5538751d43aaf4648a6efc6549f"
+    },
+    {
+      "path": "doc/步骤衔接审计附件-20261105/effective_prompts/merge-objects-v6.md",
+      "sha256": "f5a8d9a214b7d20f3c3826532f71d9f3fbac47bbbc70a83b437f52c0adc49833"
+    },
+    {
+      "path": "doc/步骤衔接审计附件-20261105/effective_prompts/merge-subs-v2.md",
+      "sha256": "29f816e81673b3ac09c5ee7b7385596caad7d2ed0faba9d4123cdef2269880be"
+    },
+    {
+      "path": "doc/步骤衔接审计附件-20261105/effective_prompts/native-continuation-v1.md",
+      "sha256": "7b5dffc687b4878884940f88d0d0b0b939d6aa2404d7a6f8af645413649fef12"
+    },
+    {
+      "path": "doc/步骤衔接审计附件-20261105/effective_prompts/package-binding-v4.md",
+      "sha256": "a4ede1b65f8658448e06a597313bbf8775281e8a0e58ec3d4e0afbf520cab3a6"
+    },
+    {
+      "path": "doc/步骤衔接审计附件-20261105/effective_prompts/repair-package-v1.md",
+      "sha256": "e054e3ad302693203c873c4604aea3ba249470c29fc41a52d27c2127ab68dd14"
+    },
+    {
+      "path": "doc/步骤衔接审计附件-20261105/effective_prompts/screen-file-v4.md",
+      "sha256": "02888777e420996681996e8f4d0502b2f062264f5ecd2d409ed379acaff5173d"
+    },
+    {
+      "path": "doc/步骤衔接审计附件-20261105/effective_prompts/screen-page-v4.md",
+      "sha256": "52a15cbb01ade0a5e2f473ea5d6b0b99b75ea41981d214ec8d3954bdb12fcd9e"
+    },
+    {
+      "path": "doc/步骤衔接审计附件-20261105/effective_prompts/supplier-completion-v1.md",
+      "sha256": "e139049e68af5223d3b62f634826d8a496d3b694d3b0ea6ffb4bcc651358b161"
+    }
+  ],
+  "hash_verified": true
+}

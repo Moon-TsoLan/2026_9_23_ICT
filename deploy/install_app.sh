@@ -15,7 +15,8 @@ echo "== 1/5 apt 依赖 =="
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
 # git：拉代码用；p7zip-full：只有附件里出现内层 rar/7z 才需要
-apt-get install -y python3-venv python3-pip git p7zip-full
+# Legacy Office / image-bearing DOCX are previewed locally before any OCR selection.
+apt-get install -y python3-venv python3-pip git p7zip-full libreoffice-writer libreoffice-calc
 
 echo "== 2/5 目录 =="
 # 运行数据放独立盘；后端与 worker 的 ICT_DATA_ROOT 都指这里

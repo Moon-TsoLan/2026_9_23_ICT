@@ -5,8 +5,6 @@ from ict.evidence import resolve_context
 from ict.html_context import parse_notice
 from ict.llm import LLMResult
 from ict.schemas import AnnouncementUnderstanding, PackageUnderstanding, Amount, HtmlTables, ProjectPlans, ProjectPlan, FileDecisions, FileDecision
-from ict.steps.s02_html import _append_candidates
-from ict.steps.s04_attach import apply_native_resolutions
 from test_rules import _cob
 
 
@@ -38,12 +36,16 @@ def test_unnamed_rows_keep_their_supplier_and_distinct_source_refs(tmp_path):
     table = notice.tables[0]
     rows = [{"fields": {"quantity": 1, "total_price": 100}, "source_refs": [f"html:t{table.table_index}:r0"]},
             {"fields": {"quantity": 2, "total_price": 200}, "source_refs": [f"html:t{table.table_index}:r1"]}]
-    candidates = []
-    _append_candidates(candidates, rows, "cob", None, "项目", 100, 1, ["1", "2"],
-                       table=table, table_index=table.table_index, column_mapping={"supplier_name": "供应商"})
-    assert [row.evidence.row_index for row in candidates] == [0, 1]
-    assert all(row.evidence.bidder_supplier == "同一公司" for row in candidates)
-    assert all(row.fields["object_name"].raw_value is None for row in candidates)
+    from ict.observations import seal_observations
+    segments = [item for item in notice.source_contexts.values() if item.get('table_index') == 0
+                and item.get('row_index') in (1, 2)]
+    rows = [{'entity_type': 'cob', 'source_ref': segment['source_ref'], 'source_class': 'cob_detail',
+             'bidder_supplier': '同一公司', 'fields': {'quantity': index + 1, 'total_price': (index + 1) * 100}}
+            for index, segment in enumerate(segments)]
+    candidates, _ = seal_observations(rows, [{'file_id':None, 'page_no':None, 'source_type':'html', 'source_segments':segments}], '项目', 1)
+    assert [row.evidence.row_index for row in candidates] == [1, 2]
+    assert all(row.evidence.bidder_supplier == '同一公司' for row in candidates)
+    assert all(row.fields['object_name'].raw_value is None for row in candidates)
     assert candidates[0].evidence.source_refs != candidates[1].evidence.source_refs
 
 
@@ -77,51 +79,3 @@ def test_context_selection_never_guesses_the_first_page_of_a_file():
     assert resolve_context({"source_ref": "p:3"}, contexts)["page_no"] == 3
     assert resolve_context({"source_ref": "invented"}, contexts) is None
     assert resolve_context({"source_ref": "p:3", "page_no": 37}, contexts) is None
-
-
-def test_native_name_evidence_can_end_file_parsing_without_claiming_discovery_complete():
-    need = {"need_id": "name", "field": "object_name", "purpose": "fill_field", "package_no": "1",
-            "target_candidate_ids": ["html"], "state": "pending"}
-    discovery = {"need_id": "discover", "field": "object_name", "purpose": "discover_objects", "package_no": "1", "state": "pending"}
-    plans = ProjectPlans(run_id="x", status="success", projects=[ProjectPlan(project_id="项目|1", package_no="1",
-                         needs=[need, discovery], has_attachment=True, needs_attachment=True, status="success")])
-    source = _cob("native", "pdf", 20, {"object_name": "互联网接入服务"}, source_class="tender_requirement")
-    from ict.schemas import CandidateEvidence
-    source.evidence = CandidateEvidence(source_refs=["file:a:native:p3"])
-    decisions = FileDecisions(run_id="x", status="success", file_decisions=[FileDecision(file_id="a",
-        file_class="tender_requirement", priority=1, read_strategy="target_pages", reason="model",
-        expected_fields=["object_name"], evidence_refs=["file:a:native:p3"], screen={"requires_deep_parse": False})])
-    ready = apply_native_resolutions(plans, decisions, [source], [{"need_id": "name", "field": "object_name",
-                                     "target_candidate_id": "html", "source_ref": "file:a:native:p3"}])
-    assert ready == {"name"}
-    assert plans.projects[0].needs[0]["state"] == "evidence_ready"
-    assert plans.projects[0].needs[1]["state"] == "pending"
-    assert decisions.file_decisions[0].read_strategy == "skip"
-
-
-def test_a_screen_hit_without_a_matching_extracted_value_does_not_skip_parsing():
-    plans = ProjectPlans(run_id="x", status="success", projects=[ProjectPlan(project_id="项目|1", package_no="1",
-        needs=[{"need_id": "name", "field": "object_name", "purpose": "fill_field", "package_no": "1",
-                "target_candidate_ids": ["html"]}], has_attachment=True, needs_attachment=True, status="success")])
-    decisions = FileDecisions(run_id="x", status="success", file_decisions=[FileDecision(file_id="a", file_class="tender_requirement",
-        priority=1, read_strategy="target_pages", reason="model", expected_fields=["object_name"],
-        evidence_refs=["p3"], screen={"requires_deep_parse": False})])
-    apply_native_resolutions(plans, decisions, [], [{"need_id": "name", "field": "object_name", "target_candidate_id": "html", "source_ref": "p3"}])
-    assert decisions.file_decisions[0].read_strategy == "target_pages"
-
-
-def test_native_coverage_requires_every_target_of_the_same_need():
-    need = {"need_id": "names", "field": "object_name", "purpose": "fill_field", "package_no": "1",
-            "target_candidate_ids": ["html1", "html2"], "state": "pending"}
-    plans = ProjectPlans(run_id="x", status="success", projects=[ProjectPlan(project_id="项目|1", package_no="1",
-        needs=[need], has_attachment=True, needs_attachment=True, status="success")])
-    from ict.schemas import CandidateEvidence
-    source = _cob("native", "pdf", 20, {"object_name": "服务"}, source_class="tender_requirement")
-    source.evidence = CandidateEvidence(source_refs=["p3"])
-    decisions = FileDecisions(run_id="x", status="success", file_decisions=[FileDecision(file_id="a",
-        file_class="tender_requirement", priority=1, read_strategy="target_pages", reason="model",
-        expected_fields=["object_name"], evidence_refs=["p3"], screen={"requires_deep_parse": False})])
-    result = apply_native_resolutions(plans, decisions, [source], [{"need_id": "names", "field": "object_name",
-        "target_candidate_id": "html1", "source_ref": "p3"}])
-    assert not result and plans.projects[0].needs[0]["state"] == "pending"
-    assert decisions.file_decisions[0].read_strategy == "target_pages"

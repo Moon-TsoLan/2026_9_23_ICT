@@ -151,7 +151,7 @@ def _progress(announcement_id: str, extra_roots: list[Path] | None,
               tenant_id: str) -> dict | None:
     """从 run_state.json 读提取进度；没有就是还没跑。
 
-    分母是整条流程的步数（`STEP_TOTAL`，12 步），不是"这条 run 已经登记了几步"。
+    分母来自当前注册步骤数STEP_TOTAL，不是这条run已经登记的步骤数。
     跑到第 9 步时 `steps` 里只有 9 条，拿它当分母会显示成"第 8/9 步"，用户看不出还剩多少。
     """
     state = run_state_of(announcement_id, extra_roots, tenant_id)
@@ -163,7 +163,8 @@ def _progress(announcement_id: str, extra_roots: list[Path] | None,
     # 已经跑完的 run 一律满格：老 run_state 可能只登记了 11 步（附件链路整条跳过的那种）
     done = STEP_TOTAL if state.get("status") in ("success", "partial", "failed") else len(finished)
     return {"done": done, "total": STEP_TOTAL,
-            "current_step": state.get("current_step"), "status": state.get("status")}
+            "current_step": state.get("current_step"), "status": state.get("status"),
+            "merge_wait": state.get("merge_wait"), "merge_timing": state.get("merge_timing")}
 
 
 def run_is_current(announcement_id: str, since: str | None, extra_roots: list[Path] | None = None,

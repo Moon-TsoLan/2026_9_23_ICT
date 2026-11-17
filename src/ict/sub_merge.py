@@ -72,7 +72,7 @@ def merge_subs(items, package_no, llm, counter, value_of, package_metadata=None,
         return ""
 
     try:
-        answer = complete_json(llm, step="merge_subs", prompt_version="merge-subs-v2",
+        answer = complete_json(llm, step="merge_subs", prompt_version="merge-subs-v3",
                                user=json.dumps(payload, ensure_ascii=False), validate=validate, counter=counter)
     except (ValueError, LLMError) as exc:
         return {"fallback": str(exc), "attempts": getattr(exc, "attempts", []), "accepted": False}

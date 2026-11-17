@@ -13,15 +13,9 @@ from ict.schemas import RunState, RunStep
 TZ = timezone(timedelta(hours=8))
 STEP_FILES = {
     "understand_announcement": "01_announcement_understanding.json",
-    "understand_html_tables": "02_html_tables.json",
-    "extract_html_candidates": "03_html_candidates.json",
-    "bind_packages": "03b_package_bindings.json",
     "plan_project_gaps": "04_project_plans.json",
-    "triage_files": "05_file_decisions.json",
-    "extract_native_evidence": "05c_native_extraction.json",
-    "parse_pages": "05b_parsed_pages.json",
-    "locate_pages": "06_page_decisions.json",
-    "extract_attachment_candidates": "07_attachment_extraction.json",
+    "process_attachment_pages": "07_attachment_extraction.json",
+    "bind_packages": "03b_package_bindings.json",
     "normalize_candidates": "08_normalized_candidates.json",
     # Written next to the normalized candidates but not a registered step: it is the read-only
     # context step 8 was given, kept so a merge decision can be replayed by hand.
@@ -118,6 +112,13 @@ class RunStore:
         path = self.directory / STEP_FILES[step]
         write_json(path, payload)
         return path
+
+    def merge_wait(self, phase: str | None) -> None:
+        self.state.merge_wait = phase
+        key = {"queued": "queued_at", "running": "started_at", "resuming": "returned_at", None: "resumed_at"}[phase]
+        setattr(self.state.merge_timing, key, datetime.now(TZ).isoformat(timespec="milliseconds"))
+        self.state.updated_at = now_iso()
+        self.save()
 
     def save(self) -> None:
         if not self.persist:

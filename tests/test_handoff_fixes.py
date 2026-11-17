@@ -99,7 +99,7 @@ def contexts():
         {"source_ref": "file:a:native:p3", "file_id": "a", "page_no": 3, "text": "包1服务，项目预算"}]}]
 
 
-def test_invalid_amount_does_not_erase_independent_names_and_need_links_on_retry():
+def test_invalid_items_keep_names_and_unassigned_amounts_across_retry():
     first = {"candidates": [{"entity_type": "cob", "source_ref": "file:a:native:p3", "fields": {"object_name": "服务"}},
                              {"entity_type": [], "source_ref": "file:a:native:p3", "fields": {}}],
              "package_amounts": [{"package_no": None, "raw_text": "741.32万元", "amount_kind": "budget", "source_ref": "file:a:native:p3"},
@@ -108,10 +108,10 @@ def test_invalid_amount_does_not_erase_independent_names_and_need_links_on_retry
     model = FakeLLMClient({"extract": [json.dumps(first), '{"candidates": [], "package_amounts": []}']})
     result = complete_json(model, step="extract", prompt_version="unused", user="{}", validate=lambda p: "",
                            receiver=ExtractionReceiver(contexts()))
-    assert len(result["candidates"]) == len(result["need_resolutions"]) == 1
-    assert not result["package_amounts"]
+    assert len(result["candidates"]) == 1 and "need_resolutions" not in result
+    assert result["package_amounts"] == [first["package_amounts"][0]]
     rejected = result["reception"]["rejected_items"]
-    assert len(rejected) == 3 and rejected[1]["raw"]["package_no"] is None
+    assert len(rejected) == 2 and rejected[1]["raw"]["amount_kind"] == []
 
 
 def test_repair_has_previous_response_and_does_not_silently_splice_delta_plans():
@@ -159,18 +159,17 @@ def test_attachment_only_amounts_reach_binding_and_unresolved_is_not_adopted(tmp
     assert model.used["bind_packages"] == 2
 
 
-def test_native_evidence_survives_an_independent_page_selection(tmp_path):
+def test_all_extracted_contexts_reach_merge_evidence(tmp_path):
     from ict.pipeline import _merge_evidence
     from ict.html_context import parse_notice
-    path = tmp_path / "a.html"
-    path.write_text("<html><body></body></html>", encoding="utf-8")
-    from ict.schemas import PageDecisions, PageDecision
-    selected = PageDecisions(run_id="x", status="success", page_decisions=[PageDecision(file_id="a", page_no=37,
-        relevance=1, package_scope="1", extraction_mode="text", reason="另页")])
-    pages = {"a": [{"page_no": 3, "text": "已发现名称", "tables": [], "source_segments": contexts()[0]["source_segments"]}]}
-    evidence = _merge_evidence(parse_notice(path), None, _understanding(), None, None, selected, pages, [], {})
-    assert evidence.attachment_pages["a:3"]["native_segments"]
-    assert not evidence.attachment_pages["a:3"]["selected_for_deep_extraction"]
+    path = tmp_path / 'a.html'
+    path.write_text('<html><body></body></html>', encoding='utf-8')
+    chunk = {'file_id': 'a', 'file_name': 'a.pdf', 'page_no': 3, 'coordinate_kind': 'pdf_page',
+             'source_segments': [{'source_ref': 'file:a:p3', 'text': '已发现名称'}]}
+    evidence = _merge_evidence(parse_notice(path), HtmlTables(run_id='r', status='success'),
+                               _understanding(), None, [chunk], [], {})
+    assert evidence.source_contexts['file:a:p3']['text'] == '已发现名称'
+    assert evidence.attachment_pages['a:3']['file_name'] == 'a.pdf'
 
 
 def test_sub_identity_merge_uses_sources_and_keeps_joint_venture_whole():

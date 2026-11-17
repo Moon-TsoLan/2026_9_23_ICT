@@ -15,7 +15,7 @@ from ict.packages import hint_reference, package_context
 from ict.schemas import AttachmentIndex, FileDecision, FileDecisions, HtmlTables, IndexedFile
 from ict.steps.s01_understand import seal
 from ict.steps.s03_plan import plan_projects
-from ict.steps.s04_attach import coerce_package_scope, locate_pages, page_packages
+from ict.steps.s04_attach import coerce_package_scope, page_packages
 from db.load_runs import _package_base_key, plan_rounds, target_entries
 
 
@@ -62,25 +62,14 @@ def test_single_lot_original_number_survives_entire_pipeline(tmp_path, monkeypat
     class Model:
         def complete(self, *, step, prompt_version, user, **kwargs):
             payload, _ = json.JSONDecoder().raw_decode(user)
-            if step == "understand_announcement":
-                answer = {"project_name": "采购", "package_mode": "single",
-                          "packages": [unit("lot", "1", "第1标段")]}
-            elif step == "understand_html_tables":
-                assert prompt_version == "html-tables-v6"
-                answer = {"table_role": "cob_detail", "package_scope": "lot:1", "row_grain": "cob",
-                          "column_mapping": {"object_name": "名称", "quantity": "数量", "unit_price": "单价"}}
-            elif step == "extract_html_candidates":
-                assert payload["known_packages"] == ["lot:1"]
-                assert payload["package_registry"][0]["source_package_no"] == "1"
-                if payload.get("body_sections"):
-                    fields = {"supplier_name": "甲公司", "is_winner": True, "bid_amount": "100元"}
-                    entry = {"entity_type": "sub", "fields": fields, "source_refs": ["html:body:0"]}
-                else:
-                    fields = {"object_name": "设备", "quantity": 1, "unit": "台", "unit_price": "100元",
-                              "total_price": "100元", "product_supplier": "制造厂"}
-                    entry = {"entity_type": "cob", "fields": fields, "source_refs": ["html:t0:r0"]}
-                # The old-number response was accepted before but then lost in the singleton branch.
-                answer = {"candidates": [{**entry, "package_no": "1"}]}
+            if step == 'read_announcement_summary':
+                answer = {}
+            elif step == 'read_announcement_body':
+                answer = {'project_name':'采购', 'package_mode':'single', 'packages':[{'source_package_no':'1',
+                    'package_kind':'lot', 'package_name':'第1标段', 'candidates':[
+                    {'entity_type':'cob','source_ref':'html:body','source_class':'cob_detail','fields':
+                     {'object_name':'设备','quantity':1,'unit':'台','unit_price':'100元','total_price':'100元','product_supplier':'制造厂'}},
+                    {'entity_type':'sub','source_ref':'html:body','fields':{'supplier_name':'甲公司','is_winner':True,'bid_amount':'100元'}}]}]}
             elif step == "merge_candidates":
                 answer = {"deltas": []}
             else:
@@ -94,9 +83,7 @@ def test_single_lot_original_number_survives_entire_pipeline(tmp_path, monkeypat
     assert project["package_no"] == "lot:1" and project["source_package_no"] == "1"
     assert [row["object_name"] for row in project["cobs"]] == ["设备"]
     assert [row["supplier_name"] for row in project["subs"]] == ["甲公司"]
-    audit = json.loads((tmp_path / "runs/aid/03b_package_bindings.json").read_text(encoding="utf-8"))
-    assert not audit["unresolved"]
-    assert all(row["suggested_package_no"] == "1" for row in audit["bindings"])
+    assert not (tmp_path / "runs/aid/03b_package_bindings.json").exists()
 
 
 def test_singleton_does_not_accept_unrelated_original_number():
@@ -153,46 +140,6 @@ def test_ambiguous_anchor_is_not_copied_to_both_units_and_reaches_model(choose):
         assert u.packages[1].package_amount is None
 
 
-def locate(u, text, scope, possible=(), filename="合订文件.pdf"):
-    plans = plan_projects("r", u, [], True)
-    files = FileDecisions(run_id="r", status="success", file_decisions=[FileDecision(file_id="f",
-        file_class="bid_quote", priority=1, read_strategy="target_pages", reason="fixed", possible_packages=list(possible))])
-    index = AttachmentIndex(announcement_id="aid", files=[IndexedFile(file_id="f", display_name=filename,
-        relative_path="f.pdf", extension="pdf", readability="text_extractable")])
-    page = {"page_no": 1, "text": text, "chars": len(text), "tables": []}
-    model = CapturingModel("locate_pages", {"page_decisions": [{"file_id": "f", "page_no": 1,
-        "package_scope": scope, "extraction_mode": "text", "relevance": 1, "reason": "fixed"}]})
-    return locate_pages("r", plans, files, {"f": [page]}, index, model).page_decisions[0].package_scope
-
-
-def test_mixed_directory_restores_multi_package_page_scope():
-    u = understanding([unit("lot", "1"), unit("contract_package", "1"), unit("contract_package", "2")])
-    text = "第1包 产品甲；第2包 产品乙。分项报价表与中标供应商信息。"
-    assert locate(u, text, "2") == "announcement"
-    # A lone ambiguous literal number also cannot force one of the same-number units.
-    assert locate(u, "第1包 产品甲。原文分项报价表信息，详见表格。", "1") == "announcement"
-
-
-@pytest.mark.parametrize("possible,filename", [(["2"], "合订文件.pdf"), ([], "第2包报价.pdf")])
-def test_one_typed_sibling_does_not_disable_ordinary_package_hint(possible, filename):
-    u = understanding([unit("lot", "1"), unit("contract_package", "2")])
-    assert locate(u, "最终报价如下，供应商及产品信息详见报价表。", "unknown", possible, filename) == "2"
-
-
-def test_unique_original_page_number_and_filename_resolve_to_reference():
-    u = understanding([unit("lot", "1"), unit("lot", "2")])
-    refs = [p.package_no for p in u.packages]
-    assert page_packages("第1包 产品甲；第2包 产品乙", refs, u.packages) == set(refs)
-    assert coerce_package_scope("1", [], refs, "文件.pdf", u.packages) == "lot:1"
-    assert locate(u, "供应商产品最终报价，见本页的详细表格。", "unknown", filename="第1包报价.pdf") == "lot:1"
-
-
-def test_ambiguous_filename_never_selects_first_same_number_unit():
-    u = understanding([unit("lot", "1"), unit("contract_package", "1")])
-    assert hint_reference("1", u.packages) is None
-    assert locate(u, "供应商产品最终报价，见本页的详细表格。", "unknown", filename="第1包报价.pdf") == "unknown"
-
-
 def test_cross_announcement_key_does_not_depend_on_siblings():
     a = understanding([unit("contract_package", "1")]).packages[0]
     b = understanding([unit("lot", "1"), unit("contract_package", "1")]).packages[1]
@@ -239,4 +186,3 @@ def test_online_prompt_contracts_do_not_request_original_output_numbers():
     assert "归属编号用原文里能确定的写法" not in tables
     for text in (html, tables, load_prompt("package-binding-v4")):
         assert "采购单元内部引用" in text
-

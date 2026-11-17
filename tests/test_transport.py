@@ -154,6 +154,65 @@ def test_vision_request_shape_is_pinned(monkeypatch):
     assert content[1] == {"type": "image_url", "image_url": {"url": "data:image/png;base64,AA=="}}
 
 
+@pytest.mark.parametrize("base,bailian", [
+    ("https://ws-f4t5fyoy9sscmuqi.cn-beijing.maas.aliyuncs.com/compatible-mode/v1", True),
+    ("https://dashscope.aliyuncs.com/compatible-mode/v1", True),
+    ("https://api.deepseek.com", False),
+    ("https://example.invalid/maas.aliyuncs.com", False),
+    ("https://maas.aliyuncs.com.example.invalid/compatible-mode/v1", False),
+])
+@pytest.mark.parametrize("thinking", [False, True])
+def test_thinking_switch_uses_endpoint_protocol(monkeypatch, base, bailian, thinking):
+    seen = {}
+
+    def handler(request):
+        seen.update(body=json.loads(request.content), url=str(request.url),
+                    auth=request.headers["authorization"])
+        return httpx.Response(200, json={
+            "choices": [{"message": {"content": '{"ok": true}',
+                                      "reasoning_content": "reason" if thinking else ""},
+                         "finish_reason": "stop"}],
+            "usage": {"total_tokens": 5},
+        })
+
+    http_module._clients["llm"] = httpx.Client(transport=httpx.MockTransport(handler))
+    result = OpenAICompatibleClient(base, "key", "test-model").complete(
+        step="test", prompt_version="announcement-v1", user="{}", thinking=thinking)
+    body = seen["body"]
+    assert seen["url"] == base + "/chat/completions"
+    assert seen["auth"] == "Bearer key"
+    assert body["model"] == "test-model" and body["temperature"] == 0
+    if bailian:
+        assert body["enable_thinking"] is thinking
+        assert "thinking" not in body
+    else:
+        assert body["thinking"] == {"type": "enabled" if thinking else "disabled"}
+        assert "enable_thinking" not in body
+    assert ("response_format" in body) is (not thinking)
+    assert result.text == '{"ok": true}'
+    assert result.reasoning == ("reason" if thinking else "")
+    assert result.usage == {"total_tokens": 5}
+    assert result.finish_reason == "stop"
+
+
+def test_bailian_vision_explicitly_disables_thinking(monkeypatch):
+    seen = {}
+
+    def handler(request):
+        seen.update(json.loads(request.content))
+        return httpx.Response(200, json=OK_BODY)
+
+    http_module._clients["llm"] = httpx.Client(transport=httpx.MockTransport(handler))
+    client = OpenAICompatibleClient(
+        "https://ws-test.cn-beijing.maas.aliyuncs.com/compatible-mode/v1", "key", "model")
+    client.complete_with_images(step="test", prompt_version="screen-page-v1",
+                                images=["data:image/png;base64,AA=="], user_text="{}")
+    assert seen["enable_thinking"] is False and "thinking" not in seen
+    assert seen["max_tokens"] == 300
+    assert "response_format" not in seen
+    assert seen["messages"][1]["content"][1]["type"] == "image_url"
+
+
 def test_throttling_is_retried(monkeypatch):
     attempts: list = []
 

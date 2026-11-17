@@ -62,11 +62,17 @@ def bind_packages(understanding, candidates, notice, tables, llm, counter=None,
     source_rows = [row | {"headers": table.headers, "section": table.section,
                           "before_text": table.before_text}
                    for table in notice.tables for row in html_rows(table)]
+    referenced = {ref for candidate in candidates if candidate.evidence
+                  for ref in candidate.evidence.source_refs}
+    referenced.update(observation.source_ref for observation in (package_amounts or []))
     source_rows.extend(segment for page in (attachment_pages or [])
+                       if any(segment["source_ref"] in referenced for segment in page.get("source_segments", []))
                        for segment in page.get("source_segments", []))
     source_rows.extend({"source_ref": f"html:body:{index}", **section}
                        for index, section in enumerate(notice.sections))
+    source_rows.extend(notice.source_contexts.values())
     source_rows.extend(anchor_rows)
+    source_rows = list({row["source_ref"]: row for row in source_rows}.values())
     references = {row["source_ref"] for row in source_rows}
     amounts = []
     for package in understanding.packages:
@@ -121,11 +127,15 @@ def bind_packages(understanding, candidates, notice, tables, llm, counter=None,
                         "suggested_package_no": item.package_no,
                         "fields": {key: obs.normalized_value if obs.normalized_value is not None else obs.raw_value
                                    for key, obs in item.fields.items()},
-                        "evidence": None if item.evidence is None else item.evidence.model_dump(),
+                        "evidence": None if item.evidence is None else item.evidence.model_dump(
+                            exclude={"row_text"} if item.evidence.source_refs and
+                            all(ref in references for ref in item.evidence.source_refs) else set()),
                         "unmapped_fields": item.unmapped_fields,
                         "previous_binding": item.binding} for item in candidates],
-        "source_rows": source_rows, "body_sections": notice.sections,
-        "table_contexts": [table.model_dump() for table in tables.tables],
+        "source_rows": source_rows,
+        "table_contexts": [{"table_index": table.table_index, "table_role": table.table_role,
+                            "row_grain": table.row_grain, "package_scope": table.package_scope}
+                           for table in tables.tables],
         "amount_observations": amounts,
     }
     ids = {candidate.candidate_id for candidate in candidates}
@@ -190,7 +200,7 @@ def bind_packages(understanding, candidates, notice, tables, llm, counter=None,
         return ""
 
     try:
-        parsed = complete_json(llm, step="bind_packages", prompt_version="package-binding-v4",
+        parsed = complete_json(llm, step="bind_packages", prompt_version="package-binding-v5",
                                user=json.dumps(payload, ensure_ascii=False), validate=validate_body, counter=counter)
     except (LLMError, ValueError) as exc:
         audit["fallback"] = str(exc)

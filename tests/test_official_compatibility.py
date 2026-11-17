@@ -13,7 +13,6 @@ from ict.packages import package_label, registry_references, hint_reference
 from ict.schemas import AnnouncementUnderstanding, PackageUnderstanding, Project, Sub, MergedProjects, ProjectPlans, ProjectPlan, FileDecisions, FileDecision
 from ict.steps.s01_understand import seal
 from ict.steps.s03_plan import plan_projects
-from ict.steps.s04_attach import apply_native_resolutions
 from ict.steps.s07_normalize import normalize_candidates
 from ict.steps.s08_merge import _merge_entity, _value
 from ict.steps.s08b_repair import repair_packages
@@ -66,19 +65,19 @@ def test_single_package_does_not_mean_unpartitioned():
 def test_supplier_gap_targets_supplier_and_opens_attachments():
     row = observation("s1", {"supplier_name": "乙", "review_status": "failed"})
     plan = plan_projects("r", understanding(), [row], True).projects[0]
-    assert plan.needs_attachment
+    assert plan.needs
     for field in ("bid_amount", "review_failure_reason"):
         need = next(n for n in plan.needs if n["field"] == field)
         assert need["target_candidate_ids"] == ["s1"]
-        assert need["package_name"] == "设备采购包"
-    assert any(n["field"] == "supplier_name" and n["purpose"] == "discover_objects" for n in plan.needs)
+        assert need["package_no"] == "1"
+    assert any(n["field"] == "supplier_name" and n["reason"] == "maybe_more_objects" for n in plan.needs)
 
 
 def test_zero_quote_is_present_and_score_does_not_prove_review():
     row = observation("s1", {"supplier_name": "甲", "bid_amount": 0, "score": 91.02, "is_winner": True})
     plan = plan_projects("r", understanding(), [row], True).projects[0]
     assert not any(n["field"] == "bid_amount" for n in plan.needs)
-    assert any(n["field"] == "review_status" for n in plan.needs)
+    assert not any(n["field"] == "review_status" for n in plan.needs)
 
 
 def test_supplier_quote_and_award_amount_normalize_independently():
@@ -88,10 +87,9 @@ def test_supplier_quote_and_award_amount_normalize_independently():
     assert _value(row, "supplier_award_amount") == 100000
     assert _value(row, "review_status") == "failed"
     assert _value(row, "score") == 91.02
-    from ict.steps.s02_html import _column_units
     row = observation("s2", {"supplier_name": "乙", "bid_amount": 12.5})
     from ict.schemas import CandidateEvidence
-    row.evidence = CandidateEvidence(column_units=_column_units({"bid_amount": "最终报价（万元）"}))
+    row.evidence = CandidateEvidence(column_units={"bid_amount": "最终报价（万元）"})
     assert _value(normalized(row)[0], "bid_amount") == 125000
 
 
@@ -130,27 +128,6 @@ def test_model_cannot_drop_observed_quote_without_explaining():
     answer = {"groups": [{"candidate_ids": ["s1", "s2"], "name_from": "s1", "winner": True, "reason": "忽略报价"}]}
     result = merge_subs(rows, "1", FakeLLMClient({"merge_subs": json.dumps(answer)}), None, _value)
     assert not result["accepted"]
-
-
-def test_native_supplier_resolution_requires_specific_source():
-    need = {"need_id": "n", "field": "bid_amount", "purpose": "fill_field", "package_no": "1", "target_entity": "sub",
-            "target_candidate_ids": ["甲"], "state": "pending"}
-    plans = ProjectPlans(run_id="r", status="success", projects=[ProjectPlan(project_id="采购|1", package_no="1", needs=[need],
-        has_attachment=True, needs_attachment=True, status="success")])
-    decisions = FileDecisions(run_id="r", status="success", file_decisions=[FileDecision(file_id="f", file_class="bid_quote",
-        expected_fields=["bid_amount"], priority=1, read_strategy="target_pages", reason="x", evidence_refs=["source"], screen={"requires_deep_parse": False})])
-    rows = [observation("s1", {"supplier_name": "甲", "bid_amount": 100}, "source")]
-    resolution = {"need_id": "n", "field": "bid_amount", "target_candidate_id": "甲", "source_ref": "source"}
-    assert not apply_native_resolutions(plans, decisions, rows, [resolution])
-    resolution["source_candidate_ref"] = "source"
-    unknown = observation("s2", {"supplier_name": "甲", "review_status": "unknown"}, "source")
-    original_need = plans.projects[0].needs[0]
-    original_need["field"] = "review_status"
-    resolution["field"] = "review_status"
-    assert not apply_native_resolutions(plans, decisions, [unknown], [resolution])
-    original_need["field"] = "bid_amount"
-    resolution["field"] = "bid_amount"
-    assert apply_native_resolutions(plans, decisions, rows, [resolution]) == {"n"}
 
 
 def test_repair_does_not_reinstate_failed_winner():
@@ -231,29 +208,6 @@ def test_same_number_database_units_do_not_become_rounds_of_one_package():
         original | {"package_kind":"lot", "package_no":"unit:2"})
 
 
-def test_quote_extraction_payload_and_receiver_without_ocr():
-    from ict.steps.s04_attach import extract_attachment_candidates
-    from ict.schemas import PageDecisions, PageDecision
-    from ict.llm import LLMResult
-    plan=plan_projects('r',understanding(),[observation('s1',{'supplier_name':'乙'})],True)
-    pages=PageDecisions(run_id='r',status='success',page_decisions=[PageDecision(file_id='f',page_no=1,
-        package_scope='1',extraction_mode='text',relevance=1,reason='审查和报价')])
-    context={'page_no':1,'text':'乙：最终报价12万元，未通过，资质不符','chars':30,'tables':[],
-        'source_segments':[{'source_ref':'file:f:p1:body','file_id':'f','page_no':1,'text':'乙：最终报价12万元，未通过，资质不符'}]}
-    class Model:
-        def complete(self,*,step,prompt_version,user,**kwargs):
-            payload=json.loads(user)
-            assert payload['known_packages'][0]['package_name']=='设备采购包'
-            assert any(n['field']=='bid_amount' for n in payload['current_package']['needs'])
-            answer={'candidates':[{'entity_type':'sub','package_no':'1','source_ref':'file:f:p1:body',
-                'fields':{'supplier_name':'乙','bid_amount':'12万元','review_status':'failed','review_failure_reason':'资质不符'}}]}
-            return LLMResult(json.dumps(answer),'fixed','fixed',prompt_version,0)
-    rows,failures,_,_=extract_attachment_candidates('r','采购',plan,pages,{'f':[context]},Model(),10)
-    assert not failures and len(rows)==1
-    sub=_merge_entity(normalized(*rows),'sub')[0][0]
-    assert sub.bid_amount==120000 and sub.review_status=='failed' and sub.review_failure_reason=='资质不符'
-
-
 def test_invalid_review_enum_is_audited_and_not_business_value():
     row=normalized(observation('s1',{'supplier_name':'甲','review_status':'未通过'}))[0]
     assert row.fields['review_status'].status=='unparsable'
@@ -280,17 +234,16 @@ def test_full_pipeline_with_fixed_model_preserves_new_fields_and_custom_spec(tmp
     class Model:
         def complete(self, *, step, prompt_version, user, **kwargs):
             payload=json.loads(user)
-            if step=='understand_announcement':
-                answer={"project_name":"采购", "package_mode":"single", "packages":[{"package_no":"1","package_kind":"unpartitioned","package_name":"未分包"}]}
-            elif step=='understand_html_tables':
-                answer={"table_role":"cob_detail","package_scope":"1","row_grain":"cob","column_mapping":{"object_name":"名称","spec_model":"规格型号"}}
-            elif step=='extract_html_candidates':
-                if payload.get('body_sections'):
-                    answer={"candidates":[{"entity_type":"sub","fields":{"supplier_name":"甲","is_winner":True,"bid_amount":"100元"}},
-                        {"entity_type":"sub","fields":{"supplier_name":"甲","is_winner":True,"bid_amount":"90元"}},
-                        {"entity_type":"sub","fields":{"supplier_name":"乙","review_status":"failed","review_failure_reason":"资质不符","score":91.02}}]}
-                else:
-                    answer={"candidates":[{"entity_type":"cob","source_refs":["html:t0:r0"],"fields":{"object_name":"设备","spec_model":"定制","product_supplier":"厂家","quantity":1,"unit_price":90,"total_price":90}}]}
+            if step == 'read_announcement_summary':
+                answer = {}
+            elif step == 'read_announcement_body':
+                answer = {'project_name': '采购', 'package_mode': 'single', 'packages': [
+                    {'source_package_no': '1', 'package_kind': 'unpartitioned', 'package_name': '未分包', 'candidates': [
+                    {'entity_type': 'cob', 'source_ref': 'html:body', 'source_class': 'cob_detail', 'fields':
+                        {'object_name':'设备','spec_model':'定制','product_supplier':'厂家','quantity':1,'unit_price':90,'total_price':90}},
+                    {'entity_type': 'sub', 'source_ref':'html:body','fields':{'supplier_name':'甲','is_winner':True,'bid_amount':'100元'}},
+                    {'entity_type': 'sub', 'source_ref':'html:body','fields':{'supplier_name':'甲','is_winner':True,'bid_amount':'90元'}},
+                    {'entity_type': 'sub', 'source_ref':'html:body','fields':{'supplier_name':'乙','review_status':'failed','review_failure_reason':'资质不符','score':91.02}}]}]}
             elif step=='merge_subs':
                 ids=[c['candidate_id'] for c in payload['candidates']]
                 answer={"groups":[{"candidate_ids":ids[:2],"name_from":ids[0],"bid_amount_from":ids[1],"winner":True,"reason":"最终报价"},

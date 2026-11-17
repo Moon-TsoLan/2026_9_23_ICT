@@ -5,7 +5,7 @@ import { api } from '@/api/client'
 import EmptyState from '@/components/EmptyState.vue'
 import RunPipeline from '@/components/RunPipeline.vue'
 import UploadDialog from '@/components/UploadDialog.vue'
-import { RECORD_STATUS_LABEL, STEP_LABEL } from '@/types/ingest'
+import { mergeWaitText, RECORD_STATUS_LABEL, STEP_LABEL } from '@/types/ingest'
 import type { IngestRecord, RunState } from '@/types/ingest'
 
 const PAGE_SIZE = 20
@@ -80,7 +80,9 @@ function pct(record: IngestRecord): number {
 function stepText(record: IngestRecord): string {
   const progress = record.progress
   if (!progress) return ''
-  const label = progress.current_step
+  const label = progress.current_step === 'merge_candidates' && progress.merge_wait
+    ? mergeWaitText(progress.merge_wait, progress.merge_timing)
+    : progress.current_step
     ? (STEP_LABEL[progress.current_step] ?? progress.current_step)
     : ''
   return `第 ${progress.done}/${progress.total} 步${label ? ' · ' + label : ''}`

@@ -71,35 +71,6 @@ def plan_projects(
             and (stat.points_to_attachment or (key in OFFICIAL_SEVEN and stat.coverage < 0.3) or (key == "object_name" and stat.coverage < 1))
         ]
         missing = list(dict.fromkeys(missing))
-        suspects: list[str] = []
-        if any("html_table_is_summary" in item.issues or "summary_row" in item.issues for item in cobs):
-            suspects.append("html_table_is_summary")
-        if any("object_name_grain_suspect" in item.issues for item in cobs):
-            suspects.append("object_name_grain_suspect")
-        if any("partial_cob_list" in item.issues for item in cobs):
-            suspects.append("partial_cob_list")
-        if any("multi_value_cell" in item.issues for item in cobs):
-            suspects.append("multi_value_cell")
-        if any(item.package_no is None for item in candidates):
-            suspects.append("package_scope_unknown")
-        if any(stat.points_to_attachment for stat in stats.values()):
-            suspects.append("field_points_to_attachment")
-        if not cobs:
-            suspects.append("no_cob_candidate")
-        needs = has_attachment and (
-            "no_cob_candidate" in suspects
-            or "field_points_to_attachment" in suspects
-            or "html_table_is_summary" in suspects
-            or stats["object_name"].coverage < 1
-            or any(key in OFFICIAL_SEVEN and key not in optional and stats[key].coverage < 0.3 for key in OFFICIAL_SEVEN)
-        )
-        names = [
-            str(item.fields["object_name"].raw_value)
-            for item in cobs
-            if item.fields["object_name"].raw_value
-        ][:5]
-        queries = [f"第{package.package_no}包 分项报价"]
-        queries.extend(names)
         targets: list[dict[str, str]] = []
         for key in missing:
             targets.append({"field": key,
@@ -115,10 +86,16 @@ def plan_projects(
         if not any(item.fields["score"].normalized_value is not None or item.fields["score"].raw_value not in (None, "")
                    for item in subs):
             targets.append({"field": "score", "reason": "absent", "package_no": package.package_no, "target_entity": "sub"})
-        # Supplier tasks are distinct from COB coverage; never infer review from score/winner.
+        # The shared final policy also defines which supplier fields remain actual gaps.
         supplier_targets = []
+        from ict.supplier_policy import supplier_defaults
         for sub in subs:
-            for field in ("bid_amount", "review_status", "review_failure_reason"):
+            observed = {key: (obs.normalized_value if obs.normalized_value is not None else obs.raw_value)
+                        for key, obs in sub.fields.items()}
+            defaults = supplier_defaults(observed)
+            for field in ('bid_amount', 'review_failure_reason'):
+                if field in defaults:
+                    continue
                 obs = sub.fields.get(field)
                 value = None if obs is None else (obs.normalized_value if obs.normalized_value is not None else obs.raw_value)
                 review = sub.fields.get("review_status")
@@ -132,53 +109,32 @@ def plan_projects(
         # Inventory completeness is not established by one observed supplier.
         targets.append({"field": "supplier_name", "reason": "maybe_more_objects",
                         "package_no": package.package_no, "target_entity": "sub"})
-        if has_attachment:
-            needs = True
         # Standing target: the announcement's own object list is often one summary row plus
         # 详见附件, so attachments may still hold objects the announcement never named.
         targets.append({"field": "object_name", "reason": "maybe_more_objects",
                         "package_no": package.package_no})
         for target in targets:
-            target.update(package_context(package))
-            suffix = ":" + ":".join(target.get("target_candidate_ids", [])) if target.get("target_candidate_ids") else ""
-            target["need_id"] = f"need:{package.package_no}:{target['field']}:{target['reason']}" + suffix
-            target["purpose"] = "discover_objects" if target["reason"] == "maybe_more_objects" else "fill_field"
-            target["target_candidate_ids"] = target.get("target_candidate_ids", [item.candidate_id for item in (subs if target.get("target_entity") == "sub" else cobs)
-                                               if target["field"] in item.fields
-                                               and item.fields[target["field"]].status != "present"])
-            if target["field"] in COB_FIELDS and not cobs:
-                # There is no old object for a fill resolution to reference. Keep the requested
-                # field, but ask for discovery instead of an impossible old-target completion.
-                target["purpose"] = "discover_objects"
-            target["target_observations"] = [{"candidate_id": item.candidate_id, "supplier_name": item.fields["supplier_name"].raw_value}
-                for item in subs if item.candidate_id in target["target_candidate_ids"]]
-            target["state"] = "pending"
+            target['target_candidate_ids'] = target.get('target_candidate_ids', [
+                item.candidate_id for item in (subs if target.get('target_entity') == 'sub' else cobs)
+                if target['field'] in item.fields and item.fields[target['field']].status != 'present'])
+            target['target_observations'] = [{'candidate_id': item.candidate_id, 'supplier_name': item.fields['supplier_name'].raw_value}
+                for item in subs if item.candidate_id in target['target_candidate_ids']]
         pending = [item for item in candidates if item.package_no is None]
         if pending:
-            targets.append({"need_id": f"need:{package.package_no}:binding", "field": "package_binding",
-                            "reason": "absent", "purpose": "resolve_binding", "state": "pending",
-                            "package_no": package.package_no,
+            targets.append({"field": "package_binding",
+                            "reason": "absent", "package_no": package.package_no,
                             "target_candidate_ids": [item.candidate_id for item in pending],
                             "target_observations": [{"candidate_id": item.candidate_id,
                                                      "fields": {key: obs.raw_value for key, obs in item.fields.items()
                                                                 if obs.raw_value not in (None, "")}}
                                                     for item in pending]})
-            needs = has_attachment
         projects.append(
             ProjectPlan(
                 project_id=package.project_id,
                 **package_context(package),
-                cob_candidate_ids=[item.candidate_id for item in cobs],
-                sub_candidate_ids=[item.candidate_id for item in subs],
-                field_stats=stats,
-                missing_fields=missing,
                 needs=targets,
-                suspects=suspects,
-                has_attachment=has_attachment,
-                needs_attachment=needs,
-                search_queries=queries,
                 status="success",
             )
         )
-    status = "partial" if failures or any(item.needs_attachment for item in projects) else "success"
+    status = "partial" if failures else "success"
     return ProjectPlans(run_id=run_id, status=status, projects=projects, failures=failures)

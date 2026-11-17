@@ -2,21 +2,21 @@
 
     python -m ict.worker              常驻，轮询任务
     python -m ict.worker --once       处理一轮就退出（测试/手动跑用）
-    python -m ict.worker --threads 2  同时处理的公告数
+    python -m ict.worker --threads 2  前半程处理名额（接续另设名额）
 
 只跑**一个**进程：LLM 与解析的闸门、任务领取都在进程内，多开会让并发翻倍。
-线程数 = 同时处理的公告数（部署基线 4）。
+合并返回进入独立接续池；合并池仍共用全局API闸门。
 """
 from __future__ import annotations
 
 import argparse
+import asyncio
 import os
 import shutil
 import sys
 import threading
 import time
 import traceback
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -34,12 +34,13 @@ import psycopg                                                    # noqa: E402
 import db.load_runs as load_runs                                  # noqa: E402
 import prep.extract_attachments as attachments                    # noqa: E402
 from ict.config import DEFAULT_TENANT, concurrency_settings, tenant_paths  # noqa: E402
-from ict.pipeline import run_announcement                         # noqa: E402
+from ict.pipeline import announcement_chain                       # noqa: E402
+from ict.scheduling import MergeScheduler, run_sync               # noqa: E402
 from server import ingest
 from ict import config as ict_config                                         # noqa: E402
 
 # 任务元数据在同一批里被多个线程改，写文件要串行；入库也要串行（轮次重排要看库内现状）。
-_SAVE_LOCK = threading.Lock()
+_SAVE_LOCK = threading.RLock()
 _DB_LOCK = threading.Lock()
 
 
@@ -133,13 +134,27 @@ def heal_interrupted(verbose: bool = True) -> int:
     return fixed
 
 
-def claim_items() -> list[tuple[dict, dict]]:
+def claim_items(limit: int | None = None, active_jobs: dict | None = None) -> list[tuple[dict, dict]]:
     """把 queued 任务里 waiting 的项认领成本进程的 running。"""
+    # The independent control thread must not read a job while our continuation thread
+    # replaces that same metadata file. This coordinates this worker's existing I/O only;
+    # cross-process Windows run_state readers remain a separate issue.
+    with _SAVE_LOCK:
+        return _claim_items(limit, active_jobs)
+
+
+def _claim_items(limit, active_jobs):
     claimed: list[tuple[dict, dict]] = []
-    for job in ingest.load_all_jobs(all_tenants=True):
+    for saved in ingest.load_all_jobs(all_tenants=True):
+        key = (saved.get("tenant_id") or DEFAULT_TENANT, saved["job_id"])
+        # All items of an active job share one in-memory object. Reloading a stale disk
+        # snapshot while another item completes would overwrite its done/failed status.
+        job = active_jobs.setdefault(key, saved) if active_jobs is not None else saved
         if job["status"] not in ("queued", "running"):
             continue
         waiting = [item for item in job["items"] if item["status"] == "waiting"]
+        if limit is not None:
+            waiting = waiting[:max(0, limit - len(claimed))]
         if not waiting:
             continue
         for item in waiting:
@@ -148,6 +163,8 @@ def claim_items() -> list[tuple[dict, dict]]:
         job["status"] = "running"
         _save(job)
         claimed.extend((job, item) for item in waiting)
+        if limit is not None and len(claimed) >= limit:
+            break
     return claimed
 
 
@@ -159,6 +176,11 @@ def _load_to_db(run_dir: Path, tenant: str) -> None:
 
 
 def process_item(job: dict, item: dict, verbose: bool = True) -> None:
+    """Synchronous single-item entry (batch worker uses the same chain with suspension)."""
+    return run_sync(_item_chain(job, item, verbose))
+
+
+def _item_chain(job: dict, item: dict, verbose: bool = True):
     aid = item["announcement_id"]
     tenant = job.get("tenant_id") or DEFAULT_TENANT
     paths = tenant_paths(tenant)
@@ -172,8 +194,8 @@ def process_item(job: dict, item: dict, verbose: bool = True) -> None:
             item["attachment_preparation"] = attachments.extract_announcement(zip_path, paths.attachments, force=True)
 
         _step(job, item, "提取")
-        report = run_announcement(aid, html_dir=incoming, attachments_root=paths.attachments,
-                                  runs_root=paths.runs)
+        report = yield from announcement_chain(aid, html_dir=incoming, attachments_root=paths.attachments,
+                                                runs_root=paths.runs)
         if report.status == "failed":
             raise RuntimeError("提取失败：%s" % (report.failure_summary or "未给出原因"))
 
@@ -205,27 +227,41 @@ def process_item(job: dict, item: dict, verbose: bool = True) -> None:
 def run_loop(threads: int, poll: float, once: bool, heal: bool, verbose: bool) -> None:
     if heal:
         heal_interrupted(verbose)
-    while True:
-        claimed = claim_items()
-        if claimed:
-            if verbose:
-                print("[worker] 领取 %d 个提取项" % len(claimed))
-            if threads <= 1:
-                for job, item in claimed:
-                    process_item(job, item, verbose)
-            else:
-                with ThreadPoolExecutor(max_workers=min(threads, len(claimed)),
-                                        thread_name_prefix="ict-worker") as pool:
-                    list(pool.map(lambda pair: process_item(pair[0], pair[1], verbose), claimed))
-        if once:
-            return
-        time.sleep(poll)
+    asyncio.run(_run_loop(threads, poll, once, verbose))
+
+
+async def _run_loop(threads: int, poll: float, once: bool, verbose: bool) -> None:
+    active_jobs, pending = {}, set()
+    settings = concurrency_settings()
+    with MergeScheduler(threads, int(settings["merge_workers"]), int(settings["resume_workers"])) as scheduler:
+        try:
+            while True:
+                available = scheduler.admission_available
+                claimed = await scheduler.control(claim_items, available, active_jobs) if available else []
+                if claimed and verbose:
+                    print("[worker] 领取 %d 个提取项" % len(claimed))
+                pending.update(asyncio.create_task(scheduler.run(_item_chain(job, item, verbose)))
+                               for job, item in claimed)
+                if not pending:
+                    if once:
+                        return
+                    await asyncio.sleep(poll)
+                else:
+                    done, pending = await asyncio.wait(pending, timeout=poll,
+                                                       return_when=asyncio.FIRST_COMPLETED)
+                    for task in done:
+                        task.result()
+                # Keep shared objects only while the corresponding job is still live.
+                active_jobs = {key: job for key, job in active_jobs.items()
+                               if job["status"] in ("queued", "running")}
+        finally:
+            await asyncio.gather(*pending, return_exceptions=True)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="ICT 数据接入工作进程")
     parser.add_argument("--threads", type=int, default=None,
-                        help="同时处理的公告数（默认取 ICT_ANNOUNCEMENT_WORKERS）")
+                        help="前半程处理名额（默认取 ICT_ANNOUNCEMENT_WORKERS；接续独立）")
     parser.add_argument("--poll", type=float, default=3.0, help="轮询间隔（秒）")
     parser.add_argument("--once", action="store_true", help="只处理一轮就退出")
     parser.add_argument("--force", action="store_true", help="忽略已存在的 worker 锁")

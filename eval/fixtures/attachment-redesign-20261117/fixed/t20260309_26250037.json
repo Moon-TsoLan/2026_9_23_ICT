@@ -1,0 +1,3128 @@
+{
+  "announcement_id": "t20260309_26250037",
+  "identity": {
+    "run_id": "t20260309_26250037",
+    "status": "success",
+    "project_name": "安定镇外围防线105国道市界至检查站区段视频监控建设",
+    "purchaser": "北京市大兴区安定镇人民政府",
+    "source_project_no": "11011526210200031767-XM001",
+    "announcement_type": "winning_announcement",
+    "package_mode": "multi",
+    "summary_amount": {
+      "raw_text": "￥191.015100 万元（人民币）",
+      "amount_yuan": 1910151.0,
+      "scope": "announcement",
+      "confidence": 0.9,
+      "amount_kind": "award",
+      "source_type": "html",
+      "source_ref": "html:n13",
+      "source_refs": [],
+      "binding": {
+        "unit_header": "总中标金额"
+      }
+    },
+    "announcement_categories": [],
+    "unclear_reason": null,
+    "model_metadata": null,
+    "failures": []
+  },
+  "html_conflicts": [],
+  "units": [
+    {
+      "package_no": "unit:1",
+      "package_kind": "contract_package",
+      "package_name": "安定镇外围防线105国道市界至检查站区段视频监控建设项目设备采购（第一包）",
+      "source_package_no": null,
+      "title": null,
+      "project_id": "安定镇外围防线105国道市界至检查站区段视频监控建设|unit:1",
+      "package_evidence_text": "1.安定镇外围防线105国道市界至检查站区段视频监控建设项目设备采购（第一包）：采购项目所需交换机、光端机、视频云存储、警戒枪机、变焦球机、周界雷达、智能防水音柱、联动报警服务模块、视频数据中心主机、智能分析板卡等相关设备，并兼容接入北京市大兴区社会治安综合治理信息平台。",
+      "package_amount": null,
+      "amount_alternatives": [],
+      "candidate_ids": []
+    },
+    {
+      "package_no": "unit:2",
+      "package_kind": "contract_package",
+      "package_name": "安定镇外围防线105国道市界至检查站区段视频监控建设项目配套安装工程（第二包）",
+      "source_package_no": null,
+      "title": null,
+      "project_id": "安定镇外围防线105国道市界至检查站区段视频监控建设|unit:2",
+      "package_evidence_text": "2.安定镇外围防线105国道市界至检查站区段视频监控建设项目配套安装工程（第二包）：提供项目现场电力、网络、监控杆、挖沟铺设管线及配套工程安装服务及整体设备集成软件调试与北京市大兴区社会治安综合治理信息平台对接服务。",
+      "package_amount": null,
+      "amount_alternatives": [],
+      "candidate_ids": []
+    }
+  ],
+  "virtual_units": [
+    {
+      "ref": "virtual:cand_000001",
+      "candidate_ids": [
+        "cand_000001",
+        "cand_000003"
+      ]
+    },
+    {
+      "ref": "virtual:cand_000002",
+      "candidate_ids": [
+        "cand_000002",
+        "cand_000004"
+      ]
+    }
+  ],
+  "candidates": [
+    {
+      "candidate_id": "cand_000001",
+      "entity_type": "sub",
+      "source": {
+        "source_type": "html"
+      },
+      "source_priority": 80,
+      "fields": {
+        "supplier_name": {
+          "raw_value": "北京中电华安科技股份有限公司",
+          "status": "present",
+          "confidence": 0.8
+        },
+        "score": {
+          "raw_value": 92.4,
+          "status": "present",
+          "confidence": 0.8
+        },
+        "is_winner": {
+          "raw_value": true,
+          "status": "present",
+          "confidence": 0.8
+        },
+        "supplier_award_amount": {
+          "raw_value": "81.0151 万元",
+          "status": "present",
+          "confidence": 0.8
+        },
+        "bid_amount": {
+          "status": "missing"
+        },
+        "review_status": {
+          "raw_value": "unknown",
+          "status": "present",
+          "confidence": 0.8
+        },
+        "review_failure_reason": {
+          "status": "missing"
+        }
+      },
+      "issues": [],
+      "validation_errors": [],
+      "warnings": [],
+      "source_class": "winner",
+      "evidence": {
+        "table_index": 0,
+        "row_index": 1,
+        "source_refs": [
+          "html:n43"
+        ],
+        "row_text": "北京中电华安科技股份有限公司 北京市昌平区科技园昌盛路12号院8号楼-1至4层101内156室 91110116765531081B 81.0151 万元 评审总得分(综合评分法)： 92.4 分",
+        "column_units": {
+          "supplier_award_amount": "中标金额"
+        }
+      },
+      "binding": {},
+      "unmapped_fields": {}
+    },
+    {
+      "candidate_id": "cand_000002",
+      "entity_type": "sub",
+      "source": {
+        "source_type": "html"
+      },
+      "source_priority": 80,
+      "fields": {
+        "supplier_name": {
+          "raw_value": "北京凤舞星河科技发展有限公司",
+          "status": "present",
+          "confidence": 0.8
+        },
+        "score": {
+          "raw_value": 93.63,
+          "status": "present",
+          "confidence": 0.8
+        },
+        "is_winner": {
+          "raw_value": true,
+          "status": "present",
+          "confidence": 0.8
+        },
+        "supplier_award_amount": {
+          "raw_value": "110 万元",
+          "status": "present",
+          "confidence": 0.8
+        },
+        "bid_amount": {
+          "status": "missing"
+        },
+        "review_status": {
+          "raw_value": "unknown",
+          "status": "present",
+          "confidence": 0.8
+        },
+        "review_failure_reason": {
+          "status": "missing"
+        }
+      },
+      "issues": [],
+      "validation_errors": [],
+      "warnings": [],
+      "source_class": "winner",
+      "evidence": {
+        "table_index": 0,
+        "row_index": 2,
+        "source_refs": [
+          "html:n44"
+        ],
+        "row_text": "北京凤舞星河科技发展有限公司 北京市大兴区安定镇田园适家3号楼1层130室(集群注册) 91110115MADDU1WL4Q 110 万元 评审总得分(综合评分法)： 93.63 分",
+        "column_units": {
+          "supplier_award_amount": "中标金额"
+        }
+      },
+      "binding": {},
+      "unmapped_fields": {}
+    },
+    {
+      "candidate_id": "cand_000003",
+      "entity_type": "cob",
+      "source": {
+        "source_type": "html"
+      },
+      "source_priority": 70,
+      "fields": {
+        "object_name": {
+          "raw_value": "详见附件",
+          "status": "points_to_attachment"
+        },
+        "category_code": {
+          "status": "missing"
+        },
+        "category_name": {
+          "status": "missing"
+        },
+        "category_type": {
+          "status": "missing"
+        },
+        "brand": {
+          "status": "missing"
+        },
+        "product_supplier": {
+          "status": "missing"
+        },
+        "spec_model": {
+          "raw_value": "详见附件",
+          "status": "points_to_attachment"
+        },
+        "unit_price": {
+          "raw_value": "81.0151万元",
+          "status": "present",
+          "confidence": 0.8
+        },
+        "quantity": {
+          "raw_value": "1",
+          "status": "present",
+          "confidence": 0.8
+        },
+        "unit": {
+          "status": "missing"
+        },
+        "total_price": {
+          "raw_value": "81.0151万元",
+          "status": "present",
+          "confidence": 0.8
+        }
+      },
+      "issues": [],
+      "validation_errors": [],
+      "warnings": [],
+      "source_class": "cob_detail",
+      "evidence": {
+        "table_index": 1,
+        "row_index": 1,
+        "source_refs": [
+          "html:n49"
+        ],
+        "row_text": "北京中电华安科技股份有限公司 详见附件 详见附件 1 81.0151万元 81.0151万元 详见附件",
+        "column_units": {
+          "unit_price": "单价",
+          "total_price": "总价"
+        }
+      },
+      "binding": {},
+      "unmapped_fields": {}
+    },
+    {
+      "candidate_id": "cand_000004",
+      "entity_type": "cob",
+      "source": {
+        "source_type": "html"
+      },
+      "source_priority": 70,
+      "fields": {
+        "object_name": {
+          "raw_value": "详见附件",
+          "status": "points_to_attachment"
+        },
+        "category_code": {
+          "status": "missing"
+        },
+        "category_name": {
+          "status": "missing"
+        },
+        "category_type": {
+          "status": "missing"
+        },
+        "brand": {
+          "status": "missing"
+        },
+        "product_supplier": {
+          "status": "missing"
+        },
+        "spec_model": {
+          "raw_value": "详见附件",
+          "status": "points_to_attachment"
+        },
+        "unit_price": {
+          "raw_value": "110万元",
+          "status": "present",
+          "confidence": 0.8
+        },
+        "quantity": {
+          "raw_value": "1",
+          "status": "present",
+          "confidence": 0.8
+        },
+        "unit": {
+          "status": "missing"
+        },
+        "total_price": {
+          "raw_value": "110万元",
+          "status": "present",
+          "confidence": 0.8
+        }
+      },
+      "issues": [],
+      "validation_errors": [],
+      "warnings": [],
+      "source_class": "cob_detail",
+      "evidence": {
+        "table_index": 1,
+        "row_index": 2,
+        "source_refs": [
+          "html:n50"
+        ],
+        "row_text": "北京凤舞星河科技发展有限公司 详见附件 详见附件 1 110万元 110万元 详见附件",
+        "column_units": {
+          "unit_price": "单价",
+          "total_price": "总价"
+        }
+      },
+      "binding": {},
+      "unmapped_fields": {}
+    }
+  ],
+  "html_sources": {
+    "html:n0": {
+      "source_ref": "html:n0",
+      "text": "财政部唯一指定政府采购信息网络发布媒体 国家级政府采购专业网站",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n1": {
+      "source_ref": "html:n1",
+      "text": "服务热线：400-810-1996    |   服务投诉：010-63819289",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n2": {
+      "source_ref": "html:n2",
+      "text": "当前位置： 首页 » 政采公告 » 地方公告 » 中标公告",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n3": {
+      "source_ref": "html:n3",
+      "text": "安定镇外围防线105国道市界至检查站区段视频监控建设中标公告",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n4": {
+      "source_ref": "html:n4",
+      "text": "2026年03月09日 17:37 来源： 【 打印 】",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n5": {
+      "source_ref": "html:n5",
+      "text": "公告概要：",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n6": {
+      "source_ref": "html:n6",
+      "text": "公告信息：",
+      "table_index": null,
+      "row_index": 0,
+      "headers": [
+        "公告信息：",
+        "",
+        "",
+        ""
+      ]
+    },
+    "html:n7": {
+      "source_ref": "html:n7",
+      "text": "采购项目名称 安定镇外围防线105国道市界至检查站区段视频监控建设",
+      "table_index": null,
+      "row_index": 1,
+      "headers": [
+        "公告信息：",
+        "",
+        "",
+        ""
+      ]
+    },
+    "html:n8": {
+      "source_ref": "html:n8",
+      "text": "品目",
+      "table_index": null,
+      "row_index": 2,
+      "headers": [
+        "公告信息：",
+        "",
+        "",
+        ""
+      ]
+    },
+    "html:n9": {
+      "source_ref": "html:n9",
+      "text": "",
+      "table_index": null,
+      "row_index": null,
+      "headers": [
+        "公告信息：",
+        "",
+        "",
+        ""
+      ]
+    },
+    "html:n10": {
+      "source_ref": "html:n10",
+      "text": "采购单位 北京市大兴区安定镇人民政府",
+      "table_index": null,
+      "row_index": 3,
+      "headers": [
+        "公告信息：",
+        "",
+        "",
+        ""
+      ]
+    },
+    "html:n11": {
+      "source_ref": "html:n11",
+      "text": "行政区域 北京市 公告时间 2026年03月09日  17:37",
+      "table_index": null,
+      "row_index": 4,
+      "headers": [
+        "公告信息：",
+        "",
+        "",
+        ""
+      ]
+    },
+    "html:n12": {
+      "source_ref": "html:n12",
+      "text": "评审专家名单 宫宝文、陈卿、赵彦、孙宏、马强",
+      "table_index": null,
+      "row_index": 5,
+      "headers": [
+        "公告信息：",
+        "",
+        "",
+        ""
+      ]
+    },
+    "html:n13": {
+      "source_ref": "html:n13",
+      "text": "总中标金额 ￥191.015100 万元（人民币）",
+      "table_index": null,
+      "row_index": 6,
+      "headers": [
+        "公告信息：",
+        "",
+        "",
+        ""
+      ]
+    },
+    "html:n14": {
+      "source_ref": "html:n14",
+      "text": "联系人及联系方式：",
+      "table_index": null,
+      "row_index": 7,
+      "headers": [
+        "公告信息：",
+        "",
+        "",
+        ""
+      ]
+    },
+    "html:n15": {
+      "source_ref": "html:n15",
+      "text": "项目联系人 李超",
+      "table_index": null,
+      "row_index": 8,
+      "headers": [
+        "公告信息：",
+        "",
+        "",
+        ""
+      ]
+    },
+    "html:n16": {
+      "source_ref": "html:n16",
+      "text": "项目联系电话 010-69231383",
+      "table_index": null,
+      "row_index": 9,
+      "headers": [
+        "公告信息：",
+        "",
+        "",
+        ""
+      ]
+    },
+    "html:n17": {
+      "source_ref": "html:n17",
+      "text": "采购单位 北京市大兴区安定镇人民政府",
+      "table_index": null,
+      "row_index": 10,
+      "headers": [
+        "公告信息：",
+        "",
+        "",
+        ""
+      ]
+    },
+    "html:n18": {
+      "source_ref": "html:n18",
+      "text": "采购单位地址 北京市大兴区安定镇兴安大街3号",
+      "table_index": null,
+      "row_index": 11,
+      "headers": [
+        "公告信息：",
+        "",
+        "",
+        ""
+      ]
+    },
+    "html:n19": {
+      "source_ref": "html:n19",
+      "text": "采购单位联系方式 80231432",
+      "table_index": null,
+      "row_index": 12,
+      "headers": [
+        "公告信息：",
+        "",
+        "",
+        ""
+      ]
+    },
+    "html:n20": {
+      "source_ref": "html:n20",
+      "text": "代理机构名称 北京盛标建筑造价咨询有限责任公司",
+      "table_index": null,
+      "row_index": 13,
+      "headers": [
+        "公告信息：",
+        "",
+        "",
+        ""
+      ]
+    },
+    "html:n21": {
+      "source_ref": "html:n21",
+      "text": "代理机构地址 北京市大兴区火神庙国际商业中心D座1240室",
+      "table_index": null,
+      "row_index": 14,
+      "headers": [
+        "公告信息：",
+        "",
+        "",
+        ""
+      ]
+    },
+    "html:n22": {
+      "source_ref": "html:n22",
+      "text": "代理机构联系方式 010-69231383",
+      "table_index": null,
+      "row_index": 15,
+      "headers": [
+        "公告信息：",
+        "",
+        "",
+        ""
+      ]
+    },
+    "html:n23": {
+      "source_ref": "html:n23",
+      "text": "附件：",
+      "table_index": null,
+      "row_index": 16,
+      "headers": [
+        "公告信息：",
+        "",
+        "",
+        ""
+      ]
+    },
+    "html:n24": {
+      "source_ref": "html:n24",
+      "text": "附件1 安定镇外围防线105国道市界至检查站区段视频监控建设招标文件.pdf",
+      "table_index": null,
+      "row_index": 17,
+      "headers": [
+        "公告信息：",
+        "",
+        "",
+        ""
+      ]
+    },
+    "html:n25": {
+      "source_ref": "html:n25",
+      "text": "附件2 中标结果公告.pdf",
+      "table_index": null,
+      "row_index": 18,
+      "headers": [
+        "公告信息：",
+        "",
+        "",
+        ""
+      ]
+    },
+    "html:n26": {
+      "source_ref": "html:n26",
+      "text": "附件3 分项报价表.pdf",
+      "table_index": null,
+      "row_index": 19,
+      "headers": [
+        "公告信息：",
+        "",
+        "",
+        ""
+      ]
+    },
+    "html:n27": {
+      "source_ref": "html:n27",
+      "text": "一、项目编号：11011526210200031767-XM001",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n28": {
+      "source_ref": "html:n28",
+      "text": "二、项目名称：安定镇外围防线105国道市界至检查站区段视频监控建设",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n29": {
+      "source_ref": "html:n29",
+      "text": "三、中标（成交）信息",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n30": {
+      "source_ref": "html:n30",
+      "text": "总中标成交金额：191.0151 万元（人民币）",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n31": {
+      "source_ref": "html:n31",
+      "text": "中标成交供应商名称、地址及中标成交金额：",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n32": {
+      "source_ref": "html:n32",
+      "text": "",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n33": {
+      "source_ref": "html:n33",
+      "text": "中标成交供应商名称：北京中电华安科技股份有限公司",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n34": {
+      "source_ref": "html:n34",
+      "text": "中标成交供应商地址：北京市昌平区科技园昌盛路12号院8号楼-1至4层101内156室",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n35": {
+      "source_ref": "html:n35",
+      "text": "中标金额：81.0151万元",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n36": {
+      "source_ref": "html:n36",
+      "text": "",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n37": {
+      "source_ref": "html:n37",
+      "text": "中标成交供应商名称：北京凤舞星河科技发展有限公司",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n38": {
+      "source_ref": "html:n38",
+      "text": "中标成交供应商地址：北京市大兴区安定镇田园适家3号楼1层130室(集群注册)",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n39": {
+      "source_ref": "html:n39",
+      "text": "中标金额：110万元",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n40": {
+      "source_ref": "html:n40",
+      "text": "",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n41": {
+      "source_ref": "html:n41",
+      "text": "",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n42": {
+      "source_ref": "html:n42",
+      "text": "供应商名称 供应商地址 统一信用代码 中标金额 中标成交备注信息",
+      "table_index": 0,
+      "row_index": 0,
+      "headers": [
+        "供应商名称",
+        "供应商地址",
+        "统一信用代码",
+        "中标金额",
+        "中标成交备注信息"
+      ]
+    },
+    "html:n43": {
+      "source_ref": "html:n43",
+      "text": "北京中电华安科技股份有限公司 北京市昌平区科技园昌盛路12号院8号楼-1至4层101内156室 91110116765531081B 81.0151 万元 评审总得分(综合评分法)： 92.4 分",
+      "table_index": 0,
+      "row_index": 1,
+      "headers": [
+        "供应商名称",
+        "供应商地址",
+        "统一信用代码",
+        "中标金额",
+        "中标成交备注信息"
+      ]
+    },
+    "html:n44": {
+      "source_ref": "html:n44",
+      "text": "北京凤舞星河科技发展有限公司 北京市大兴区安定镇田园适家3号楼1层130室(集群注册) 91110115MADDU1WL4Q 110 万元 评审总得分(综合评分法)： 93.63 分",
+      "table_index": 0,
+      "row_index": 2,
+      "headers": [
+        "供应商名称",
+        "供应商地址",
+        "统一信用代码",
+        "中标金额",
+        "中标成交备注信息"
+      ]
+    },
+    "html:n45": {
+      "source_ref": "html:n45",
+      "text": "四、主要标的信息",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n46": {
+      "source_ref": "html:n46",
+      "text": "",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n47": {
+      "source_ref": "html:n47",
+      "text": "",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n48": {
+      "source_ref": "html:n48",
+      "text": "供应商 商品名称 规格型号 数量 单价 总价 服务要求",
+      "table_index": 1,
+      "row_index": 0,
+      "headers": [
+        "供应商",
+        "商品名称",
+        "规格型号",
+        "数量",
+        "单价",
+        "总价",
+        "服务要求"
+      ]
+    },
+    "html:n49": {
+      "source_ref": "html:n49",
+      "text": "北京中电华安科技股份有限公司 详见附件 详见附件 1 81.0151万元 81.0151万元 详见附件",
+      "table_index": 1,
+      "row_index": 1,
+      "headers": [
+        "供应商",
+        "商品名称",
+        "规格型号",
+        "数量",
+        "单价",
+        "总价",
+        "服务要求"
+      ]
+    },
+    "html:n50": {
+      "source_ref": "html:n50",
+      "text": "北京凤舞星河科技发展有限公司 详见附件 详见附件 1 110万元 110万元 详见附件",
+      "table_index": 1,
+      "row_index": 2,
+      "headers": [
+        "供应商",
+        "商品名称",
+        "规格型号",
+        "数量",
+        "单价",
+        "总价",
+        "服务要求"
+      ]
+    },
+    "html:n51": {
+      "source_ref": "html:n51",
+      "text": "",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n52": {
+      "source_ref": "html:n52",
+      "text": "名称：安定镇外围防线105国道市界至检查站区段视频监控建设",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n53": {
+      "source_ref": "html:n53",
+      "text": "采购需求：",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n54": {
+      "source_ref": "html:n54",
+      "text": "1.安定镇外围防线105国道市界至检查站区段视频监控建设项目设备采购（第一包）：采购项目所需交换机、光端机、视频云存储、警戒枪机、变焦球机、周界雷达、智能防水音柱、联动报警服务模块、视频数据中心主机、智能分析板卡等相关设备，并兼容接入北京市大兴区社会治安综合治理信息平台。",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n55": {
+      "source_ref": "html:n55",
+      "text": "2.安定镇外围防线105国道市界至检查站区段视频监控建设项目配套安装工程（第二包）：提供项目现场电力、网络、监控杆、挖沟铺设管线及配套工程安装服务及整体设备集成软件调试与北京市大兴区社会治安综合治理信息平台对接服务。",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n56": {
+      "source_ref": "html:n56",
+      "text": "合同履行期限：",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n57": {
+      "source_ref": "html:n57",
+      "text": "第一包：签订合同之日起10日内",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n58": {
+      "source_ref": "html:n58",
+      "text": "第二包：签订合同之日起60日内",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n59": {
+      "source_ref": "html:n59",
+      "text": "",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n60": {
+      "source_ref": "html:n60",
+      "text": "",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n61": {
+      "source_ref": "html:n61",
+      "text": "五、评审专家（单一来源采购人员）名单：",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n62": {
+      "source_ref": "html:n62",
+      "text": "宫宝文、陈卿、赵彦、孙宏、马强",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n63": {
+      "source_ref": "html:n63",
+      "text": "六、代理服务收费标准及金额：",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n64": {
+      "source_ref": "html:n64",
+      "text": "",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n65": {
+      "source_ref": "html:n65",
+      "text": "本项目代理费总金额：2.42万元（人民币）",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n66": {
+      "source_ref": "html:n66",
+      "text": "本项目代理费收费标准：",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n67": {
+      "source_ref": "html:n67",
+      "text": "以中标通知书的中标总金额作为收取的计算基数。中标服务费收费标准参照国家计委计价格【2002】1980 号文和发改办价格【2003】857 号文规定的办法进行收取。 包段代理费如下： 安定镇外围防线105国道市界至检查站区段视频监控建设项目设备采购（第一包）：1.61万元； 安定镇外围防线105国道市界至检查站区段视频监控建设项目配套安装工程（第二包）：0.81万元。",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n68": {
+      "source_ref": "html:n68",
+      "text": "七、公告期限",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n69": {
+      "source_ref": "html:n69",
+      "text": "自本公告发布之日起1个工作日。",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n70": {
+      "source_ref": "html:n70",
+      "text": "八、其它补充事宜",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n71": {
+      "source_ref": "html:n71",
+      "text": "",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n72": {
+      "source_ref": "html:n72",
+      "text": "",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n73": {
+      "source_ref": "html:n73",
+      "text": "无",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n74": {
+      "source_ref": "html:n74",
+      "text": "",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n75": {
+      "source_ref": "html:n75",
+      "text": "九、凡对本次公告内容提出询问，请按以下方式联系。",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n76": {
+      "source_ref": "html:n76",
+      "text": "1.采购人信息",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n77": {
+      "source_ref": "html:n77",
+      "text": "名 称：北京市大兴区安定镇人民政府",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n78": {
+      "source_ref": "html:n78",
+      "text": "地址：北京市大兴区安定镇兴安大街3号",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n79": {
+      "source_ref": "html:n79",
+      "text": "联系方式：马强,010-80231432",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n80": {
+      "source_ref": "html:n80",
+      "text": "2.采购代理机构信息",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n81": {
+      "source_ref": "html:n81",
+      "text": "名 称：北京盛标建筑造价咨询有限责任公司",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n82": {
+      "source_ref": "html:n82",
+      "text": "地　址：北京市大兴区火神庙国际商业中心D座1240室",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n83": {
+      "source_ref": "html:n83",
+      "text": "联系方式：杨迎，010-69231383",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n84": {
+      "source_ref": "html:n84",
+      "text": "3.项目联系方式",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n85": {
+      "source_ref": "html:n85",
+      "text": "项目联系人：杨迎",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n86": {
+      "source_ref": "html:n86",
+      "text": "电　话：　　010-69231383",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n87": {
+      "source_ref": "html:n87",
+      "text": "",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n88": {
+      "source_ref": "html:n88",
+      "text": "相关公告",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:n89": {
+      "source_ref": "html:n89",
+      "text": "主办单位：中华人民共和国财政部国库司 网站标识码： bm14000002 | 京 ICP 备 19054529 号 -1 |  京公网安备 11010602060068 号 © 1999- 中华人民共和国财政部 版权所有  | 联系我们 | 意见反馈",
+      "table_index": null,
+      "row_index": null,
+      "headers": []
+    },
+    "html:summary": {
+      "source_ref": "html:summary",
+      "text": "安定镇外围防线105国道市界至检查站区段视频监控建设中标公告 公告信息： 采购项目名称 安定镇外围防线105国道市界至检查站区段视频监控建设 品目 采购单位 北京市大兴区安定镇人民政府 行政区域 北京市 公告时间 2026年03月09日  17:37 评审专家名单 宫宝文、陈卿、赵彦、孙宏、马强 总中标金额 ￥191.015100 万元（人民币） 联系人及联系方式： 项目联系人 李超 项目联系电话 010-69231383 采购单位 北京市大兴区安定镇人民政府 采购单位地址 北京市大兴区安定镇兴安大街3号 采购单位联系方式 80231432 代理机构名称 北京盛标建筑造价咨询有限责任公司 代理机构地址 北京市大兴区火神庙国际商业中心D座1240室 代理机构联系方式 010-69231383 附件： 附件1 安定镇外围防线105国道市界至检查站区段视频监控建设招标文件.pdf 附件2 中标结果公告.pdf 附件3 分项报价表.pdf"
+    },
+    "html:body": {
+      "source_ref": "html:body",
+      "text": "安定镇外围防线105国道市界至检查站区段视频监控建设中标公告 财政部唯一指定政府采购信息网络发布媒体 国家级政府采购专业网站 服务热线：400-810-1996    |   服务投诉：010-63819289 首页 政采法规 购买服务 监督检查 信息公告 国际专栏 当前位置： 首页 » 政采公告 » 地方公告 » 中标公告 2026年03月09日 17:37 来源： 【 打印 】 公告概要： 一、项目编号：11011526210200031767-XM001 二、项目名称：安定镇外围防线105国道市界至检查站区段视频监控建设 三、中标（成交）信息 总中标成交金额：191.0151 万元（人民币） 中标成交供应商名称、地址及中标成交金额： 中标成交供应商名称：北京中电华安科技股份有限公司 中标成交供应商地址：北京市昌平区科技园昌盛路12号院8号楼-1至4层101内156室 中标金额：81.0151万元 中标成交供应商名称：北京凤舞星河科技发展有限公司 中标成交供应商地址：北京市大兴区安定镇田园适家3号楼1层130室(集群注册) 中标金额：110万元 供应商名称 供应商地址 统一信用代码 中标金额 中标成交备注信息 北京中电华安科技股份有限公司 北京市昌平区科技园昌盛路12号院8号楼-1至4层101内156室 91110116765531081B 81.0151 万元 评审总得分(综合评分法)： 92.4 分 北京凤舞星河科技发展有限公司 北京市大兴区安定镇田园适家3号楼1层130室(集群注册) 91110115MADDU1WL4Q 110 万元 评审总得分(综合评分法)： 93.63 分 四、主要标的信息 供应商 商品名称 规格型号 数量 单价 总价 服务要求 北京中电华安科技股份有限公司 详见附件 详见附件 1 81.0151万元 81.0151万元 详见附件 北京凤舞星河科技发展有限公司 详见附件 详见附件 1 110万元 110万元 详见附件 名称：安定镇外围防线105国道市界至检查站区段视频监控建设 采购需求： 1.安定镇外围防线105国道市界至检查站区段视频监控建设项目设备采购（第一包）：采购项目所需交换机、光端机、视频云存储、警戒枪机、变焦球机、周界雷达、智能防水音柱、联动报警服务模块、视频数据中心主机、智能分析板卡等相关设备，并兼容接入北京市大兴区社会治安综合治理信息平台。 2.安定镇外围防线105国道市界至检查站区段视频监控建设项目配套安装工程（第二包）：提供项目现场电力、网络、监控杆、挖沟铺设管线及配套工程安装服务及整体设备集成软件调试与北京市大兴区社会治安综合治理信息平台对接服务。 合同履行期限： 第一包：签订合同之日起10日内 第二包：签订合同之日起60日内 五、评审专家（单一来源采购人员）名单： 宫宝文、陈卿、赵彦、孙宏、马强 六、代理服务收费标准及金额： 本项目代理费总金额：2.42万元（人民币） 本项目代理费收费标准： 以中标通知书的中标总金额作为收取的计算基数。中标服务费收费标准参照国家计委计价格【2002】1980 号文和发改办价格【2003】857 号文规定的办法进行收取。 包段代理费如下： 安定镇外围防线105国道市界至检查站区段视频监控建设项目设备采购（第一包）：1.61万元； 安定镇外围防线105国道市界至检查站区段视频监控建设项目配套安装工程（第二包）：0.81万元。 七、公告期限 自本公告发布之日起1个工作日。 八、其它补充事宜 无 九、凡对本次公告内容提出询问，请按以下方式联系。 1.采购人信息 名 称：北京市大兴区安定镇人民政府 地址：北京市大兴区安定镇兴安大街3号 联系方式：马强,010-80231432 2.采购代理机构信息 名 称：北京盛标建筑造价咨询有限责任公司 地　址：北京市大兴区火神庙国际商业中心D座1240室 联系方式：杨迎，010-69231383 3.项目联系方式 项目联系人：杨迎 电　话：　　010-69231383 相关公告 主办单位：中华人民共和国财政部国库司 网站标识码： bm14000002 | 京 ICP 备 19054529 号 -1 |  京公网安备 11010602060068 号 © 1999- 中华人民共和国财政部 版权所有  | 联系我们 | 意见反馈"
+    }
+  },
+  "needs": {
+    "run_id": "t20260309_26250037",
+    "status": "success",
+    "projects": [
+      {
+        "project_id": "安定镇外围防线105国道市界至检查站区段视频监控建设|unit:1",
+        "package_no": "unit:1",
+        "package_kind": "contract_package",
+        "package_name": "安定镇外围防线105国道市界至检查站区段视频监控建设项目设备采购（第一包）",
+        "source_package_no": null,
+        "needs": [
+          {
+            "field": "object_name",
+            "reason": "coverage_low",
+            "package_no": "unit:1",
+            "target_candidate_ids": [],
+            "target_observations": []
+          },
+          {
+            "field": "category_name",
+            "reason": "coverage_low",
+            "package_no": "unit:1",
+            "target_candidate_ids": [],
+            "target_observations": []
+          },
+          {
+            "field": "brand",
+            "reason": "coverage_low",
+            "package_no": "unit:1",
+            "target_candidate_ids": [],
+            "target_observations": []
+          },
+          {
+            "field": "spec_model",
+            "reason": "coverage_low",
+            "package_no": "unit:1",
+            "target_candidate_ids": [],
+            "target_observations": []
+          },
+          {
+            "field": "unit_price",
+            "reason": "coverage_low",
+            "package_no": "unit:1",
+            "target_candidate_ids": [],
+            "target_observations": []
+          },
+          {
+            "field": "quantity",
+            "reason": "coverage_low",
+            "package_no": "unit:1",
+            "target_candidate_ids": [],
+            "target_observations": []
+          },
+          {
+            "field": "total_price",
+            "reason": "coverage_low",
+            "package_no": "unit:1",
+            "target_candidate_ids": [],
+            "target_observations": []
+          },
+          {
+            "field": "package_total_amount",
+            "reason": "absent",
+            "package_no": "unit:1",
+            "target_candidate_ids": [],
+            "target_observations": []
+          },
+          {
+            "field": "is_winner",
+            "reason": "absent",
+            "package_no": "unit:1",
+            "target_entity": "sub",
+            "target_candidate_ids": [],
+            "target_observations": []
+          },
+          {
+            "field": "score",
+            "reason": "absent",
+            "package_no": "unit:1",
+            "target_entity": "sub",
+            "target_candidate_ids": [],
+            "target_observations": []
+          },
+          {
+            "field": "supplier_name",
+            "reason": "maybe_more_objects",
+            "package_no": "unit:1",
+            "target_entity": "sub",
+            "target_candidate_ids": [],
+            "target_observations": []
+          },
+          {
+            "field": "object_name",
+            "reason": "maybe_more_objects",
+            "package_no": "unit:1",
+            "target_candidate_ids": [],
+            "target_observations": []
+          },
+          {
+            "field": "package_binding",
+            "reason": "absent",
+            "package_no": "unit:1",
+            "target_candidate_ids": [
+              "cand_000001",
+              "cand_000002",
+              "cand_000003",
+              "cand_000004"
+            ],
+            "target_observations": [
+              {
+                "candidate_id": "cand_000001",
+                "fields": {
+                  "supplier_name": "北京中电华安科技股份有限公司",
+                  "score": 92.4,
+                  "is_winner": true,
+                  "supplier_award_amount": "81.0151 万元",
+                  "review_status": "unknown"
+                }
+              },
+              {
+                "candidate_id": "cand_000002",
+                "fields": {
+                  "supplier_name": "北京凤舞星河科技发展有限公司",
+                  "score": 93.63,
+                  "is_winner": true,
+                  "supplier_award_amount": "110 万元",
+                  "review_status": "unknown"
+                }
+              },
+              {
+                "candidate_id": "cand_000003",
+                "fields": {
+                  "object_name": "详见附件",
+                  "spec_model": "详见附件",
+                  "unit_price": "81.0151万元",
+                  "quantity": "1",
+                  "total_price": "81.0151万元"
+                }
+              },
+              {
+                "candidate_id": "cand_000004",
+                "fields": {
+                  "object_name": "详见附件",
+                  "spec_model": "详见附件",
+                  "unit_price": "110万元",
+                  "quantity": "1",
+                  "total_price": "110万元"
+                }
+              }
+            ]
+          }
+        ],
+        "status": "success"
+      },
+      {
+        "project_id": "安定镇外围防线105国道市界至检查站区段视频监控建设|unit:2",
+        "package_no": "unit:2",
+        "package_kind": "contract_package",
+        "package_name": "安定镇外围防线105国道市界至检查站区段视频监控建设项目配套安装工程（第二包）",
+        "source_package_no": null,
+        "needs": [
+          {
+            "field": "object_name",
+            "reason": "coverage_low",
+            "package_no": "unit:2",
+            "target_candidate_ids": [],
+            "target_observations": []
+          },
+          {
+            "field": "category_name",
+            "reason": "coverage_low",
+            "package_no": "unit:2",
+            "target_candidate_ids": [],
+            "target_observations": []
+          },
+          {
+            "field": "brand",
+            "reason": "coverage_low",
+            "package_no": "unit:2",
+            "target_candidate_ids": [],
+            "target_observations": []
+          },
+          {
+            "field": "spec_model",
+            "reason": "coverage_low",
+            "package_no": "unit:2",
+            "target_candidate_ids": [],
+            "target_observations": []
+          },
+          {
+            "field": "unit_price",
+            "reason": "coverage_low",
+            "package_no": "unit:2",
+            "target_candidate_ids": [],
+            "target_observations": []
+          },
+          {
+            "field": "quantity",
+            "reason": "coverage_low",
+            "package_no": "unit:2",
+            "target_candidate_ids": [],
+            "target_observations": []
+          },
+          {
+            "field": "total_price",
+            "reason": "coverage_low",
+            "package_no": "unit:2",
+            "target_candidate_ids": [],
+            "target_observations": []
+          },
+          {
+            "field": "package_total_amount",
+            "reason": "absent",
+            "package_no": "unit:2",
+            "target_candidate_ids": [],
+            "target_observations": []
+          },
+          {
+            "field": "is_winner",
+            "reason": "absent",
+            "package_no": "unit:2",
+            "target_entity": "sub",
+            "target_candidate_ids": [],
+            "target_observations": []
+          },
+          {
+            "field": "score",
+            "reason": "absent",
+            "package_no": "unit:2",
+            "target_entity": "sub",
+            "target_candidate_ids": [],
+            "target_observations": []
+          },
+          {
+            "field": "supplier_name",
+            "reason": "maybe_more_objects",
+            "package_no": "unit:2",
+            "target_entity": "sub",
+            "target_candidate_ids": [],
+            "target_observations": []
+          },
+          {
+            "field": "object_name",
+            "reason": "maybe_more_objects",
+            "package_no": "unit:2",
+            "target_candidate_ids": [],
+            "target_observations": []
+          },
+          {
+            "field": "package_binding",
+            "reason": "absent",
+            "package_no": "unit:2",
+            "target_candidate_ids": [
+              "cand_000001",
+              "cand_000002",
+              "cand_000003",
+              "cand_000004"
+            ],
+            "target_observations": [
+              {
+                "candidate_id": "cand_000001",
+                "fields": {
+                  "supplier_name": "北京中电华安科技股份有限公司",
+                  "score": 92.4,
+                  "is_winner": true,
+                  "supplier_award_amount": "81.0151 万元",
+                  "review_status": "unknown"
+                }
+              },
+              {
+                "candidate_id": "cand_000002",
+                "fields": {
+                  "supplier_name": "北京凤舞星河科技发展有限公司",
+                  "score": 93.63,
+                  "is_winner": true,
+                  "supplier_award_amount": "110 万元",
+                  "review_status": "unknown"
+                }
+              },
+              {
+                "candidate_id": "cand_000003",
+                "fields": {
+                  "object_name": "详见附件",
+                  "spec_model": "详见附件",
+                  "unit_price": "81.0151万元",
+                  "quantity": "1",
+                  "total_price": "81.0151万元"
+                }
+              },
+              {
+                "candidate_id": "cand_000004",
+                "fields": {
+                  "object_name": "详见附件",
+                  "spec_model": "详见附件",
+                  "unit_price": "110万元",
+                  "quantity": "1",
+                  "total_price": "110万元"
+                }
+              }
+            ]
+          }
+        ],
+        "status": "success"
+      }
+    ],
+    "failures": []
+  },
+  "files": [
+    {
+      "path": "中标结果公告.pdf",
+      "route": "direct",
+      "reason": "filled_award_or_review",
+      "part": 1,
+      "errors": [],
+      "parts": [
+        {
+          "number": 1,
+          "text": "       中标结果公告\n\n  一、项目编号：11011526210200031767-XM001\n\n 二、项目名称：安定镇外围防线105 国道市界至检查站区段视频监控\n\n 建设\n\n 三、中标（成交）信息\n\n    总中标金额：191.0151 万元\n\n   中标供应商名称、联系地址及中标金额：\n\n序                    最终投标报价\n   中标供应商名称 中标供应商联系地址         中标成交备注信息\n号                     （万元）\n\n           北京市大兴区安定镇\n   北京凤舞星河科                     评审总得分(综合\n 1          田园适家3 号楼1 层      110\n   技发展有限公司                           评分法)：93.63 分\n                      130 室（集群注册）\n\n           北京市昌平区科技园\n   北京中电华安科                     评审总得分(综合\n 2           昌盛路12 号院8 号楼    81.0151\n   技股份有限公司                           评分法)：92.4 分\n                     -1 至4 层101 内156 室\n\n 四、主要标的信息\n\n              货物类\n\n名称：安定镇外围防线105 国道市界至检查站区段视频监控建设\n\n采购需求：\n\n1.安定镇外围防线105 国道市界至检查站区段视频监控建设项目设备采购（第一包）：\n\n采购项目所需交换机、光端机、视频云存储、警戒枪机、变焦球机、周界雷达、智能\n\n防水音柱、联动报警服务模块、视频数据中心主机、智能分析板卡等相关设备，并兼\n\n容接入北京市大兴区社会治安综合治理信息平台。\n\n2.安定镇外围防线105 国道市界至检查站区段视频监控建设项目配套安装工程（第二\n\n包）：提供项目现场电力、网络、监控杆、挖沟铺设管线及配套工程安装服务及整体\n\n设备集成软件调试与北京市大兴区社会治安综合治理信息平台对接服务。\n\n合同履行期限：\n\n第一包：签订合同之日起10 日内\n\n第二包：签订合同之日起60 日内",
+          "has_image": false,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 2,
+          "text": "五、评审专家（单一来源采购人员）名单：\n\n宫宝文、陈卿、赵彦、孙宏、马强\n\n六、代理服务收费标准及金额：\n\n本项目代理费总金额：2.42 万元（人民币）；\n\n本项目代理费收费标准：\n\n以中标通知书的中标总金额作为收取的计算基数。中标服务费收费标\n\n准参照国家计委计价格【2002】1980 号文和发改办价格【2003】857\n\n号文规定的办法进行收取。\n\n包段代理费如下：\n\n安定镇外围防线105 国道市界至检查站区段视频监控建设项目设备\n\n采购（第一包）：1.61 万元；\n\n安定镇外围防线105 国道市界至检查站区段视频监控建设项目配套\n\n安装工程（第二包）：0.81 万元。\n\n七、公告期限\n\n自本公告发布之日起1 个工作日。\n\n八、其他补充事宜\n\n无\n\n九、凡对本次公告内容提出询问，请按以下方式联系\n\n1.采购人信息\n\n名  称：北京市大兴区安定镇人民政府\n\n地  址：北京市大兴区安定镇兴安大街3 号\n\n联系方式：马强010-80231432\n\n2、采购代理机构信息\n\n名称：北京盛标建筑造价咨询有限责任公司\n\n地 址：北京市大兴区火神庙国际商业中心D 座1240 室\n\n联系人：杨迎\n\n电  话：010-69231383\n\n3、项目联系方式\n\n项目联系人：杨迎\n\n电  话：010-69231383",
+          "has_image": false,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        }
+      ]
+    },
+    {
+      "path": "分项报价表.pdf",
+      "route": "direct",
+      "reason": "filled_quotation",
+      "part": 5,
+      "errors": [],
+      "parts": [
+        {
+          "number": 1,
+          "text": "4 投标分项报价表（实质性格式）\n\n\n                投标分项报价表\n\n项目编号：11011526210200031767-XM001\n\n项目名称：安定镇外围防线105 国道市界至检查站区段视频监控建设\n\n报价单位：人民币元\n                             外\n                        制\n            产             制造 商\n                        造\n序             地/    制造商      商所 投  品\n  分项名称 制造商              商            规格、型号    单价（元） 数量 合价（元）\n号          国  统一社会信用代码    属性 资  牌\n                        规\n            别              别  类\n                        模\n                             型\n       北京光 北\n  区镇接入 桥科技 京/           小    内  光\n 1                          91110108758748426Q    男                F6-5800-M24GT6X       10000      2 台    20000\n   交换机  股份有 中           型    资  桥\n       限公司 国\n       北京光 北\n  室外光汇 桥科技 京/           小    内  光\n 2                          91110108758748426Q    男             F6-MTX4FX4G-M8GT24GX     4100      3 台    12300\n  聚交换机 股份有 中           型    资  桥\n       限公司 国\n       北京光 北\n  周界光端 桥科技 京/           小    内  光\n 3                          91110108758748426Q    男              F6-MTX4FX4G-4GT1GX       700      29 套    20300\n    机   股份有 中           型    资  桥\n       限公司 国\n\n                                                                             6",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 2,
+          "text": "       北京光 北\n  千兆光模 桥科技 京/           小    内  光\n4                          91110108758748426Q    男                    FB-420D            150      29 对    4350\n   块   股份有 中           型    资  桥\n       限公司 国\n       浙江宇 浙\n    48 盘位\n       视科技 江/           大    内  宇\n5 云存储节               91330100580274795B    男                CX1848-V3@BAS-C       87270      1 台    87270\n       有限公 中           型    资  视\n   点\n        司  国\n       浙江宇 浙\n  云存储电 视科技 江/           大    内  宇\n6                          91330100580274795B    男                PWR-800A-AC-NB        2500      1 个     2500\n  源模块  有限公 中           型    资  视\n        司  国\n       浙江宇 浙\n  云存储电 视科技 江/           大    内  宇\n7                          91330100580274795B    男                 BAT-LA5800-NB         1600      1 个     1600\n  池模块  有限公 中           型    资  视\n        司  国\n       浙江宇 浙\n  云存储专 视科技 江/           大    内  宇\n8                          91330100580274795B    男              NI-HD8000V-A-S-N-01      3200      12 块    38400\n  用硬盘  有限公 中           型    资  视\n        司  国\n       浙江宇 浙\n    400 万智\n       视科技 江/           大    内  宇\n9 能双光警               91330100580274795B    男                IPC-B2A4-FW@JSF        2000      18 台    36000\n       有限公 中           型    资  视\n  戒枪机\n        司  国\n\n\n\n\n\n                                                                           7",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 3,
+          "text": "       浙江宇 浙\n       视科技 江/           大    内  宇\n10 抱杆支架               91330100580274795B    男                  TR-UP06-IN           95       18 个    1710\n       有限公 中           型    资  视\n        司  国\n       浙江宇 浙\n  枪机三维 视科技 江/           大    内  宇\n11                         91330100580274795B    男                 TR-UV06-A-IN          80       18 个    1440\n   支架  有限公 中           型    资  视\n        司  国\n       浙江宇 浙\n       视科技 江/           大    内  宇\n12 枪机电源               91330100580274795B    男                 PWR-DC1202-NB          90       18 个    1620\n       有限公 中           型    资  视\n        司  国\n       浙江宇 浙\n       视科技 江/           大    内  宇  IPC-S6612-IR@M-X25-V\n13 路口球机               91330100580274795B    男                                       6000      1 台     6000\n       有限公 中           型    资  视           D2\n        司  国\n       浙江宇 浙\n  路口球机 视科技 江/           大    内  宇\n14                         91330100580274795B    男                   TR-UF45-G            90       1 个      90\n  吊装盘  有限公 中           型    资  视\n        司  国\n       浙江宇 浙\n  路口球机 视科技 江/           大    内  宇\n15                         91330100580274795B    男                  TR-UP06-IN           95       1 个      95\n  抱杆支架 有限公 中           型    资  视\n        司  国\n\n\n\n\n\n                                                                            8",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 4,
+          "text": "       浙江宇 浙\n    400 万40\n       视科技 江/           大    内  宇\n16 倍变焦球               91330100580274795B    男               IPC-E6824-IR@H40       9000      19 台   171000\n       有限公 中           型    资  视\n    机\n        司  国\n       浙江宇 浙\n  变焦球机\n       视科技 江/           大    内  宇\n17 球机吊装               91330100580274795B    男                   TR-UF45-G            90       19 个    1710\n       有限公 中           型    资  视\n    盘\n        司  国\n       浙江宇 浙\n  变焦球机 视科技 江/           大    内  宇\n18                         91330100580274795B    男                  TR-UP06-IN           95       19 个    1805\n  抱杆支架 有限公 中           型    资  视\n        司  国\n       浙江宇 浙\n       视科技 江/           大    内  宇\n19 周界雷达               91330100580274795B    男               RVS441@2D-D30-SH       20000     19 台   380000\n       有限公 中           型    资  视\n        司  国\n       浙江宇 浙\n  雷达抱杆 视科技 江/           大    内  宇  TR-UV06-A-IN+TR-UP06\n20                         91330100580274795B    男                                        90       19 套    1710\n   支架  有限公 中           型    资  视           -IN\n        司  国\n       南昌航\n           南                   航\n  智能防水 天广信\n               昌/           小    内  天\n21 音柱（内 科技有       91360111746071251H    男                   HT-9922Y           1900      19 台    36100\n           中           型    资  广\n  置功放） 限责任\n           国                   电\n        公司\n\n\n\n\n\n                                                                            9",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 5,
+          "text": "  雷达周界 浙江宇 浙\n  视频联动 视科技 江/           大    内  宇\n22                         91330100580274795B    男                LIS-BSP-PPS@RA        3500      19 套    66500\n  报警服务 有限公 中           型    资  视\n   模块   司  国\n       浙江宇 浙\n  视频接入 视科技 江/           大    内  宇    LIS-Video Manager\n23                         91330100580274795B    男                                      24000      1 套    24000\n   引擎  有限公 中           型    资  视       3.0-Cam-100\n        司  国\n       浙江宇 浙\n  视频数据 视科技 江/           大    内  宇\n24                         91330100580274795B    男                VS-VDC12508@U-I       45000      1 台    45000\n  中心主机 有限公 中           型    资  视\n        司  国\n       浙江宇 浙\n  数据中心 视科技 江/           大    内  宇\n25                         91330100580274795B    男                 PWR-DC12-1600        14000      1 个    14000\n   电源  有限公 中           型    资  视\n        司  国\n       浙江宇 浙\n  智能分析 视科技 江/           大    内  宇\n26                         91330100580274795B    男                 FB-IA15806@AX        98000      1 张    98000\n   板卡  有限公 中           型    资  视\n        司  国\n       浙江宇 浙\n  全结构化 视科技 江/           大    内  宇\n27                         91330100580274795B    男              LIS-IA15800-FVAS-1      5300      5 套    26500\n  分析授权 有限公 中           型    资  视\n        司  国\n\n                        总价（元）                                                   1100000\n\n\n\n\n                                                                           10",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 6,
+          "text": "注：1.本表应按包分别填写。\n\n  2.上述各项的详细规格（如有），可另页描述。\n\n  3.制造商规模列应填写“大型”、“中型”、“小型”、“微型”或“其他”，且不应与《中小企业声明函》或《拟分包情况说\n\n明》中内容矛盾。制造商所属性别请填写“男”或“女”，指拥有制造商51%以上绝对所有权的性别；绝对所有权拥有者可以是一个\n\n人，也可以是多人合计计算。外商投资类型请填写“外商单独投资”、“外商部分投资”或“内资”。\n\n\n\n\n\n投标人名称（加盖公章）：北京凤舞星河科技发展有限公司\n\n日期：2026年03月06日\n\n\n                                                                            11",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        }
+      ]
+    },
+    {
+      "path": "安定镇外围防线105国道市界至检查站区段视频监控建设招标文件.pdf",
+      "route": "reference",
+      "reason": "procurement_document_or_form",
+      "part": null,
+      "errors": [],
+      "parts": [
+        {
+          "number": 1,
+          "text": "安定镇外围防线105国道市界至检查站区段视频监控建设\n\n         （招标文件）\n\n\n\n\n\n 项目名称：安定镇外围防线105国道市界至检查站区段视频监控建设\n\n  项目编号：11011526210200031767-XM001\n\n 采购人：北京市大兴区安定镇人民政府\n\n 采购代理机构：北京盛标建筑造价咨询有限责任公司",
+          "has_image": false,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 2,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n\n\n             目 录\n\n\n\n\n 第一章   投标邀请.......................................... 2\n\n 第二章   投标人须知........................................7\n\n 第三章   资格审查......................................... 23\n\n 第四章  评标程序、评标方法和评标标准................... 27\n\n 第五章   采购需求......................................... 38\n\n 第六章   拟签订的合同文本................................ 54\n\n 第七章   投标文件格式.....................................61\n\n\n注：采购文件条款中以“■”形式标记的内容适用于本项目，以“□”形\n\n式标记的内容不适用于本项目。\n\n\n\n\n\n                                             1",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 3,
+          "text": "北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n\n\n         第一章  投标邀请\n\n\n 一、项目基本情况\n\n  1.项目编号：11011526210200031767-XM001\n\n 2.项目名称：安定镇外围防线105国道市界至检查站区段视频监控建设\n\n  3.项目预算金额：195.47万元、项目最高限价：195.47万元，其中第\n\n    一包112.45万元，第二包83.02万元。\n\n 4.采购需求：\n\n              采购包预算金\n包号    标的名称            数量  简要技术需求或服务要求\n               额（万元）\n                         采购项目所需交换机、光端\n                         机、视频云存储、警戒枪机\n    安定镇外围防线105国            、变焦球机、周界雷达、智\n   道市界至检查站区段            能防水音柱、联动报警服务\n 01                             112.45       1\n   视频监控建设项目设            模块、视频数据中心主机、\n    备采购（第一包）             智能分析板卡等相关设备，\n                         并兼容接入北京市大兴区社\n                         会治安综合治理信息平台。\n                         提供项目现场电力、网络、\n    安定镇外围防线105国            监控杆、挖沟铺设管线及配\n   道市界至检查站区段视            套工程安装服务及整体设备\n 02                             83.02        1   频监控建设项目配套安            集成软件调试与北京市大兴\n    装工程（第二包）             区社会治安综合治理信息平\n                         台对接服务。\n\n 5.合同履行期限：\n\n 第一包：签订合同之日起10 日内\n\n 第二包：签订合同之日起60 日内\n\n 6.本项目是否接受联合体投标：□是 ■否。\n\n 二、申请人的资格要求（须同时满足）\n\n 1.满足《中华人民共和国政府采购法》第二十二条规定；\n\n 2.落实政府采购政策需满足的资格要求：\n\n   2.1 中小企业政策\n\n ■本项目不专门面向中小企业预留采购份额。\n\n                                           2",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [
+            {
+              "headers": [
+                "包号",
+                "标的名称",
+                "采购包预算金\n额（万元）",
+                "数量",
+                "简要技术需求或服务要求"
+              ],
+              "rows": [
+                [
+                  "01",
+                  "安定镇外围防线105国\n道市界至检查站区段\n视频监控建设项目设\n备采购（第一包）",
+                  "112.45",
+                  "1",
+                  "采购项目所需交换机、光端\n机、视频云存储、警戒枪机\n、变焦球机、周界雷达、智\n能防水音柱、联动报警服务\n模块、视频数据中心主机、\n智能分析板卡等相关设备，\n并兼容接入北京市大兴区社\n会治安综合治理信息平台。"
+                ],
+                [
+                  "02",
+                  "安定镇外围防线105国\n道市界至检查站区段视\n频监控建设项目配套安\n装工程（第二包）",
+                  "83.02",
+                  "1",
+                  "提供项目现场电力、网络、\n监控杆、挖沟铺设管线及配\n套工程安装服务及整体设备\n集成软件调试与北京市大兴\n区社会治安综合治理信息平\n台对接服务。"
+                ]
+              ]
+            }
+          ],
+          "sheet": null
+        },
+        {
+          "number": 4,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n  □本项目专门面向□中小企业采购。即：提供的货物全部由符合政策\n\n要求的中小/小微企业制造、服务全部由符合政策要求的中小/小微企业承\n\n接。\n\n  □本项目预留部分采购项目预算专门面向中小企业采购。对于预留份\n\n额，提供的货物由符合政策要求的中小企业制造、服务由符合政策要求的\n\n中小企业承接。预留份额通过以下措施进行：/ 。\n\n    2.2 其它落实政府采购政策的资格要求（如有）：无。\n\n  3.本项目的特定资格要求：\n\n    3.1 本项目是否属于政府购买服务：\n\n  ■否\n\n  □是，公益一类事业单位、使用事业编制且由财政拨款保障的群团组\n\n织，不得作为承接主体；\n\n    3.2 其他特定资格要求：\n\n  第一包：\n\n   3.2.1供应商未被信用中国网站（www.creditchina.gov.cn）列入失信\n\n被执行人、重大税收违法失信主体名单、政府采购严重违法失信行为记录\n\n名单，未被中国政府采购网（www.ccgp.gov.cn）列入政府采购严重违法失\n\n信行为记录名单。\n\n  第二包：\n\n  3.2.1供应商须具备建设行政主管部门核发的电子与智能化工程专业承\n\n包二级及以上资质；\n\n  3.2.2供应商具有有效的安全生产许可证；\n\n  3.2.3拟派项目经理须具备机电工程专业二级（含以上级）注册建造师\n\n执业资格及有效的安全生产考核合格证书（B本）；\n\n   3.2.4供应商未被信用中国网站（www.creditchina.gov.cn）列入失信\n\n被执行人、重大税收违法失信主体名单、政府采购严重违法失信行为记录\n\n名单，未被中国政府采购网（www.ccgp.gov.cn）列入政府采购严重违法失\n\n信行为记录名单。\n\n  三、获取招标文件\n\n\n\n                                             3",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 5,
+          "text": "  北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n    1.时间：2026年02月14日至2026年02月27日，每天上午8:00至12:00，\n\n 下午13:00至17:00（北京时间，法定节假日除外）。\n\n   2.地点：北京市政府采购电子交易平台\n\n   3.方式：供应商使用CA 数字证书或电子营业执照登录北京市政府采\n\n 购电子交易平台（http://zbcg-bjzc.zhongcy.com/bjczj-portal-site/in\n\n dex.html#/home）获取电子版招标文件。\n\n   售价：0 元。\n\n  四、提交投标文件截止时间、开标时间和地点\n\n   投标截止时间、开标时间：2026年03月06日09点00分（北京时间）。\n\n   地点：北京市大兴区火神庙国际商业中心D座1231室。（供应商可选择\n\n到达开标地点参加现场开标会或自行登陆北京市政府采购电子交易平台远\n\n程在线参加开标会）（供应商应于投标截止时间前在北京市政府采购电子\n\n交易平台提交电子投标文件）。\n\n  五、公告期限\n\n   自本公告发布之日起5 个工作日。\n\n  六、其他补充事宜\n\n     1. 本项目需要落实的政府采购政策：\n\n     1.1 财政部关于调整优化节能产品、环境标志产品政府采购执行机制\n\n 的通知（财库〔2019〕9号）；\n\n     1.2 依据“《国务院关于扶持小型微型企业健康发展的意见》（国发\n\n〔2014〕52号）”、“财政部工业和信息化部关于印发《政府采购促进中\n\n 小企业发展管理办法》的通知(财库[2020]46号)”、“《财政部关于进一\n\n 步加大政府采购支持中小企业力度的通知》（财库[2022]19号）”的采购\n\n政策；\n\n     1.3 依据“财政部民政部中国残疾人联合会关于促进残疾人就业政\n\n 府采购政策的通知（京财采购[2017]2067号）”的采购政策；\n\n     1.4 依据“《财政部关于在政府采购活动中查询及使用信用记录有关\n\n 问题的通知》（财库[2016]125号）”的采购政策；\n\n     1.5 依据“财政部关于印发《政府采购进口产品管理办法》的通知（\n\n 财库[2007]119号）”的采购政策；\n\n                                               4",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 6,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n    1.6 本项目采购本国货物和服务，扶持不发达地区和少数民族地区、\n\n促进监狱企业和中小企业发展，支持节能减排、环境保护。\n\n    2. 本项目采用全流程电子化采购方式，请供应商认真学习北京市政府\n\n采购电子交易平台发布的相关操作手册（供应商可在交易平台下载相关手\n\n册），办理CA数字证书或电子营业执照、进行北京市政府采购电子交易平\n\n台注册绑定，并认真核实CA数字证书或电子营业执照情况确认是否符合本\n\n项目电子化采购流程要求。\n\n    CA 数字证书服务热线010-58511086\n\n   电子营业执照服务热线400-699-7000\n\n   技术支持服务热线010-86483801\n\n    2.1 办理CA 数字证书或电子营业执照\n\n  供应商登录北京市政府采购电子交易平台查阅“用户指南”—“操作\n\n指南”—“市场主体CA 办理操作流程指引”/“电子营业执照使用指南”，\n\n按照程序要求办理。\n\n    2.2 注册\n\n  供应商登录北京市政府采购电子交易平台“用户指南”—“操作指南”\n\n—“市场主体注册入库操作流程指引”进行自助注册绑定。\n\n    2.3 驱动、客户端下载\n\n  供应商登录北京市政府采购电子交易平台“用户指南”—“工具下载”\n\n—“招标采购系统文件驱动安装包”下载相关驱动。供应商登录北京市政\n\n府采购电子交易平台“用户指南”—“工具下载”—“投标文件编制工具”\n\n下载相关客户端。\n\n    2.4 获取电子招标文件\n\n  供应商使用CA数字证书或电子营业执照登录北京市政府采购电子交易\n\n平台获取电子招标文件。\n\n  供应商如计划参与多个采购包的投标，应在登录北京市政府采购电子\n\n交易平台后，在【我的项目】栏目依次选择对应采购包，进入项目工作台\n\n招标/采购文件环节分别按采购包下载招标文件电子版。未在规定期限内\n\n按上述操作获取文件的采购包，供应商无法提交相应包的电子投标文件。\n\n    2.5 编制电子投标文件\n\n                                             5",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 7,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n  供应商应使用电子投标客户端编制电子投标文件并进行线上投标，供\n\n应商电子投标文件需要加密并加盖电子签章，如无法按照要求在电子投标\n\n文件中加盖电子签章和加密，请及时通过技术支持服务热线联系技术人员。\n\n    2.6 提交电子投标文件\n\n  供应商应于投标截止时间前在北京市政府采购电子交易平台提交电子\n\n投标文件，上传电子投标文件过程中请保持与互联网的连接畅通。\n\n    2.7 电子开标\n\n  供应商在开标地点使用CA数字证书或电子营业执照登录北京市政府采\n\n购电子交易平台进行电子开标。\n\n  为保证开标解密顺利进行，现场参与开标会的供应商请务必携带CA数\n\n字证书（投标文件加密所用的CA数字证书）、投标U盘1份（U盘内容包括：\n\n加密《投标文件》TBJ格式、未加密《投标文件》TBJ格式文件、投标解密\n\n符BSKEY 格式文件，PDF格式《投标文件》）进行现场解密操作。\n\n  注：因本项目为全流程电子化项目，如有参加意向的供应商需注意以\n\n上事项。\n\n  七、对本次招标提出询问，请按以下方式联系。\n\n  1.采购人信息\n\n  名  称：北京市大兴区安定镇人民政府\n\n  地  址：北京市大兴区安定镇兴安大街3号\n\n   联系方式：马强010-80231432\n\n  2.采购代理机构信息\n\n  名  称：北京盛标建筑造价咨询有限责任公司\n\n  地  址：北京市大兴区火神庙国际商业中心D座1240室\n\n   联系方式：杨迎010-69231383\n\n  3.项目联系方式\n\n  项目联系人：杨迎\n\n  电     话：010-69231383\n\n\n\n\n\n                                             6",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 8,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n         第二章  投标人须知\n\n             投标人须知资料表\n\n本表是对投标人须知的具体补充和修改，如有矛盾，均以本资料表为准。\n\n条款号  条目               内容\n          项目属性：\n  2.2  项目属性 □服务\n         ■货物\n          是否属于科研仪器设备采购项目：\n  2.3 科研仪器设备 □是\n         ■否\n          ■关于核心产品本项目第_二_包不适用。\n          □本项目 包为单一产品采购项目。\n  2.4  核心产品\n          ■本项目第一包为非单一产品采购项目，核心产品为：400万智能\n          双光警戒枪机。\n         ■不组织\n    现场考察 □组织，考察时间：__年_月_ 日_点_分\n           考察地点：      。\n  3.1\n         ■不召开\n   开标前答疑会 □召开，召开时间：__年_月_ 日_点_分\n           召开地点：      。\n\n          投标样品递交：\n         ■不需要\n          □需要，具体要求如下：\n           （1）样品制作的标准和要求：     ；\n          （2）是否需要随样品提交相关检测报告：\n  4.1   样品    □不需要\n           □需要\n           （3）样品递交要求：     ；\n           （4）未中标人样品退还：     ；\n           （5）中标人样品保管、封存及退还：     ；\n           （6）其他要求（如有）：    。\n\n           本项目采购标的对应的中小企业划分标准所属行业：\n\n               标的名称      中小企业划分标准所属行业\n\n           安定镇外围防线105国道市界至\n 5.2.5 标的所属行业 检查站区段视频监控建设项目设      工业\n          备采购（第一包）\n           安定镇外围防线105国道市界至\n          检查站区段视频监控建设项目配      建筑业\n          套安装工程（第二包）\n\n\n                                             7",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 9,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n          投标报价的特殊规定：\n         □无\n 11.2  投标报价\n          ■有，具体情形：不得超过最高投标限价，最高投标限价：\n             195.47万元，其中第一包112.45万元，第二包83.02万元。\n\n          投标保证金金额：/（不适用）\n          投标保证金形式：银行汇票、电汇、支票。如使用电汇、支票方\n          式支付投标保证金的，且必须保证在/年/月/ 日/ 时/分前到\n          达招标机构指定账户。逾期均视为无投标保证金。\n 12.1          投标保证金银行及帐号：\n           开户单位：/    投标保证金\n           开户银行：/\n          帐  号：/\n          注：投标保证金有效期同投标有效期。\n\n          投标保证金可以不予退还的其他情形：\n12.8.2      ■无\n          □有，具体情形：   。\n\n 13.1 投标有效期自提交投标文件的截止之日起算60天。\n\n 18.2  解密时间 解密时间：10分钟\n          中标候选人并列的，采购人是否委托评标委员会确定中标人：\n          ■否\n         □是\n 22.1 确定中标人\n          中标候选人并列的，按照以下方式确定中标人：\n          ■得分且投标报价均相同的，以技术部分评审得分高者为中标人\n         □随机抽取\n          本项目的非主体、非关键性工作是否允许分包：\n         ■不允许\n          □允许，具体要求：\n 25.5   分包\n          （1）可以分包履行的具体内容：  ；\n          （2）允许分包的金额或者比例：  ；\n           （3）其他要求：  。\n\n         为更大力度激发市场活力和社会创造力，增强发展动力，按照\n         《北京市全面优化营商环境助力企业高质量发展实施方案》（京政\n          办发〔2023〕8号）部署，进一步加强政府采购合同线上融资“一\n 25.6  政采贷  站式”服务（以下简称“政采贷”），北京市财政局、中国人民\n         银行营业管理部联合发布《关于推进政府采购合同线上融资有关\n           工作的通知》（京财采购〔2023〕637号）。有需求的供应商，可\n          按上述通知要求办理“政采贷”。\n\n26.1.1  询问  询问送达形式：书面\n\n\n\n\n                                             8",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 10,
+          "text": "北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n         接收询问和质疑的联系方式\n         联系部门：招标代理部，杨迎；\n26.3  联系方式\n              联系电话：010-69231383；\n          通讯地址：北京市大兴区火神庙国际商业中心D座1240室。\n         收费对象：\n         □采购人\n         ■中标人\n         交纳中标服务费的标准如下：\n 27   代理费\n         1）以每包中标通知书的中标总金额作为收取的计算基数。\n           2）中标服务费收费标准参照国家计委计价格【2002】1980号文和\n            发改办价格【2003】857 号文规定的办法进行收取。\n         缴纳时间：领取中标通知书时一次性支付。\n\n\n\n\n\n                                            9",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 11,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n\n              投标人须知\n\n              一 说 明\n\n    1 采购人、采购代理机构、投标人、联合体\n\n    1.1 采购人、采购代理机构：指依法进行政府采购的国家机关、事业\n\n单位、团体组织，及其委托的采购代理机构。本项目采购人、采购代理机\n\n构见第一章《投标邀请》。\n\n    1.2 投标人（也称“供应商”、“申请人”）：指向采购人提供货物、\n\n工程或者服务的法人、其他组织或者自然人。\n\n    1.3 联合体：指两个以上的自然人、法人或者其他组织组成一个联合\n\n体，以一个供应商的身份共同参加政府采购。\n\n    2 资金来源、项目属性、科研仪器设备采购、核心产品\n\n    2.1 资金来源为财政性资金和/或本项目采购中无法与财政性资金分割\n\n的非财政性资金。\n\n    2.2 项目属性见《投标人须知资料表》。\n\n    2.3 是否属于科研仪器设备采购见《投标人须知资料表》。\n\n    2.4 核心产品见《投标人须知资料表》。\n\n    3 现场考察、开标前答疑会\n\n    3.1 若《投标人须知资料表》中规定了组织现场考察、召开开标前答\n\n疑会，则投标人应按要求在规定的时间和地点参加。\n\n    3.2 由于未参加现场考察或开标前答疑会而导致对项目实际情况不了\n\n解，影响投标文件编制、投标报价准确性、综合因素响应不全面等问题的，\n\n由投标人自行承担不利评审后果。\n\n    4 样品\n\n    4.1 本项目是否要求投标人提供样品，以及样品制作的标准和要求、\n\n是否需要随样品提交相关检测报告、样品的递交与退还等要求见《投标人\n\n须知资料表》。\n\n    4.2 样品的评审方法以及评审标准等内容见第四章《评标程序、评标\n\n方法和评标标准》。\n\n    5 政府采购政策（包括但不限于下列具体政策要求）\n\n\n                                             10",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 12,
+          "text": "  北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n     5.1 采购本国货物、工程和服务\n\n     5.1.1 政府采购应当采购本国货物、工程和服务。但有《中华人民共\n\n和国政府采购法》第十条规定情形的除外。\n\n     5.1.2 本项目如接受非本国货物、工程、服务参与投标，则具体要求\n\n见第四章《采购需求》。\n\n     5.1.3 进口产品指通过中国海关报关验放进入中国境内且产自关境外\n\n的产品，包括已经进入中国境内的进口产品。关于进口产品的相关规定依\n\n 据《政府采购进口产品管理办法》（财库〔2007〕119号文）、《关于政府\n\n 采购进口产品管理有关问题的通知》（财办库〔2008〕248号文）。\n\n     5.2 中小企业、监狱企业及残疾人福利性单位\n\n     5.2.1 中小企业定义：\n\n     5.2.1.1 中小企业是指在中华人民共和国境内依法设立，依据国务院\n\n批准的中小企业划分标准确定的中型企业、小型企业和微型企业，但与大\n\n企业的负责人为同一人，或者与大企业存在直接控股、管理关系的除外。\n\n符合中小企业划分标准的个体工商户，在政府采购活动中视同中小企业。\n\n关于中小企业的相关规定依据《中华人民共和国中小企业促进法》、《关\n\n 于进一步加大政府采购支持中小企业力度的通知》（财库〔2022〕19号）、\n\n《政府采购促进中小企业发展管理办法》（财库〔2020〕46号）、《关于印\n\n 发中小企业划型标准规定的通知》（工信部联企业〔2011〕300号）、《金\n\n 融业企业划型标准规定》（〔2015〕309号）等国务院批准的中小企业划分\n\n标准执行。\n\n     5.2.1.2 供应商提供的货物、工程或者服务符合下列情形的，享受中\n\n小企业扶持政策：\n\n   （1）在货物采购项目中，货物由中小企业制造，即货物由中小企业生\n\n产且使用该中小企业商号或者注册商标；\n\n   （2）在工程采购项目中，工程由中小企业承建，即工程施工单位为中\n\n小企业；\n\n   （3）在服务采购项目中，服务由中小企业承接，即提供服务的人员为\n\n中小企业依照《中华人民共和国劳动合同法》订立劳动合同的从业人员。\n\n\n\n                                              11",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 13,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n     5.2.1.3 在货物采购项目中，供应商提供的货物既有中小企业制造货\n\n物，也有大型企业制造货物的，不享受中小企业扶持政策。\n\n    5.2.1.4 以联合体形式参加政府采购活动，联合体各方均为中小企业\n\n的，联合体视同中小企业。其中，联合体各方均为小微企业的，联合体视\n\n同小微企业。\n\n    5.2.2 在政府采购活动中，监狱企业视同小型、微型企业，享受预留\n\n份额、评审中价格扣除等政府采购促进中小企业发展的政府采购政策。监\n\n狱企业定义：是指由司法部认定的为罪犯、戒毒人员提供生产项目和劳动\n\n对象，且全部产权属于司法部监狱管理局、戒毒管理局、直属煤矿管理局，\n\n各省、自治区、直辖市监狱管理局、戒毒管理局，各地（设区的市）监狱、\n\n强制隔离戒毒所、戒毒康复所，以及新疆生产建设兵团监狱管理局、戒毒\n\n管理局的企业。\n\n    5.2.3 在政府采购活动中，残疾人福利性单位视同小型、微型企业，\n\n享受预留份额、评审中价格扣除等促进中小企业发展的政府采购政策。残\n\n疾人福利性单位定义：享受政府采购支持政策的残疾人福利性单位应当同\n\n时满足以下条件：\n\n    5.2.3.1 安置的残疾人占本单位在职职工人数的比例不低于25%（含\n\n25%），并且安置的残疾人人数不少于10人（含10人）；\n\n    5.2.3.2 依法与安置的每位残疾人签订了一年以上（含一年）的劳动\n\n合同或服务协议；\n\n    5.2.3.3 为安置的每位残疾人按月足额缴纳了基本养老保险、基本医\n\n疗保险、失业保险、工伤保险和生育保险等社会保险费；\n\n    5.2.3.4 通过银行等金融机构向安置的每位残疾人，按月支付了不低\n\n于单位所在区县适用的经省级人民政府批准的月最低工资标准的工资；\n\n    5.2.3.5 提供本单位制造的货物、承担的工程或者服务（以下简称产\n\n品），或者提供其他残疾人福利性单位制造的货物（不包括使用非残疾人\n\n福利性单位注册商标的货物）；\n\n    5.2.3.6 前款所称残疾人是指法定劳动年龄内，持有《中华人民共和\n\n国残疾人证》或者《中华人民共和国残疾军人证（1至8级）》的自然人，\n\n\n\n                                             12",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 14,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n包括具有劳动条件和劳动意愿的精神残疾人。在职职工人数是指与残疾人\n\n福利性单位建立劳动关系并依法签订劳动合同或服务协议的雇员人数。\n\n    5.2.4 本项目是否专门面向中小企业预留采购份额见第一章《投标邀\n\n请》。\n\n    5.2.5 采购标的对应的中小企业划分标准所属行业见《投标人须知资\n\n料表》。\n\n    5.2.6 小微企业价格评审优惠的政策调整：见第四章《评标程序、评\n\n标方法和评标标准》。\n\n    5.3 政府采购节能产品、环境标志产品\n\n    5.3.1 政府采购节能产品、环境标志产品实施品目清单管理。财政部、\n\n发展改革委、生态环境部等部门根据产品节能环保性能、技术水平和市场\n\n成熟程度等因素，确定实施政府优先采购和强制采购的产品类别及所依据\n\n的相关标准规范，以品目清单的形式发布并适时调整。依据品目清单和认\n\n证证书实施政府优先采购和强制采购。\n\n    5.3.2 采购人拟采购的产品属于品目清单范围的，采购人及其委托的\n\n采购代理机构依据国家确定的认证机构出具的、处于有效期之内的节能产\n\n品、环境标志产品认证证书，对获得证书的产品实施政府优先采购或强制\n\n采购。关于政府采购节能产品、环境标志产品的相关规定依据《关于调整\n\n优化节能产品、环境标志产品政府采购执行机制的通知》（财库〔2019〕9\n\n号）。\n\n    5.3.3 如本项目采购产品属于实施政府强制采购品目清单范围的节能\n\n产品，则投标人所报产品必须获得国家确定的认证机构出具的、处于有效\n\n期之内的节能产品认证证书，否则投标无效；\n\n    5.3.4 非政府强制采购的节能产品或环境标志产品，依据品目清单和\n\n认证证书实施政府优先采购。优先采购的具体规定见第四章《评标程序、\n\n评标方法和评标标准》（如涉及）。\n\n    5.4 正版软件\n\n    5.4.1 各级政府部门在购置计算机办公设备时，必须采购预装正版操\n\n作系统软件的计算机产品，相关规定依据《国家版权局、信息产业部、财\n\n政部、国务院机关事务管理局关于政府部门购置计算机办公设备必须采购\n\n                                             13",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 15,
+          "text": "  北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n 已预装正版操作系统软件产品的通知》（国权联〔2006〕1号）、《国务院\n\n 办公厅关于进一步做好政府机关使用正版软件工作的通知》（国办发〔201\n\n 0〕47 号）、《财政部关于进一步做好政府机关使用正版软件工作的通知》\n\n（财预〔2010〕536号）。\n\n     5.5 网络安全专用产品\n\n     5.5.1 根据《关于调整网络安全专用产品安全管理有关事项的公告》\n\n （2023年第1号），所提供产品属于列入《网络关键设备和网络安全专用产\n\n品目录》的网络安全专用产品时，应当按照《信息安全技术网络安全专用\n\n产品安全技术要求》等相关国家标准的强制性要求，由具备资格的机构安\n\n全认证合格或者安全检测符合要求。\n\n     5.6 推广使用低挥发性有机化合物（VOCs）\n\n     5.6.1 为全面推进本市挥发性有机物（VOCs）治理，贯彻落实挥发性\n\n有机物污染治理专项行动有关要求，相关规定依据《北京市财政局北京市\n\n 生态环境局关于政府采购推广使用低挥发性有机化合物（VOCs）有关事项\n\n 的通知》（京财采购〔2020〕2381号）。本项目中涉及涂料、胶黏剂、油\n\n墨、清洗剂等挥发性有机物产品的，属于强制性标准的，供应商应执行符\n\n 合本市和国家的VOCs 含量限制标准（具体标准见第五章《采购需求》），\n\n否则投标无效；属于推荐性标准的，优先采购，具体见第四章《评标程序、\n\n评标方法和评标标准》。\n\n     5.7 采购需求标准\n\n     5.7.1 商品包装、快递包装政府采购需求标准（试行）\n\n   为助力打好污染防治攻坚战，推广使用绿色包装，根据财政部关于印\n\n发《商品包装政府采购需求标准（试行）》、《快递包装政府采购需求标\n\n 准（试行）》的通知（财办库〔2020〕123 号），本项目如涉及商品包装\n\n和快递包装的，则其具体要求见第五章《采购需求》。\n\n     5.7.2 其他政府采购需求标准\n\n   为贯彻落实《深化政府采购制度改革方案》有关要求，推动政府采购\n\n需求标准建设，财政部门会同有关部门制定发布的其他政府采购需求标准，\n\n本项目如涉及，则具体要求见第五章《采购需求》。\n\n     6 投标费用\n\n                                              14",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 16,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n    6.1 投标人应自行承担所有与准备和参加投标有关的费用，无论投标\n\n的结果如何，采购人或采购代理机构在任何情况下均无承担这些费用的义\n\n务和责任。\n\n             二 招标文件\n\n    7 招标文件构成\n\n    7.1 招标文件包括以下部分：\n\n  第一章 投标邀请\n\n  第二章 投标人须知\n\n  第三章 资格审查\n\n  第四章 评标程序、评标方法和评标标准\n\n  第五章 采购需求\n\n  第六章 拟签订的合同文本\n\n  第七章 投标文件格式\n\n    7.2 投标人应认真阅读招标文件的全部内容。投标人应按照招标文件\n\n要求提交投标文件并保证所提供的全部资料的真实性，并对招标文件做出\n\n实质性响应，否则投标无效。\n\n    8 对招标文件的澄清或修改\n\n    8.1 采购人或采购代理机构对已发出的招标文件进行必要澄清或者修\n\n改的，将在原公告发布媒体上发布更正公告，并以书面形式通知所有获取\n\n招标文件的潜在投标人。\n\n    8.2 上述书面通知，按照获取招标文件的潜在投标人提供的联系方式\n\n发出，因提供的信息有误导致通知延迟或无法通知的，采购人或采购代理\n\n机构不承担责任。\n\n    8.3 澄清或者修改的内容为招标文件的组成部分，并对所有获取招标\n\n文件的潜在投标人具有约束力。澄清或者修改的内容可能影响投标文件编\n\n制的，将在投标截止时间至少15日前，以书面形式通知所有获取招标文件\n\n的潜在投标人；不足15日的，将顺延提交投标文件截止时间和开标时间。\n\n            三  投标文件的编制\n\n    9 投标范围、投标文件中计量单位的使用及投标语言\n\n    9.1 本项目如划分采购包，投标人可以对本项目的其中一个采购包进\n\n                                             15",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 17,
+          "text": "  北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n行投标，也可同时对多个采购包进行投标。投标人应当对所投采购包对应\n\n第五章《采购需求》所列的全部内容进行投标，不得将一个采购包中的内\n\n容拆分投标，否则其对该采购包的投标将被认定为无效投标。\n\n     9.2 除招标文件有特殊要求外，本项目投标所使用的计量单位，应采\n\n用中华人民共和国法定计量单位。\n\n     9.3 除专用术语外，投标文件及来往函电均应使用中文书写。必要时\n\n专用术语应附有中文解释。投标人提交的支持资料和已印制的文献可以用\n\n外文，但相应内容应附有中文翻译本，在解释投标文件时以中文翻译本为\n\n准。未附中文翻译本或翻译本中文内容明显与外文内容不一致的，其不利\n\n后果由投标人自行承担。\n\n     10 投标文件构成\n\n     10.1 投标人应当按照招标文件的要求编制投标文件。投标文件应由\n\n《资格证明文件》、《商务技术文件》两部分构成。投标文件的部分格式要\n\n求，见第七章《响应文件格式》。\n\n     10.2 对于招标文件中标记了“实质性格式”文件的，投标人不得改变\n\n格式中给定的文字所表达的含义，不得删减格式中的实质性内容，不得自\n\n行添加与格式中给定的文字内容相矛盾的内容，不得对应当填写的空格不\n\n填写或不实质性响应，否则投标无效。未标记“实质性格式”的文件和招\n\n标文件未提供格式的内容，可由投标人自行编写。\n\n     10.3 第四章《评标程序、评标方法和评标标准》中涉及的证明文件。\n\n     10.4 对照第五章《采购需求》，说明所提供货物和服务已对第五章\n\n《采购需求》做出了响应，或申明与第五章《采购需求》的偏差和例外。如\n\n第五章《采购需求》中要求提供证明文件的，投标人应当按具体要求提供\n\n证明文件。\n\n     10.5 投标人认为应附的其他材料。\n\n     11 投标报价\n\n     11.1 所有投标均以人民币为计价货币。\n\n     11.2 投标人的报价应包括为完成本项目所发生的一切费用和税费，采\n\n购人将不再支付报价以外的任何费用。投标人的报价应包括但不限于下列\n\n内容，《投标人须知资料表》中有特殊规定的，从其规定。\n\n                                              16",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 18,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n    11.2.1 投标货物及标准附件、备品备件、专用工具等的出厂价（包括\n\n已在中国国内的进口货物完税后的仓库交货价、展室交货价或货架交货价）\n\n和运至最终目的地的运输费和保险费，安装调试、检验、技术服务、培训、\n\n质量保证、售后服务、税费等；\n\n    11.2.2 按照招标文件要求完成本项目的全部相关费用。\n\n    11.3 采购人不得向供应商索要或者接受其给予的赠品、回扣或者与采\n\n购无关的其他商品、服务。\n\n    11.4 投标人不能提供任何有选择性或可调整的报价（招标文件另有规\n\n定的除外），否则其投标无效。\n\n    12 投标保证金（不适用）\n\n    12.1 投标人应按《投标人须知资料表》中规定的金额及要求交纳投标\n\n保证金。投标人自愿超额缴纳投标保证金的，投标文件不做无效处理。\n\n    12.2 交纳投标保证金可采用的形式：政府采购法律法规接受的支票、\n\n汇票、本票、网上银行支付或者金融机构、担保机构出具的保函等非现金\n\n形式。\n\n    12.3 投标保证金到账（保函提交）截止时间同投标截止时间。以支票、\n\n汇票、本票、网上银行支付等形式提交投标保证金的，应在投标截止时间\n\n前到账；以金融机构、担保机构出具的纸质保函等形式提交投标保证金的，\n\n应在投标截止时间前将原件提交至采购代理机构；以电子保函形式提交投\n\n标保证金的，应在投标截止时间前通过北京市政府采购电子交易平台完成\n\n电子保函在线办理。未按上述要求缴纳投标保证金的，其投标无效。\n\n    12.4 投标人除需在投标文件中提供“投标保证金凭证/交款单据电子\n\n件”，还需在投标截止时间前，通过电子交易平台上传“投标保证金凭证/\n\n交款单据电子件”。\n\n    12.5 投标保证金有效期同投标有效期。\n\n    12.6 投标人为联合体的，可以由联合体中的一方或者多方共同交纳投\n\n标保证金，其交纳的投标保证金对联合体各方均具有约束力。\n\n    12.7 采购人、采购代理机构将及时退还投标人的保证金，采用银行保\n\n函、担保机构担保函等形式递交的投标保证金，经投标人同意后采购人、\n\n\n\n                                             17",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 19,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n采购代理机构可以不再退还，但因投标人自身原因导致无法及时退还的除\n\n外：\n\n    12.7.1 投标人在投标截止时间前撤回已提交的投标文件的，自收到投\n\n标人书面撤回通知之日起5个工作日内退还已收取的投标保证金；\n\n    12.7.2 中标人的投标保证金，自采购合同签订之日起5个工作日内退\n\n还中标人；\n\n    12.7.3 未中标投标人的投标保证金，自中标通知书发出之日起5个工\n\n作日内退还未中标人；\n\n    12.7.4 终止招标项目已经收取投标保证金的，自终止采购活动后5个\n\n工作日内退还已收取的投标保证金及其在银行产生的孳息。\n\n    12.8 有下列情形之一的，采购人或采购代理机构可以不予退还投标保\n\n证金：\n\n    12.8.1 投标有效期内投标人撤销投标文件的；\n\n    12.8.2 《投标人须知资料表》中规定的其他情形。\n\n    13 投标有效期\n\n    13.1 投标文件应在本招标文件《投标人须知资料表》中规定的投标有\n\n效期内保持有效，投标有效期少于招标文件规定期限的，其投标无效。\n\n    14 投标文件的签署、盖章\n\n    14.1 招标文件要求签字的内容（如授权委托书等），可以使用电子签\n\n章或使用原件的电子件（电子件指扫描件、照片等形式电子文件）；要求\n\n第三方出具的盖章件原件（如联合协议、分包意向协议、制造商授权书\n\n等），投标文件中应使用原件的电子件。\n\n    14.2 招标文件要求盖章的内容，一般通过投标文件编制工具加盖电子\n\n签章。\n\n            四  投标文件的提交\n\n    15 投标文件的提交\n\n    15.1 本项目使用北京市政府采购电子交易平台。投标人根据招标文件\n\n及电子交易平台供应商操作手册要求编制、生成并提交电子投标文件。\n\n    15.2 采购人及采购代理机构拒绝接受通过电子交易平台以外任何形式\n\n提交的投标文件，投标保证金除外。\n\n                                             18",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 20,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n    16 投标截止时间\n\n    16.1 投标人应在招标文件要求提交投标文件截止时间前，将电子投标\n\n文件提交至电子交易平台。\n\n    17 投标文件的修改与撤回\n\n    17.1 投标截止时间前，投标人可以通过电子交易平台对所提交的投标\n\n文件进行补充、修改或者撤回。投标保证金的补充、修改或者撤回无需通\n\n过电子交易平台，但应就其补充、修改或者撤回通知采购人或采购代理机\n\n构。\n\n    17.2 投标人对投标文件的补充、修改的内容应当按照招标文件要求签\n\n署、盖章，作为投标文件的组成部分。\n\n          五 开标、资格审查及评标\n\n    18 开标\n\n    18.1 采购人或采购代理机构将按招标文件的规定，在投标截止时间的\n\n同一时间和招标文件预先确定的地点组织开标。\n\n    18.2 本项目开标使用北京市政府采购电子交易平台。投标人应在《投\n\n标人须知资料表》规定的时间内对投标文件进行解密，因非系统原因导致\n\n的解密失败，视为投标无效。\n\n    18.3 开标过程将使用电子交易平台宣布投标人名称、投标价格和招标\n\n文件规定的需要宣布的其他内容并进行记录，并由参加开标的各投标人确\n\n认。投标人未在规定时间内提出疑义或确认一览表的，视同认可开标结果。\n\n    18.4 投标人对开标过程和开标记录有疑义，以及认为采购人、采购代\n\n理机构相关工作人员有需要回避的情形的，应当场提出询问或者回避申请。\n\n采购人、采购代理机构对投标人提出的询问或者回避申请将及时处理。\n\n    18.5 投标人不足3家的，不予开标。\n\n    19 资格审查\n\n    19.1 见第三章《资格审查》。\n\n    20 评标委员会\n\n    20.1 评标委员会根据政府采购有关规定和本次采购项目的特点进行组\n\n建，并负责具体评标事务，独立履行职责。\n\n\n\n                                             19",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 21,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n    20.2 评审专家须符合《财政部关于在政府采购活动中查询及使用信用\n\n记录有关问题的通知》（财库〔2016〕125号）的规定。依法自行选定评审\n\n专家的，采购人和采购代理机构将查询有关信用记录，对具有行贿、受贿、\n\n欺诈等不良信用记录的人员，拒绝其参与政府采购活动。\n\n    21 评标程序、评标方法和评标标准\n\n    21.1 见第四章《评标程序、评标方法和评标标准》\n\n             六 确定中标\n\n    22 确定中标人\n\n    22.1 采购人将在评标报告确定的中标候选人名单中按顺序确定中标人，\n\n中标候选人并列的，由采购人或者采购人委托评标委员会按照招标文件规\n\n定的方式确定中标人；招标文件未规定的，采取随机抽取的方式确定。采\n\n购人是否委托评标委员会直接确定中标人，见《投标人须知资料表》。中\n\n标候选人并列的，按照《投标人须知资料表》要求确定中标人。\n\n    23 中标公告与中标通知书\n\n    23.1 采购人或采购代理机构自中标人确定后2个工作日内，在北京市\n\n政府采购网公告中标结果，同时向中标人发出中标通知书，中标公告期限\n\n为1个工作日。\n\n    23.2 中标通知书对采购人和中标供应商均具有法律效力。中标通知书\n\n发出后，采购人改变中标结果的，或者中标供应商放弃中标项目的，应当\n\n依法承担法律责任。\n\n    24 废标\n\n    24.1 在招标采购中，出现下列情形之一的，应予废标：\n\n    24.1.1 符合专业条件的供应商或者对招标文件作实质响应的供应商不\n\n足三家的；\n\n    24.1.2 出现影响采购公正的违法、违规行为的；\n\n    24.1.3 投标人的报价均超过了采购预算，采购人不能支付的；\n\n    24.1.4 因重大变故，采购任务取消的。\n\n    24.2 废标后，采购人将废标理由书面通知所有投标人。\n\n    25 签订合同\n\n    25.1 中标人、采购人应当自中标通知书发出之日起30日内，按照招标\n\n                                             20",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 22,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n文件和中标人投标文件的规定签订书面合同。所签订的合同不得对招标文\n\n件确定的事项和中标人投标文件作实质性修改。\n\n    25.2 中标人拒绝与采购人签订合同的，采购人可以按照评标报告推荐\n\n的中标候选人名单排序，确定下一候选人为中标人，也可以重新开展政府\n\n采购活动。\n\n    25.3 联合体中标的，联合体各方应当共同与采购人签订合同，就采购\n\n合同约定的事项向采购人承担连带责任。\n\n    25.4 政府采购合同不能转包。\n\n    25.5 采购人允许采用分包方式履行合同的，中标人可以依法在中标后\n\n将中标项目的非主体、非关键性工作采取分包方式履行合同。本项目的非\n\n主体、非关键性工作是否允许分包，见《投标人须知资料表》。政府采购\n\n合同分包履行的，应当在投标文件中载明分包承担主体，分包承担主体应\n\n当具备相应资质条件且不得再次分包，否则投标无效。中标人就采购项目\n\n和分包项目向采购人负责，分包供应商就分包项目承担责任。\n\n    25.6 “政采贷”融资指引：详见《投标人须知资料表》。\n\n    26 询问与质疑\n\n    26.1 询问\n\n    26.1.1 投标人对政府采购活动事项有疑问的，可依法向采购人或采购\n\n代理机构提出询问，提出形式见《投标人须知资料表》。\n\n    26.1.2 采购人或采购代理机构对供应商依法提出的询问，在3个工作\n\n日内作出答复，但答复的内容不得涉及商业秘密。\n\n    26.2 质疑\n\n    26.2.1 投标人认为采购文件、采购过程、中标结果使自己的权益受到\n\n损害的，可以在知道或者应知其权益受到损害之日起7个工作日内，以书面\n\n形式向采购人、采购代理机构提出质疑。采购人、采购代理机构在收到质\n\n疑函后7个工作日内作出答复。\n\n    26.2.2 质疑函须使用财政部制定的范本文件。投标人为自然人的，质\n\n疑函应当由本人签字；投标人为法人或者其他组织的，质疑函应当由法定\n\n代表人、主要负责人，或者其授权代表签字或者盖章，并加盖公章。\n\n    26.2.3 投标人委托代理人进行质疑的，应当随质疑函同时提交投标人\n\n                                             21",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 23,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n签署的授权委托书。授权委托书应当载明代理人的姓名或者名称、代理事\n\n项、具体权限、期限和相关事项。投标人为自然人的，应当由本人签字；\n\n投标人为法人或者其他组织的，应当由法定代表人、主要负责人签字或者\n\n盖章，并加盖公章。\n\n    26.2.4 投标人应在法定质疑期内一次性提出针对同一采购程序环节的\n\n质疑，法定质疑期内针对同一采购程序环节再次提出的质疑，采购人、采\n\n购代理机构有权不予答复。\n\n    26.3 接收询问和质疑的联系部门、联系电话和通讯地址见《投标人须\n\n知资料表》。\n\n    27 代理费\n\n    27.1 收费对象、收费标准及缴纳时间见《投标人须知资料表》。由中\n\n标人支付的，中标人须一次性向采购代理机构缴纳代理费，投标报价应包\n\n含代理费用。\n\n\n\n\n\n                                             22",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 24,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n         第三章  资格审查\n\n            一、资格审查程序\n\n    1 开标结束后，采购人或采购代理机构将根据《资格审查要求》中的\n\n规定，对投标人进行资格审查，并形成资格审查结果。\n\n  2《资格审查要求》中对格式有要求的，除招标文件另有规定外，均为\n\n“实质性格式”文件。\n\n    3 投标人《资格证明文件》有任何一项不符合《资格审查要求》的，\n\n资格审查不合格，其投标无效。\n\n    4 资格审查合格的投标人不足3家的，不进行评标。\n\n            二、资格审查要求\n\n序号   审查因素           审查内容         格式要求\n\n    满足《中华人民共\n  1  和国政府采购法》 具体规定见第一章《投标邀请》\n    第二十二条规定\n             投标人为企业（包括合伙企业）的，应提供\n             有效的“营业执照”；\n             投标人为事业单位的，应提供有效的“事业\n             单位法人证书”；\n             投标人是非企业机构的，应提供有效的“执\n             业许可证”、“登记证书”等证明文件；\n             投标人是个体工商户的，应提供有效的“个\n             体工商户营业执照”；\n             投标人是自然人的，应提供有效的自然人身 提供证明文\n    营业执照等证明文\n 1-1           份证明。                件的电子件\n    件\n             分支机构参加投标的，应提供该分支机构或 或电子证照\n             其所属法人/其他组织的相应证明文件；同\n             时还应提供其所属法人/其他组织出具的授\n             权其参与本项目的授权书（格式自拟，须加\n             盖其所属法人/其他组织的公章）；对于银\n             行、保险、石油石化、电力、电信等行业的\n             分支机构，可以提供上述授权，也可以提供\n             其所属法人/其他组织的有关文件或制度等\n             能够证明授权其独立开展业务的证明材料。\n                                 格式见《投\n             提供了符合招标文件要求的《投标人资格声\n 1-2 投标人资格声明书                     标文件格\n             明书》。\n                                 式》\n\n\n\n\n                                             23",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 25,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n序号   审查因素           审查内容         格式要求\n\n             查询渠道：信用中国网站和中国政府采购网\n                       （www.creditchina.gov.cn、www.ccgp.gov.\n                 cn）；\n             截止时点：投标截止时间以后、资格审查阶\n             段采购人或采购代理机构的实际查询时间；\n                                 无须投标人\n             信用信息查询记录和证据留存具体方式：查\n                                 提供，由采\n             询结果网页打印页作为查询记录和证据，与\n 1-3 投标人信用记录                      购人或采购\n             其他采购文件一并保存；\n                                 代理机构查\n             信用信息的使用原则：经认定的被列入失信\n                                 询。\n             被执行人、重大税收违法案件当事人名单、\n             政府采购严重违法失信行为记录名单的投标\n             人，其投标无效。联合体形式投标的，联合\n             体成员存在不良信用记录，视同联合体存在\n             不良信用记录。\n   法律、行政法规规\n 1-4           法律、行政法规规定的其他条件            /\n   定的其他条件\n   落实政府采购政策\n  2           具体要求见第一章《投标邀请》\n   需满足的资格要求\n   中小企业政策证明\n 2-1           具体要求见第一章《投标邀请》\n   文件\n             当本项目（包）涉及预留份额专门面向中小\n             企业采购，此时建议在《资格证明文件》中\n             提供。\n             1、投标人单独投标的，应提供《中小企业\n             声明函》或《残疾人福利性单位声明函》或\n             由省级以上监狱管理局、戒毒管理局（含新\n             疆生产建设兵团）出具的属于监狱企业的证\n             明文件。                格式见《投\n2-1-1 中小企业证明文件 2、如招标文件要求以联合体形式参加或者  标文件格\n             要求合同分包的，且投标人为联合体或拟进 式》\n             行合同分包的，则联合体中的中小企业、签\n             订分包意向协议的中小企业具体情况须在《\n             中小企业声明函》或《残疾人福利性单位声\n             明函》或由省级以上监狱管理局、戒毒管理\n             局（含新疆生产建设兵团）出具的属于监狱\n             企业的证明文件中如实填报，且满足招标文\n             件关于预留份额的要求。\n\n\n\n\n\n                                             24",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 26,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n序号   审查因素           审查内容         格式要求\n\n             如本项目（包）要求通过分包措施预留部分\n             采购份额面向中小企业采购、且投标人因落\n             实政府采购政策拟进行分包的，必须提供；\n                                 格式见《投\n   拟分包情况说明及 否则无须提供。\n2-1-2                              标文件格\n   分包意向协议   对于预留份额专门面向中小企业采购的项目\n                                 式》\n            （包），组成联合体或者接受分包合同的中\n             小企业与联合体内其他企业、分包企业之间\n             不得存在直接控股、管理关系。\n                                 提供证明文\n   其它落实政府采购\n 2-2           如有，见第一章《投标邀请》       件的电子件\n   政策的资格要求\n                                 或电子证照\n   本项目的特定资格\n  3           如有，见第一章《投标邀请》\n   要求\n             1、如本项目接受联合体投标，且投标人为\n             联合体时必须提供《联合协议》，明确各方\n             拟承担的工作和责任，并指定联合体牵头人\n             ，授权其代表所有联合体成员负责本项目投\n             标和合同实施阶段的牵头、协调工作。该联\n             合协议应当作为投标文件的组成部分，与投\n             标文件其他内容同时递交。\n             2、联合体各成员单位均须提供本表中序号1\n              -1、1-2的证明文件。联合体各成员单位均\n              应满足本表3-2项规定。\n                                 提供《联合\n              3、本表序号3-3项规定的其他特定资格要求\n                                 协议》原件\n             中的每一小项要求，联合体各方中至少应当\n   本项目对于联合体                     的电子件\n 3-1           有一方符合本表中其他资格要求并提供证明\n   的要求                          格式见《投\n             文件。\n                                 标文件格\n             4、联合体中有同类资质的供应商按照联合\n                                 式》\n             体分工承担相同工作的，应当按照资质等级\n             较低的供应商确定资质等级。\n             5、以联合体形式参加政府采购活动的，联\n             合体各方不得再单独参加或者与其他供应商\n             另外组成联合体参加同一合同项下的政府采\n             购活动。\n             6、若联合体中任一成员单位中途退出，则\n             该联合体的投标无效。\n             7、本项目不接受联合体投标时，投标人不\n             得为联合体。\n                                 格式见《投\n             如本项目属于政府购买服务，投标人不属于 标文件格\n   政府购买服务承接\n 3-2           公益一类事业单位、使用事业编制且由财政 式》“1-2\n   主体的要求\n             拨款保障的群团组织。          投标人资格\n                                 声明书”\n\n                                             25",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 27,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n序号   审查因素           审查内容         格式要求\n\n            如有，见第一章《投标邀请》\n                                提供证明文\n            注：如联合体中有同类资质的供应商按照联\n 3-3 其他特定资格要求                     件的电子件\n            合体分工承担相同工作的，均应当提供资质\n                                或电子证照\n            证书电子件或电子证照。\n   投标保证金（不适\n  4           按照招标文件的要求提交投标保证金。\n   用）\n            在规定期限内通过北京市政府采购电子交易\n            平台获取所参与包的招标文件。\n  5  获取招标文件   注：如本项目接受联合体，且供应商为联合\n            体时，联合体中任一成员获取文件即视为满\n            足要求。\n\n\n\n\n\n                                            26",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 28,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n    第四章  评标程序、评标方法和评标标准\n\n             一、评标方法\n\n    1 投标文件的符合性审查\n\n    1.1 评标委员会对资格审查合格的投标人的投标文件进行符合性审查，\n\n以确定其是否满足招标文件的实质性要求。\n\n    1.2 评标委员会根据《符合性审查要求》中规定的审查因素和审查内\n\n容，对投标人的投标文件是否实质上响应招标文件进行符合性审查，并形\n\n成符合性审查评审结果。投标人《商务技术文件》有任何一项不符合《符\n\n合性审查要求》要求的，投标无效。\n\n             符合性审查要求\n\n序\n   审查因素              审查内容\n号\n\n 1  授权委托书 按招标文件要求提供授权委托书；\n\n 2  投标完整性 未将一个采购包中的内容拆分投标；\n\n          投标报价未超过招标文件中规定的项目/采购包预算金额或者项目/\n 3  投标报价\n         采购包最高限价；\n\n         投标文件未出现可选择性或可调整的报价（招标文件另有规定的除\n 4  报价唯一性\n         外）；\n\n         投标文件中承诺的投标有效期满足招标文件中载明的投标有效期\n 5  投标有效期\n         的；\n\n         标记为“实质性格式”的文件均按招标文件要求提供且签署、盖章\n 6  实质性格式\n         的；\n\n 7 ★号条款响应 投标文件满足招标文件第五章《采购需求》中★号条款要求的；\n\n  拟分包情况说 如本项目（包）非因“落实政府采购政策”亦允许分包，且供应商\n 8\n   明（如有） 拟进行分包时，必须提供；否则无须提供；\n\n         分包履行的内容、金额或者比例未超出《投标人须知资料表》中的\n  分包其他要求 规定；\n 9\n   （如有）  分包承担主体具备《投标人须知资料表》载明的资质条件且提供了\n         资质证书电子件（如有）；\n\n   报价的修正 不涉及报价修正，或投标文件报价出现前后不一致时，投标人对修\n10\n   （如有）  正后的报价予以确认；（如有）\n\n         报价合理，或投标人的报价明显低于其他通过符合性审查投标人的\n11  报价合理性 报价，有可能影响产品质量或者不能诚信履约的，能够应评标委员\n         会要求在规定时间内证明其报价合理性的；\n\n                                             27",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 29,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n  进口产品（如 招标文件不接受进口产品投标的内容时，投标人所投产品不含进口\n12\n    有）   产品；\n\n         国家有关部门对投标人的投标产品有强制性规定或要求的（如相应\n         技术、安全、节能和环保等），投标人的投标产品应符合相应规定\n         或要求，并提供证明文件电子件：\n         1）采购的产品若属于《节能产品政府采购品目清单》范围中政府\n         强制采购产品，则投标人所报产品必须获得国家确定的认证机构出\n  国家有关部门 具的、处于有效期之内的节能产品认证证书；\n  对投标人的投 2）所投产品属于列入《网络关键设备和网络安全专用产品目录》\n13 标产品有强制 的网络安全专用产品时，应当按照《信息安全技术网络安全专用产\n  性规定或要求 品安全技术要求》等相关国家标准的强制性要求，由具备资格的机\n     的   构安全认证合格或者安全检测符合要求；（如该产品已经获得公安\n         部颁发的计算机信息系统安全专用产品销售许可证，且在有效期\n         内，亦视为符合要求）\n         3）项目中涉及涂料、胶黏剂、油墨、清洗剂等挥发性有机物产\n          品，且属于强制性标准的，供应商应执行符合本市和国家的VOCs\n         含量限制标准。\n\n         投标人遵循公平竞争的原则，不存在恶意串通，妨碍其他投标人的\n14  公平竞争\n         竞争行为，不存在损害采购人或者其他投标人的合法权益情形的；\n\n         不存在《政府采购货物和服务招标投标管理办法》视为投标人串通\n         投标的情形：（一）不同投标人的投标文件由同一单位或者个人编\n         制；（二）不同投标人委托同一单位或者个人办理投标事宜；\n15  串通投标 （三）不同投标人的投标文件载明的项目管理成员或者联系人员为\n         同一人；（四）不同投标人的投标文件异常一致或者投标报价呈规\n         律性差异；（五）不同投标人的投标文件相互混装；（六）不同投\n         标人的投标保证金从同一单位或者个人的账户转出；\n\n16  附加条件  投标文件未含有采购人不能接受的附加条件的；\n\n         投标人、投标文件不存在不符合法律、法规和招标文件规定的其他\n17 其他无效情形\n         无效情形。\n\n    2 投标文件有关事项的澄清或者说明\n\n    2.1 评标过程中，评标委员会将以书面形式要求投标人对其投标文件\n\n中含义不明确、同类问题表述不一致或者有明显文字和计算错误的内容，\n\n作出必要的澄清、说明或者补正。投标人的澄清、说明或者补正应当采用\n\n书面形式，并加盖公章，或者由法定代表人（若投标人为事业单位或其他\n\n组织或分支机构，可为单位负责人）或其授权的代表签字。投标人的澄清、\n\n说明或者补正不得超出投标文件的范围或者改变投标文件的实质性内容。\n\n                                             28",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [
+            {
+              "headers": [
+                "12",
+                "进口产品（如\n有）",
+                "招标文件不接受进口产品投标的内容时，投标人所投产品不含进口\n产品；"
+              ],
+              "rows": [
+                [
+                  "13",
+                  "国家有关部门\n对投标人的投\n标产品有强制\n性规定或要求\n的",
+                  "国家有关部门对投标人的投标产品有强制性规定或要求的（如相应\n技术、安全、节能和环保等），投标人的投标产品应符合相应规定\n或要求，并提供证明文件电子件：\n1）采购的产品若属于《节能产品政府采购品目清单》范围中政府\n强制采购产品，则投标人所报产品必须获得国家确定的认证机构出\n具的、处于有效期之内的节能产品认证证书；\n2）所投产品属于列入《网络关键设备和网络安全专用产品目录》\n的网络安全专用产品时，应当按照《信息安全技术网络安全专用产\n品安全技术要求》等相关国家标准的强制性要求，由具备资格的机\n构安全认证合格或者安全检测符合要求；（如该产品已经获得公安\n部颁发的计算机信息系统安全专用产品销售许可证，且在有效期\n内，亦视为符合要求）\n3）项目中涉及涂料、胶黏剂、油墨、清洗剂等挥发性有机物产\n品，且属于强制性标准的，供应商应执行符合本市和国家的VOCs\n含量限制标准。"
+                ],
+                [
+                  "14",
+                  "公平竞争",
+                  "投标人遵循公平竞争的原则，不存在恶意串通，妨碍其他投标人的\n竞争行为，不存在损害采购人或者其他投标人的合法权益情形的；"
+                ],
+                [
+                  "15",
+                  "串通投标",
+                  "不存在《政府采购货物和服务招标投标管理办法》视为投标人串通\n投标的情形：（一）不同投标人的投标文件由同一单位或者个人编\n制；（二）不同投标人委托同一单位或者个人办理投标事宜；\n（三）不同投标人的投标文件载明的项目管理成员或者联系人员为\n同一人；（四）不同投标人的投标文件异常一致或者投标报价呈规\n律性差异；（五）不同投标人的投标文件相互混装；（六）不同投\n标人的投标保证金从同一单位或者个人的账户转出；"
+                ],
+                [
+                  "16",
+                  "附加条件",
+                  "投标文件未含有采购人不能接受的附加条件的；"
+                ],
+                [
+                  "17",
+                  "其他无效情形",
+                  "投标人、投标文件不存在不符合法律、法规和招标文件规定的其他\n无效情形。"
+                ]
+              ]
+            }
+          ],
+          "sheet": null
+        },
+        {
+          "number": 30,
+          "text": "  北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n澄清文件将作为投标文件内容的一部分。\n\n     2.2 评标委员会认为投标人的报价明显低于其他通过符合性审查投标\n\n人的报价，有可能影响产品质量或者不能诚信履约的，有权要求该投标人\n\n在评标现场合理的时间内提供书面说明，必要时提交相关证明材料；若投\n\n标人不能证明其报价合理性，评标委员会将其作为无效投标处理。\n\n     2.3 投标报价须包含招标文件全部内容，如分项报价表有缺漏视为已\n\n含在其他各项报价中，将不对投标总价进行调整。评标委员会有权要求投\n\n标人在评标现场合理的时间内对此进行书面确认，投标人不确认的，视为\n\n将一个采购包中的内容拆分投标，其投标无效。\n\n     2.4 投标文件报价出现前后不一致的，按照下列规定修正：\n\n     2.4.1 招标文件对于报价修正是否另有规定：\n\n    □有，具体规定为：______________\n\n   ■无，按下述2.4.2-2.4.8项规定修正。\n\n     2.4.2 单独递交的开标一览表（报价表）与投标文件中开标一览表\n\n（报价表）内容不一致的，以单独递交的开标一览表（报价表）为准；\n\n     2.4.3 投标文件中开标一览表（报价表）内容与投标文件中相应内容\n\n不一致的，以开标一览表（报价表）为准；\n\n     2.4.4 大写金额和小写金额不一致的，以大写金额为准；\n\n     2.4.5 单价金额小数点或者百分比有明显错位的，以开标一览表的总\n\n价为准，并修改单价；\n\n     2.4.6 总价金额与按单价汇总金额不一致的，以单价金额计算结果为\n\n准。\n\n     2.4.7 同时出现两种以上不一致的，按照前款规定的顺序修正。\n\n     2.4.8 修正后的报价经投标人书面确认后产生约束力，投标人不确认\n\n的，其投标无效。\n\n     2.5 落实政府采购政策的价格调整：只有符合第二章《投标人须知》\n\n 5.2条规定情形的，可以享受中小企业扶持政策，用扣除后的价格参加评审；\n\n否则，评审时价格不予扣除。\n\n     2.5.1 对于未预留份额专门面向中小企业采购的采购项目，以及预留\n\n 份额项目中的非预留部分采购包，对小微企业报价给予10%的扣除，用扣除\n\n                                              29",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 31,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n后的价格参加评审。\n\n    2.5.2 对于未预留份额专门面向中小企业采购的采购项目，以及预留\n\n份额项目中的非预留部分采购包，且接受大中型企业与小微企业组成联合\n\n体或者允许大中型企业向一家或者多家小微企业分包的采购项目，对于联\n\n合协议或者分包意向协议约定小微企业的合同份额占到合同总金额30%以上\n\n的联合体或者大中型企业的报价给予/%的扣除，用扣除后的价格参加评审。\n\n    2.5.3 组成联合体或者接受分包的小微企业与联合体内其他企业、分\n\n包企业之间存在直接控股、管理关系的，不享受价格扣除优惠政策。\n\n    2.5.4 价格扣除比例对小型企业和微型企业同等对待，不作区分。\n\n    2.5.5 中小企业参加政府采购活动，应当按照招标文件给定的格式出\n\n具《中小企业声明函》，否则不得享受相关中小企业扶持政策。\n\n    2.5.6 监狱企业提供了由省级以上监狱管理局、戒毒管理局（含新疆\n\n生产建设兵团）出具的属于监狱企业的证明文件的，视同小微企业。\n\n    2.5.7 残疾人福利性单位按招标文件要求提供了《残疾人福利性单位\n\n声明函》的，视同小微企业。\n\n    2.5.8 若投标人同时属于小型或微型企业、监狱企业、残疾人福利性\n\n单位中的两种及以上，将不重复享受小微企业价格扣减的优惠政策。\n    2.6 评审中出现下列情形之一的，评审委员会应当启动异常低价投标\n（响应）审查程序：\n\n    2.6.1 投标（响应）报价低于全部通过符合性审查供应商投标（响应）\n\n报价平均值50%的，即投标（响应）报价<全部通过符合性审查供应商投标\n\n（响应）报价平均值×50%；\n\n    2.6.2 投标（响应）报价低于通过符合性审查的次低报价供应商投标\n\n（响应）报价50%的，即投标（响应）报价<通过符合性审查的次低报价供\n\n应商投标（响应）报价×50%；\n\n    2.6.3 投标（响应）报价低于采购项目最高限价45%的，即投标（响应）\n\n报价<采购项目最高限价×45%；\n\n    2.6.4 评审委员会基于专业判断，认为供应商报价过低，有可能影响产\n\n品质量或者不能诚信履约的其他情形。\n\n    2.7 评审委员会启动异常低价投标（响应）审查后，属于前述第1 项至\n\n\n                                             30",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 32,
+          "text": "  北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n 第4 项情形的，应当要求相关供应商在评审现场合理的时间内对投标（响\n\n应）价格作出解释，提供项目具体成本测算等与报价合理性相关的书面说\n\n明及必要的证明材料，包括但不限于原材料成本、人工成本、制造费用等，\n\n 给予相关供应商的合理时间一般不少于30 分钟。其中，属于第3 项情形，\n\n供应商已随投标（响应）文件一并提交相关书面说明及必要的证明材料的，\n\n在评审现场可不再重复提交。\n\n   评审委员会依据专业经验，参考同类项目中标（成交）价格、类似产\n\n品市场价格水平、行业人工费用标准、国家有关部门指导行业协会发布的\n\n行业平均成本等情况，对报价合理性进行判断。投标（响应）供应商不能\n\n提供书面说明、证明材料，或者提供的书面说明、证明材料不能证明其报\n\n价合理性的，评审委员会应当将其作为无效投标（响应）处理。\n\n   采购人、采购代理机构应当为评审委员会在评审现场及时获取同类项\n\n目中标（成交）价格、类似产品市场价格水平、行业人工费用标准、国家\n\n有关部门指导行业协会发布的行业平均成本等相关信息资料提供便利。评\n\n审委员会借助互联网等渠道查询相关信息的，应当严格遵守评审工作纪律，\n\n不得实施影响评审公正的行为。\n\n   异常低价投标（响应）审查的启动原因、审查意见和审查结果应当在\n\n评审报告中记录，并随供应商提供的相关书面说明及证明材料，以及评审\n\n委员会有关互联网浏览、查询历史一并归档。\n\n     3 投标文件的比较和评价\n\n     3.1 评标委员会将按照招标文件中规定的评标方法和标准，对符合性\n\n审查合格的投标文件进行商务和技术评估，综合比较与评价；未通过符合\n\n性审查的投标文件不得进入比较与评价。\n\n     3.2 评标方法和评标标准\n\n     3.2.1 本项目采用的评标方法为\n\n   ■综合评分法，指投标文件满足招标文件全部实质性要求，且按照评\n\n审因素的量化指标评审得分最高的投标人为中标候选人的评标方法，见\n\n《评标标准》，招标文件中没有规定的评标标准不得作为评审的依据。\n\n   □最低评标价法，指投标文件满足招标文件全部实质性要求，且投标\n\n报价最低的投标人为中标候选人的评标方法。\n\n                                              31",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 33,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n  3.2.2采用最低评标价法时，提供相同品牌产品（单一产品或核心产品\n\n品牌相同）的不同投标人参加同一合同项下投标的，以其中通过资格审查、\n\n符合性审查且报价最低的参加评标；报价相同的，由采购人或者采购人委\n\n托评标委员会按照下述方法确定一个参加评标的投标人，其他投标无效。\n\n  □随机抽取\n\n  □其他方式，具体要求：  /\n\n  3.2.3非政府强制采购的节能产品或环境标志产品，依据品目清单和认\n\n证证书实施政府优先采购。优先采购的具体规定（如涉及）  / 。\n\n  4确定中标候选人名单\n\n  4.1采用综合评分法时，提供相同品牌产品（单一产品或核心产品品牌\n\n相同）且通过资格审查、符合性审查的不同投标人参加同一合同项下投标\n\n的，按一家投标人计算，评审后得分最高的同品牌投标人获得中标人推荐\n\n资格；评审得分相同的，评标委员会按照下述规定确定一个投标人获得中\n\n标人推荐资格，其他同品牌投标人不作为中标候选人。\n\n  □随机抽取\n\n  █其他方式，具体要求：得分相同的，按投标报价由低到高顺序排列。\n\n得分且投标报价相同的并列。投标文件满足招标文件全部实质性要求，且\n\n按照评审因素的量化指标评审得分最高的投标人为排名第一的中标候选人。\n\n  4.2采用综合评分法时，评标结果按评审后得分由高到低顺序排列。得\n\n分相同的，按投标报价由低到高顺序排列。得分且投标报价相同的并列。\n\n投标文件满足招标文件全部实质性要求，且按照评审因素的量化指标评审\n\n得分最高的投标人为排名第一的中标候选人。评分分值计算保留小数点后\n\n两位，第三位四舍五入。\n\n  4.3采用最低评标价法时，评标结果按本章2.4、2.5调整后的投标报价\n\n由低到高顺序排列。投标报价相同的并列。投标文件满足招标文件全部实\n\n质性要求且投标报价最低的投标人为排名第一的中标候选人。\n\n  4.4评标委员会要对评分汇总情况进行复核，特别是对排名第一的、报\n\n价最低的、投标或响应文件被认定为无效的情形进行重点复核。\n\n  4.5评标委员会将根据各投标人的评标排序，依次推荐本项目（各采购\n\n包）的中标候选人，起草并签署评标报告。本项目（各采购包）评标委员\n\n                                             32",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 34,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n会共（各）推荐3 名中标候选人。\n\n  5报告违法行为\n\n    5.1 评标委员会在评标过程中发现投标人有行贿、提供虚假材料或者\n\n串通等违法行为时，应当及时向财政部门报告。\n\n\n\n\n\n                                             33",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 35,
+          "text": "  北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n          二、评标标准（适用于第一包）\n序\n  评分因素   分值            评分标准           说明\n号\n                  投标人近五年（2021年02月至2026年02月），具有\n              监控设备供货业绩（以采购合同签订日期为准）。\n        类似业绩\n               有一个得3分，最高得6分，未提供得0分。注：须提\n          （6分）\n              供合同关键页（合同首页、金额页、签署日期页、\n              双方签字盖章页等）扫描件并加盖公章。\n 1 商务部分        根据本项目的特点和采购需求，制定人员配备方\n   （15分）        案，内容包括①拟派人员组织架构；②岗位职责；\n       项目主要人员 ③人员配备保障方案等。\n         配备   每项内容进行分别阐述，描述具体且详实，每项得\n         （9分）     3 分；每项内容阐述，描述较为详实，每项得2\n               分；每项内容阐述简单，每项得1 分；未提供此项\n               内容，得0 分。\n              综合考虑投标人提供的项目供货实施方案，包括但\n              不限于①接到供货通知后供货时效；②出厂品质保\n              证；③运输过程中的保护措施；④验收等方案的完\n              整性、合理性进行综合性打分。\n       供货实施方案\n              每项内容进行分别阐述，描述具体详实，可行性\n          （16分）               强，每项得4分；每项内容阐述贴合实际情况进行论\n               述，描述较具体详实，可行性一般，每项得3分；每\n              项内容阐述不够清晰，描述不够具体详实，可行性\n               差，每项得1分；未提供此项内容，得0分。\n              综合考虑投标人提供的针对本项目设备安装、调试\n              方案，包括但不限于①安装前对到场设备的质量、\n              规格、性能、数量和技术指标的复核实施方案；②\n              设备进行安装、调试实施方案；③设备的操作手\n  技术部分        册、安装手册、维修手册、专用工具等存档、移交\n 2      设备安装、调\n   （55分）        方案。\n        试方案（12分\n              每项内容进行分别阐述，描述具体详实，可行性\n          ）               强，每项得4 分；每项内容阐述贴合实际情况进行\n               论述，描述较具体详实，可行性一般，每项得3\n              分；每项内容阐述不够清晰，描述不够具体详实，\n               可行性差，每项得1 分；未提供此项内容，得0\n              分。\n              根据投标产品技术指标，是否符合招标文件要求及\n              符合程度进行评价，全部参数满足或优于采购要求\n               得满分；标“#”项为重要指标，共14 项，每项指\n       技术指标响应\n                标满足或优于采购需求，每项得0.5 分，共7 分，\n        程度（7分）              其中一项不满足，此项不得分。（供应商须按采购\n              需求要求提供第三方机构检测报告）不满足上述要\n              求的视为该条指标未响应。\n\n\n                                                34",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [
+            {
+              "headers": [
+                "序\n号",
+                "评分因素",
+                "分值",
+                "评分标准",
+                "说明"
+              ],
+              "rows": [
+                [
+                  "1",
+                  "商务部分\n（15分）",
+                  "类似业绩\n（6分）",
+                  "投标人近五年（2021年02月至2026年02月），具有\n监控设备供货业绩（以采购合同签订日期为准）。\n有一个得3分，最高得6分，未提供得0分。注：须提\n供合同关键页（合同首页、金额页、签署日期页、\n双方签字盖章页等）扫描件并加盖公章。",
+                  ""
+                ],
+                [
+                  null,
+                  null,
+                  "项目主要人员\n配备\n（9分）",
+                  "根据本项目的特点和采购需求，制定人员配备方\n案，内容包括①拟派人员组织架构；②岗位职责；\n③人员配备保障方案等。\n每项内容进行分别阐述，描述具体且详实，每项得\n3 分；每项内容阐述，描述较为详实，每项得 2\n分；每项内容阐述简单，每项得1 分；未提供此项\n内容，得0 分。",
+                  ""
+                ],
+                [
+                  "2",
+                  "技术部分\n（55分）",
+                  "供货实施方案\n（16分）",
+                  "综合考虑投标人提供的项目供货实施方案，包括但\n不限于①接到供货通知后供货时效；②出厂品质保\n证；③运输过程中的保护措施；④验收等方案的完\n整性、合理性进行综合性打分。\n每项内容进行分别阐述，描述具体详实，可行性\n强，每项得4分；每项内容阐述贴合实际情况进行论\n述，描述较具体详实，可行性一般，每项得3分；每\n项内容阐述不够清晰，描述不够具体详实，可行性\n差，每项得1分；未提供此项内容，得0分。",
+                  ""
+                ],
+                [
+                  null,
+                  null,
+                  "设备安装、调\n试方案（12分\n）",
+                  "综合考虑投标人提供的针对本项目设备安装、调试\n方案，包括但不限于①安装前对到场设备的质量、\n规格、性能、数量和技术指标的复核实施方案；②\n设备进行安装、调试实施方案；③设备的操作手\n册、安装手册、维修手册、专用工具等存档、移交\n方案。\n每项内容进行分别阐述，描述具体详实，可行性\n强，每项得4 分；每项内容阐述贴合实际情况进行\n论述，描述较具体详实，可行性一般，每项得3\n分；每项内容阐述不够清晰，描述不够具体详实，\n可行性差，每项得1 分；未提供此项内容，得0\n分。",
+                  ""
+                ],
+                [
+                  null,
+                  null,
+                  "技术指标响应\n程度（7分）",
+                  "根据投标产品技术指标，是否符合招标文件要求及\n符合程度进行评价，全部参数满足或优于采购要求\n得满分；标“#”项为重要指标，共14 项，每项指\n标满足或优于采购需求，每项得0.5 分，共7 分，\n其中一项不满足，此项不得分。（供应商须按采购\n需求要求提供第三方机构检测报告）不满足上述要\n求的视为该条指标未响应。",
+                  ""
+                ]
+              ]
+            }
+          ],
+          "sheet": null
+        },
+        {
+          "number": 36,
+          "text": "  北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n              综合考虑投标人提供的质量管理措施，包括但不限\n              于①质量目标；②管理制度；③质量保障措施等进\n              行评审。\n              每项内容进行分别阐述，描述具体详实，可行性\n       质量管理措施\n               强，每项得4 分；每项内容阐述贴合实际情况进行\n              (12分)\n              论述，描述较具体详实，可行性一般，每项得3\n              分；每项内容阐述不够清晰，描述不够具体详实，\n              可行性差，每项得1 分；未提供此项内容，得0\n              分。\n              综合考虑投标人提供的售后服务方案、反应速度\n              等。包括①质保期内的服务方案及保修期过后服务\n              方案；②维保时效保证措施等。\n       售后服务及维 每项内容进行分别阐述，描述具体详实，可行性\n         保方案（8  强，每项得4 分；每项内容阐述贴合实际情况进行\n         分）   论述，描述较具体详实，可行性一般，每项得3\n              分；每项内容阐述不够清晰，描述不够具体详实，\n              可行性差，每项得1 分；未提供此项内容，得0\n              分。\n                                      此处投\n                                      标报价\n                                      指经过\n                                      报价修\n                                      正，及\n                                      因落实\n                                      政府采\n              满足招标文件要求且投标价格最低的投标报价为评  购政策\n              标基准价，其价格分为满分。其他投标人的价格分  进行价\n3 投标报价     30分   统一按照下列公式计算：             格调整\n               投标报价得分＝（评标基准价/投标报价）×30分值 后的报\n              。                       价，详\n                                      见第四\n                                      章《评\n                                      标方法\n                                      和评标\n                                      标准》\n                                                            2.4及\n                                                            2.5。\n\n  合计           100\n\n\n\n\n\n                                               35",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 37,
+          "text": "   北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n            评标标准（适用于第二包）\n序\n  评分因素   分值            评分标准           说明\n号\n                  投标人近五年（2021年02月至2026年02月），具有\n              电子与智能化施工业绩（以采购合同签订日期为\n        类似业绩\n               准）。有一个得3分，最高得6分，未提供得0分。\n          （6分）\n              注：须提供合同关键页（合同首页、金额页、签署\n              日期页、双方签字盖章页等）扫描件并加盖公章。\n 1 商务部分\n              针对采购需求制定人员配备方案，包括但不限于①\n   （15分）\n              拟派人员组织架构；②岗位职责；③人员数量等。\n       项目主要人员\n              每项内容进行分别阐述，描述具体且详实，每项得\n         配备\n                             3 分；每项内容阐述，描述较为详实，每项得2\n         （9分）\n               分；每项内容阐述简单，每项得1 分；未提供此项\n               内容，得0 分。\n              针对采购需求制定设备配套安装方案，包括但不限\n              于①配套安装技术实施方案；②技术保障与调试方\n              案。每项内容进行分别阐述，描述具体详实，可行\n        实施方案（10\n               性强，每项得5分；每项内容阐述贴合实际情况进行\n         分）\n               论述，描述较具体详实，可行性一般，每项得3分；\n              每项内容阐述不够清晰，描述不够具体详实，可行\n               性差，每项得1分；未提供此项内容，得0分。\n              针对采购需求制定进度计划与保证措施，包括但不\n              限于①材料机械准备计划与保证措施；②进度计划\n       工程进度计划 及人员安排与保证措施等，符合项目实际需求，细\n        与保证措施  节考虑完善且切实可行，每项得5分；工程进度计划\n            （10 分）  与保证措施较能满足要求，每项得3分；工程进度计\n              划与保证措施基本满足要求但方案针对性不强，每\n                项得1分；未提供得0分。\n              针对采购需求制定质量管理体系与保证措施，包括\n  技术部分\n 2              但不限于①施工质量管理方法和保证措施；②对关\n   （75分）              键部位、关键工序环节把控方案等，符合项目实际\n       质量管理体系\n               需求，细节考虑完善且切实可行，每项得5分；施工\n        与保证措施\n              质量管理体系与保证措施内容较全面、方案针对性\n          （10分）\n               较强，细节待完善，每项得3分；施工质量管理体系\n              与保证措施内容基本全面、方案针对性较差，基本\n               合理，每项得1分；未提供得0分。\n              针对采购需求制定完整的安全和文明施工保障措施\n              ，包括但不限于各施工环节安全和绿色施工①保障\n              措施；②预防措施；③安全技术交底；④绿色施工\n       安全和文明施 管理制度及责任制度；⑤现场环境维护等内容，符\n        工保障措施  合项目实际需求，细节考虑完善且切实可行，每项\n          （15分）  得3分；安全和文明施工保障措施内容较全面、方案\n               针对性较强，细节待完善，每项得2分；安全和文明\n              施工保障措施内容基本全面、方案针对性较差，基\n               本合理每项得1分；未提供得0分。\n\n                                                  36",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [
+            {
+              "headers": [
+                "序\n号",
+                "评分因素",
+                "分值",
+                "评分标准",
+                "说明"
+              ],
+              "rows": [
+                [
+                  "1",
+                  "商务部分\n（15分）",
+                  "类似业绩\n（6分）",
+                  "投标人近五年（2021年02月至2026年02月），具有\n电子与智能化施工业绩（以采购合同签订日期为\n准）。有一个得3分，最高得6分，未提供得0分。\n注：须提供合同关键页（合同首页、金额页、签署\n日期页、双方签字盖章页等）扫描件并加盖公章。",
+                  ""
+                ],
+                [
+                  null,
+                  null,
+                  "项目主要人员\n配备\n（9分）",
+                  "针对采购需求制定人员配备方案，包括但不限于①\n拟派人员组织架构；②岗位职责；③人员数量等。\n每项内容进行分别阐述，描述具体且详实，每项得\n3 分；每项内容阐述，描述较为详实，每项得2\n分；每项内容阐述简单，每项得 1 分；未提供此项\n内容，得 0 分。",
+                  ""
+                ],
+                [
+                  "2",
+                  "技术部分\n（75分）",
+                  "实施方案（10\n分）",
+                  "针对采购需求制定设备配套安装方案，包括但不限\n于①配套安装技术实施方案；②技术保障与调试方\n案。每项内容进行分别阐述，描述具体详实，可行\n性强，每项得5分；每项内容阐述贴合实际情况进行\n论述，描述较具体详实，可行性一般，每项得3分；\n每项内容阐述不够清晰，描述不够具体详实，可行\n性差，每项得1分；未提供此项内容，得0分。",
+                  ""
+                ],
+                [
+                  null,
+                  null,
+                  "工程进度计划\n与保证措施\n（10 分）",
+                  "针对采购需求制定进度计划与保证措施，包括但不\n限于①材料机械准备计划与保证措施；②进度计划\n及人员安排与保证措施等，符合项目实际需求，细\n节考虑完善且切实可行，每项得5分；工程进度计划\n与保证措施较能满足要求，每项得3分；工程进度计\n划与保证措施基本满足要求但方案针对性不强，每\n项得1分；未提供得0分。",
+                  ""
+                ],
+                [
+                  null,
+                  null,
+                  "质量管理体系\n与保证措施\n（10分）",
+                  "针对采购需求制定质量管理体系与保证措施，包括\n但不限于①施工质量管理方法和保证措施；②对关\n键部位、关键工序环节把控方案等，符合项目实际\n需求，细节考虑完善且切实可行，每项得5分；施工\n质量管理体系与保证措施内容较全面、方案针对性\n较强，细节待完善，每项得3分；施工质量管理体系\n与保证措施内容基本全面、方案针对性较差，基本\n合理，每项得1分；未提供得0分。",
+                  ""
+                ],
+                [
+                  null,
+                  null,
+                  "安全和文明施\n工保障措施\n（15分）",
+                  "针对采购需求制定完整的安全和文明施工保障措施\n，包括但不限于各施工环节安全和绿色施工①保障\n措施；②预防措施；③安全技术交底；④绿色施工\n管理制度及责任制度；⑤现场环境维护等内容，符\n合项目实际需求，细节考虑完善且切实可行，每项\n得3分；安全和文明施工保障措施内容较全面、方案\n针对性较强，细节待完善，每项得2分；安全和文明\n施工保障措施内容基本全面、方案针对性较差，基\n本合理每项得1分；未提供得0分。",
+                  ""
+                ]
+              ]
+            }
+          ],
+          "sheet": null
+        },
+        {
+          "number": 38,
+          "text": "   北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n              针对采购需求制定安全应急预案，包括但不限于①\n              自然灾害应急预案；②应急响应时效；③故障解决\n        应急预案（12 时限等，方案内容完全满足采购需求并且详细、切\n         分）   实可行，每项得4分；方案内容满足采购需求、细节\n              较完善，每项得3分；方案内容不完全满足采购需求\n               、细节不完善，每项得1分；未提供得0分。\n              针对采购需求制定售后服及维保方案。包括①质保\n              期内的服务方案及保修期过后服务方案；②定期巡\n              检等。\n       售后服务及维 每项内容进行分别阐述，描述具体详实，可行性\n         保方案（10  强，每项得5 分；每项内容阐述贴合实际情况进行\n         分）   论述，描述较具体详实，可行性一般，每项得3\n              分；每项内容阐述不够清晰，描述不够具体详实，\n              可行性差，每项得1 分；未提供此项内容，得0\n              分。\n              针对采购需求制定完整的扬尘治理专项施工方案和\n              保证措施，包括但不限于①施工现场防护、裸露土\n       扬尘治理专项 方及散装材料覆盖；②施工场地采取洒水降尘措施\n       施工方案和保 等内容，符合项目实际需求，细节考虑完善且切实\n        证措施   可行，每项得4分；安全和文明施工保障措施内容较\n         （8分）  全面、方案针对性较强，细节待完善，每项得3分；\n              安全和文明施工保障措施内容基本全面、方案针对\n               性较差，较合理，每项得1分；未提供得0分。\n                                      此处投标\n                                      报价指经\n                                      过报价修\n                                      正，及因\n                                      落实政府\n              满足招标文件要求且投标价格最低的投标报价为评\n                                      采购政策\n              标基准价，其价格分为满分。其他投标人的价格分\n                                      进行价格\n3 投标报价     10分   统一按照下列公式计算：\n                                      调整后的\n               投标报价得分＝（评标基准价/投标报价）×10分值\n                                      报价，详\n              。\n                                      见第四章\n                                      《评标方\n                                      法和评标\n                                                  标准》2.4\n                                                      及2.5。\n\n  合计           100\n\n\n\n\n\n                                                 37",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 39,
+          "text": "  北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n          第五章  采购需求\n\n   说明：\n\n     1. 当采购项目涉及政务信息系统时，采购需求应当符合《政务信息系\n\n 统政府采购管理暂行办法》（财库〔2017〕210号）的相关要求。\n\n     2. 采购人及采购代理机构应关注财政部门会同有关部门制定发布的需\n\n求标准，结合具体应用场景，根据对应《需求标准》确定采购需求。\n\n   已发布的需求标准如下：\n\n  《关于印发〈商品包装政府采购需求标准（试行）〉、〈快递包装政府\n\n 采购需求标准（试行）〉的通知》（财办库﹝2020﹞123号））\n\n  《绿色数据中心政府采购需求标准（试行）》（财库〔2023〕7号）\n\n  《台式计算机政府采购需求标准（2023年版）》（财库〔2023〕29号）\n\n  《便携式计算机政府采购需求标准（2023年版）》（财库〔2023〕30号）\n\n  《一体式计算机政府采购需求标准（2023年版）》（财库〔2023〕31号）\n\n  《工作站政府采购需求标准（2023年版）》（财库〔2023〕32号）\n\n  《通用服务器政府采购需求标准（2023年版）》（财库〔2023〕33号）\n\n  《操作系统政府采购需求标准（2023年版）》（财库〔2023〕34号）\n\n  《数据库政府采购需求标准（2023年版）》（财库〔2023〕35号）\n\n  《物业管理服务政府采购需求标准（办公场所类）（试行）》（财办库\n\n〔2024〕113号）\n\n   如有更新或增加，以财政部门发布为准。\n\n  第一包：\n\n  一、采购标的\n\n   1.采购标的：安定镇外围防线105国道市界至检查站区段视频监控建设\n\n项目设备采购（第一包）\n               采购包预算金\n 包号    标的名称          数量   简要技术需求或服务要求\n               额（万元）\n                         采购项目所需交换机、光端机、\n    安定镇外围防线105国道          视频云存储、警戒枪机、变焦球\n    市界至检查站区段视频          机、周界雷达、智能防水音柱、\n                                112.45\n    监控建设项目设备采购          联动报警服务模块、视频数据中\n   01                                       1\n    （第一包）                心主机、智能分析板卡等相关设\n                         备，并兼容接入北京市大兴区社\n\n\n                                                   38",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [
+            {
+              "headers": [
+                "包号",
+                "标的名称",
+                "采购包预算金\n额（万元）",
+                "数量",
+                "简要技术需求或服务要求"
+              ],
+              "rows": [
+                [
+                  "01",
+                  "安定镇外围防线105国道\n市界至检查站区段视频\n监控建设项目设备采购\n（第一包）",
+                  "112.45",
+                  "1",
+                  "采购项目所需交换机、光端机、\n视频云存储、警戒枪机、变焦球\n机、周界雷达、智能防水音柱、\n联动报警服务模块、视频数据中\n心主机、智能分析板卡等相关设\n备，并兼容接入北京市大兴区社"
+                ]
+              ]
+            }
+          ],
+          "sheet": null
+        },
+        {
+          "number": 40,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n                        会治安综合治理信息平台。\n\n\n  是否接受进口产品：□是■否\n\n  2.项目背景\n\n  大兴区是首都南大门，外围防线建设是保卫中央、防控风险、维护稳\n\n定的重要举措，为保证外围防线整体效果，补充缺失部分，完善安定镇外\n\n围防线105 国道至检查站区段视频监控设施，保障安定镇范围内外围防线\n\n的完整性，并方便安定镇对区域范围内防线的管控，同时完成大兴区指办\n\n任务。\n\n  3.建设内容\n\n   安定镇105 国道两侧长度合计4.8 公里建设技防系统，主要内容如下：\n\n  （1）购置38 路技防监控设备，包括人车智能监控38 套、雷达警戒监\n\n控19 套、室外音柱19 套及配套设备。对原区平台后端补充建设19 套雷达\n\n视频联动报警模块、1 台云存储（12 块硬盘）、1 套智能化处理设备（5 路）\n\n及100 路接入授权，配合后端平台实现人员越界监控和预警、指挥调度。\n\n  二、商务要求\n\n    1. 交付（实施）的时间（期限）和地点（范围）\n\n  合同履行期限：签订合同之日起10 日内\n\n  地点：北京市大兴区安定镇\n\n  2.付款条件（进度和方式）\n  经甲方验收合格且审计结束后支付乙方审定金额100%。采购人付款前，\n供应商应先向采购人提供有效等额增值税普通发票。\n\n  三、设备采购需求\n\n  1.产品规格要求\n\n序号  产品名称           规格要求          数量 单位\n\n           1.千兆太网端口≥24个,万兆光端口≥4个\n           2.支持子卡槽位,支持双电源。\n   区镇接入交\n  1          3.含万兆单模光模块≥2个光模块，单模，1310nm，    2  台\n   换机\n              双LC，10km，\n           4.支持双栈\n            1.千兆光端口≥16个\n   室外光汇聚\n  2          2.千兆电端口≥2                                  3  台\n   交换机\n            3.工业级\n\n\n                                                  39",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [
+            {
+              "headers": [
+                "",
+                "",
+                "",
+                "",
+                "会治安综合治理信息平台。"
+              ],
+              "rows": []
+            },
+            {
+              "headers": [
+                "序号",
+                "产品名称",
+                "规格要求",
+                "数量",
+                "单位"
+              ],
+              "rows": [
+                [
+                  "1",
+                  "区镇接入交\n换机",
+                  "1.千兆太网端口≥24个,万兆光端口≥4个\n2.支持子卡槽位,支持双电源。\n3.含万兆单模光模块≥2个光模块，单模，1310nm，\n双LC，10km，\n4.支持双栈",
+                  "2",
+                  "台"
+                ],
+                [
+                  "2",
+                  "室外光汇聚\n交换机",
+                  "1.千兆光端口≥16个\n2.千兆电端口≥2\n3.工业级",
+                  "3",
+                  "台"
+                ]
+              ]
+            }
+          ],
+          "sheet": null
+        },
+        {
+          "number": 41,
+          "text": "北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n          1.千兆单模双纤20公里工业级光光端机\n          2.支持广播风暴功能\n          3.一收一发1对，1光4电端口\n               4.单模光纤：20km/40km/80km1310nm/1550nm\n              5.输入电压：DC12/24/48V或DC/AC110V/220V单电源\n3  周界光端机                                                    29  套\n           6.工作温度：-25℃～70℃\n           7.存储温度：-40℃～80℃\n           8.相对湿度：5%～95%无凝结\n          9.外壳：IP40保护标准，铝制外壳、无风扇设计\n           10.安装方式：DIN导轨安装\n          1.单模双纤\n4  千兆光模块  2.传输距离20km                                   29  对\n             3.LC接口\n          1.纯国产化云存储节点：控制器架构，≤4U高度，\n           ≥48盘位\n          2.具备≥5个千兆网口，可扩展4端口千兆以太网接\n         口或2端口万兆以太网接口或4端口万兆以太网接口\n         ；\n         3.支持全对称部署模式，集群所有节点服务角色对\n         等，无需独立元数据服务器\n         4.支持分布式块存储，无碎片，系统无存储空间和\n         性能衰减；支持分布式文件存储；分布式对象存储\n         ，读取过程不产生索引数据，不存在单独索引盘\n         #5.支持前端摄像机按照块直存的方式存储，前端摄\n          像机发送的存储流为iSCSI数据流，且直接发送到存\n         储节点(需提供第三方机构检测报告)\n          6.支持一套云存储中创建至少100万个不同容量的资\n              源池/Bucket\n   48盘位云存\n5          #7.单存储节点支持接入并存储≥8000Mbps，同时转    1  台\n  储节点\n            发≥8000Mbps，同时回放≥3000Mbps(需提供第三\n         方机构检测报告)\n           #8.单节点图片写入性能≥19000张/s；单节点图片\n            写入≥14000张/s，并发读取≥14000张/s(需提供第\n         三方机构检测报告)\n         9.支持直接通过运维系统界面一键收集系统、存储\n         节点、业务模块的诊断日志\n             10.支持H.264\\SVAC\\H.265等视频编码格式和G.711\n          、AAC等音频编码格式，支持接入4K前端，进行音视\n         频的混合同步存取\n          #11.对录像某时间点添加标签并可查询，单个录像\n          支持≥10240个标签(需提供第三方机构检测报告)\n           12.在一个控制器内，支持双BIOS，当主BIOS异常时\n           ，能从备用BIOS启动\n          #13.设备供电异常恢复后，可立即自检重启进入可\n\n\n                                                40",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 42,
+          "text": "北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n         服务状态，从供电恢复正常至设备能正常提供业务\n          服务时间≤1秒(需提供第三方机构检测报告)\n            1.800W交流电源模块\n             2.交流输入电压：90-264VAC\n  云存储电源\n6          3.交流输入频率：47 Hz-63 Hz                      1  个\n  模块\n               4.交流输入电流：100-240V/10A，180-360V/10A\n            5.支持240V直流输入\n  云存储电池  1.电池类型：铅酸电池\n7                                                                  1  个\n  模块      2.电池容量：34W\n            1.容量：≥8TB\n            2.尺寸：3.5英寸\n  云存储专用  3.硬盘类型：监控级\n8                                                                 12  块\n  硬盘       4.转速5400RPM\n            5.缓存不低于128MB\n            6.接口类型SATA\n          1.智能型双光警戒筒型网络筒型摄像机，采用≥400\n           万像素，靶面尺寸≥1/2.9\" 传感器，最高分辨率≥\n                  2688*1520\n           2.采用定焦镜头，镜头焦距≥8.0 mm，光圈大小≥\n                  F1.6\n             3.最低照度：彩色：0.0005lux;黑白：0.0001lux\n         4.支持红外补光，暖光补光，智能双光；补光距离\n           ：红外补光距离≥150m，暖光补光距离≥100m\n         5.支持人脸检测；支持周界布防；支持人数统计；\n   ★400万智能 支持行为分析；\n9  双光警戒枪  6.支持宽动态自动切换，在环境亮度变化时，可自     18  台\n  机      动进行关闭、开启\n         7.支持视频内容保护功能，可对视频图像码流进行\n         随机混淆处理\n         8.内嵌深度智能算法，可进行多种行为分析，且支\n         持机非人检测\n         9.周界布防：支持越界检测、进入区域、离开区域\n         、区域入侵4种布防模式，可对机动车、非机动车、\n         行人目标分类检测布防\n               10.供电方式：DC12V±25%;POE(IEEE802.3af)\n            11.防护等级：≥IP68\n          1.通用型抱杆支架\n           2.使用环境:室外\n10 抱杆支架   3.材质:镀锌板                                    18  个\n          4.使用范围:横杆或立杆安装\n             5.调节范围:≥67mm~127mm可调节抱箍\n          1.三维可调安装支架\n  枪机三维支\n11          2.材质:铝合金                                    18  个\n  架\n          3.使用范围:横杆安装\n\n\n                                                41",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 43,
+          "text": "北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n           4.调节范围:水平：360°，垂直：90°\n             5.最大承重:≥20kg\n              1.DC12V/24W电源适配器\n12 枪机电源    2.输入:100-240V~50/60Hz，最大0.7A                18  个\n                3.输出:12V/2.0A\n          1.星光级红外球型网络摄像机，像素≥200万，传感\n            器靶面：≥1/2.7\"，最高分辨率：≥1920*1080\n            2.焦距：≥5.0 mm ~ 125.0 mm，支持≥25X光学变\n         倍\n          #3.在低于一定照度的场景下，摄像机自动开启\n          AIISP图像优化功能，开启后图像效果明显提升(需\n         提供第三方机构检测报告)\n           4.最低照度检验：彩色：≤0.0005lux，黑白：≤\n                  0.0001lux\n         5.支持智能红外技术，根据画面亮度实时调整红外\n          灯亮度，避免近景过曝现象，补光距离：≥150米\n           6.水平范围：360°连续旋转，垂直范围：≥-15°\n           ~90°，水平最高转速：≥240°/s ，垂直最高转速\n13 路口球机                                                      1  台\n             ：≥80°/s\n          #7.在同一静止场景、相同图像参数，摄像机开启高\n          级模式与普通模式相比，码率减少≥92％(需提供第\n         三方机构检测报告)\n          8.预置位数目≥1024个，可按照设置的预置位、巡\n         航路径、模式路径进行巡航，并可以设置定时启动\n         调预置位、自动巡航、自动扫描、模式路径等功能\n         9.支持多种深度智能功能：周界布防、人脸检测、\n         人数统计、自动跟踪\n          10.自动跟踪：支持对画面中的机动车、非机动车、\n         行人目标进行分类跟踪，达到预设跟踪时间后自动\n         返回初始位置\n            11.防护等级：≥IP68\n          1.球机室外吊装盘\n  路口球机吊\n14          2.材质:铝合金                                    1  个\n  装盘\n          3.使用范围:球机吊装\n          1.通用型抱杆支架\n  路口球机抱  2.材质:镀锌板\n15                                                                 1  个\n  杆支架    3.使用范围:横杆或立杆安装\n             4.调节范围:≥67mm~127mm可调节抱箍\n          1.超星光级红外智能球型网络摄像机，像素≥400万\n          ，传感器靶面：≥1/1.8\"，最高分辨率：≥\n    400万40倍变  2688*1520；\n16                                                                 19  台\n  焦球机     2.焦距：≥6.0mm~240.0mm，支持≥40X光学变倍；\n           3.最低照度检验：彩色：≤0.0002lux，黑白：≤\n                  0.0001lux\n\n\n                                                42",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 44,
+          "text": "北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n           4.水平范围：360°连续旋转，垂直范围：≥-30°\n           ~90°(自动翻转)，水平手控最大速度≥400°／s，\n          垂直手控最大速度≥400°／s，云台定位准确度≤\n              0.1°\n          #5.摄像机支持红外补光，夜晚天气晴朗无遮挡，摄\n          像机红外灯开启，可识别距摄像机≥350m处的人体\n          轮廓(需提供第三方机构检测报告)\n         6.支持多种深度智能功能：人脸检测、人脸比对、\n         周界布防、混行检测、人数统计、自动跟踪\n          #7.可对监控画面全屏区域或设定区域内出现的机动\n         车、二轮车、三轮车和行人进行检测，可将人脸与\n         人体、车牌与车辆进行关联显示，可对监控画面中\n          出现的≥320个目标进行检测，当检测到目标后可抓\n         拍小图，并可抓拍全景大图上传至后台服务器；(需\n         提供第三方机构检测报告)\n          #8.可对出现在监控场景内的两眼瞳距≥18像素的人\n         脸进行检测，同时叠加目标提示框并进行抓拍；当\n         检测到人脸后，可联动抓拍人脸图片并分析裁剪出\n         人脸图片发送至平台；(需提供第三方机构检测报告\n                  )\n         9.支持电子罗盘，实时感知摄像机的方位信息\n           #10.支持双路iSCSI直存方式存储(需提供第三方机\n          构检测报告)\n            11.防护等级：≥IP68\n          1.球机室外吊装盘\n  变焦球机球\n17          2.材质:铝合金                                    19  个\n  机吊装盘\n          3.使用范围:球机吊装\n          1.通用型抱杆支架\n  变焦球机抱  2.材质:镀锌板\n18                                                                 19  个\n  杆支架    3.使用范围:横杆或立杆安装\n             4.调节范围:≥67mm~127mm可调节抱箍\n           1.周界雷视一体机,图像传感器:全景：≥1/1.8＂≥\n             400万像素CMOS,细节：≥1/1.8＂≥400万像素CMOS\n            2.镜头类型:全景：≥4mm定焦,细节：≥8-32mm电动\n         变焦\n          3.补光距离:全景：暖光补光≥40m,细节：红外补光\n               ≥200m\n19 周界雷达   4.可检测目标数:≥32个，可检测区域数:≥8个        19  台\n          5.雷达类型:调频连续波多普勒雷达，采用调频连续\n         波体制以及相控阵技术\n           6.行走人员:径向采集≥300m，横向采集200m\n             7.移动车辆:≥1~300m\n             8.速度精度:≤0.03m/s，距离精度:≤±0.75m\n           9.径向行人探测距离≥300米，横穿行人探测≥200\n\n\n                                                43",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 45,
+          "text": "北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n         米，适合中长距周界管理\n          10.围界性好，天线低副瓣设计使雷达不容易受地面\n         杂波和主波束外目标的干扰，能够显著提高雷达探\n         测目标的信噪比\n          11.支持多目标跟踪，具有同时探测跟踪≥32个目标\n         的能力，且系统支持≥10个目标同步输出\n          12.能区别移动车辆和人员，准确率≥85%\n          13.采用恒虚警检测算法，有效剔除树木等虚警\n          1.套装，含三维支架和抱杆支架\n          2.三维可调安装支架\n           3.材质:铝合金\n          4.使用范围:横杆安装\n  雷达抱杆支  5.最大承重:≥20kg\n20                                                                 19  套\n  架      6.通用型抱杆支架\n           7.使用环境:室外\n           8.材质:镀锌板\n          9.使用范围:横杆或立杆安装\n             10.调节范围:≥67mm~127mm可调节抱箍\n         1.可接收服务器的文件广播任务、采集任务、定时\n         任务、网络电台任务等资源\n          2.支持手机修改IP地址、设置设备参数\n         3.支持多媒体音频接入扩音，支持本地话筒扩音，\n         终端可设置网络音频优先和混音输出\n         4.内置情景语音媒体，固定一种情景语音播放\n          5.支持电脑读取/上传情景语音文件，可自由更换情\n         景语音文件\n         6.接收常闭信号，与监控联动，接收到摄像机的开\n         关量信号后自动播放预设好的报警语音，也可与警\n  智能防水音\n         示灯联动，设备报警时会打开外置警示灯闪烁警示\n21 柱（内置功                                                    19  台\n            7.支持DHCP自动获取IP地址\n  放）\n         8.支持手动复位：当设备设置不了设备参数的时候\n         可通过复位按键将设备还原到出厂设置；\n              9.支持协议TCP/IP，UDP，IGMP（组播），RTP,RTSP\n            音频格式MP3/MP2\n              10.采样率8K～48KHz传输速率100Mbps\n           11.音频模式16位立体声CD音质输出频率优于20Hz～\n                  16KHz\n            12.工作温度-20℃～+60℃工作湿度0%～90%\n             13.待机功耗≤20W输入电源AC220V/50Hz\n            14.音箱功率≥40W\n         1.周界雷达跟踪效果优化服务，支持雷达周界视频\n  雷达周界视\n         联动报警\n22 频联动报警                                                    19  套\n         2.支持地图展示各类周界设备分布及设备状态\n  服务模块\n         3.支持周界报警在地图快速定位，支持查看并处理\n\n\n                                                44",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 46,
+          "text": "北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n         报警\n         4.支持查看历史报警信息，支持数据导出\n         5.支持对周界进行布防、撤防等远程控制\n          #6.为保证周界雷达与原有系统的兼容性和可靠性，\n         需提供所投产品与现有北京市大兴区社会治安综合\n         治理信息平台无缝对接的承诺函，支持与大兴区外\n         围防线管理平台兼容，全功能实现\n         1.视频监控服务软件授权，用于实现摄像机的接入\n  视频接入引\n23         ，每套授权内置100路摄像机的接入，授权路数按照    1  套\n  擎\n         通道计算\n          1.视频数据中心一体机，高度≤4U\n          2.板卡能力:提供≥8个业务板插槽\n         3.业务覆盖范围广：可实现通用计算业务、智能分\n         析业务、大数据业务等\n         4.按需灵活组合：支持通用计算板卡、智能分析计\n         算板卡、大数据业务板卡混插，按需自由选配\n  视频数据中  5.系统管理方便：支持整机系统管理，实现各节点\n24                                                                 1  台\n  心主机    统一管理\n         6.融合视图库标准体系中视图库和视频图像分析系\n         统两大核心业务模块\n         7.支持业务灵活调度：可根据各板卡业务能力，实\n         现板卡间业务调度\n            8.硬盘槽位:≥24个\n           9.电源槽位:≥4个，标配≥2个，2+2冗余\n  数据中心电  1.1600W电源配件\n25                                                                 1  个\n  源      2.与视频数据中心主机配套使用\n           1.智能分析板卡，GPU 配置：内置≥8 颗高性能\n                  GPU 芯片，配套显存≥64G\n           2.存储配置：系统盘≥128GB SSD 固态硬盘\n           3.网络接口：≥5 个GE 网口（含1 个专用管理网\n         口）\n           4.扩展接口：≥1 个RJ45 型RS232 串口，≥2 个\n                  USB3.0 接口\n         5.智能解析性能：人脸图片分析：单卡支持接入≥\n  智能分析板   584 张/ 秒图片流或人脸视频分析：单卡支持接入\n26                                                                 1  张\n  卡         ≥128 路视频流或机非人图片分析：单卡支持接入\n              ≥464 张/ 秒图片流或机非人视频分析：单卡支持\n            接入≥128 路视频流\n          6.人脸在低头角度≤30°或左右侧脸≤45°情况下\n          ，人脸识别准确率≥98%\n          #7.支持GPU模组芯片集群调度及故障保护；支持实\n          时监测板卡分析能力和GPU芯片的运行状态(需提供\n         第三方机构检测报告)\n         8.支持智能分析任务的新增、删除、暂停、启动功\n\n\n                                                45",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 47,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n         能；支持告警过滤功能；支持查看任务详细信息\n           9.以图搜脸功能：以图搜脸首位命中率≥99%\n          #10.人脸图片检测功能：在人脸微笑、大笑、张嘴\n          、做鬼脸、皱眉、眉毛被遮挡(戴帽子、齐刘海)、\n         闭眼、耳朵遮挡、戴眼镜、半边脸遮挡等情况下，\n          均可正确识别人脸。人脸识别准确率≥99%(需提供\n          第三方机构检测报告)\n          1.全结构化1路实况分析板卡授权\n           2.人像属性:性别;年龄段;戴眼镜;戴口罩\n           3.机动车属性:车身颜色-主色;车身颜色-辅色;车身\n           颜色-次色;车辆品牌;车辆系列;车牌颜色;移动速度\n           ;机动车抓拍朝向;主遮阳板;副遮阳板;车辆挂件;年\n          检标贴;主驾驶安全带;前排乘坐人数;黄标车;车牌\n          号码;危险品车辆;行驶方向;主驾打电话;车牌种类\n           4.人体/非机动车属性:年龄段;性别;鞋子;上衣主色\n           ;上衣辅色;上衣次色;上衣款式;上衣纹理;下衣主色\n   全结构化分\n 27         ;下衣辅色;下衣次色;下衣款式;是否携包;发型;发     5  套\n   析授权\n           色;包款式;身姿;戴口罩;口罩颜色;戴帽子;帽子颜\n           色;戴眼镜;抱小孩;撑伞;驾驶类型;移动方向;移动\n          速度;承载人数;非机动车主色;非机动车辅色;非机\n         动车次色\n          5.分析性能:1个全结构化分析授权，每个授权支持\n          并发分析1路视频流或并发5张/秒人脸图片或并发3\n           张/秒结构化图片或25W/天结构化图片的二次分析。\n          每路视频支持全结构化/人脸/机非人三种分析模式\n         切换\n\n  注:标注“★”项设备为本项目核心产品（提供相应的检测报告及公告\n\n或彩页或第三方证明资料或公开发行的文件等，按要求提供以上材料即为\n\n有效，如未按此要求提供，响应无效）。标注“#”号条款标注的内容为该\n\n设备重点技术指标项，将作为重要评分指标。未标注“★”或“#”号条款\n\n为一般性技术指标项。\n\n  一般性技术指标项所投货物需提供相关的第三方检测报告（如有）、\n\n认证证书等(如有)。（交货时单独提供）。\n\n  四、技术要求\n\n  1.供应商提供的产品均需符合国家及行业各项标准，质量优良，性能\n\n稳定、可靠。\n\n\n\n\n\n                                                  46",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 48,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n  2.所供货物的各项技术指标均达到或优于本招标文件提出的技术要求。\n\n无论在货物质量保证期内和保证期外，供货商均有义务以最优惠的条件向\n\n采购人提供售后服务。\n\n  3.投标所供的设备是全新的、未使用过的；为原厂制造、合法渠道供\n\n应的全新产品。\n\n  4.所提供的产品与北京市大兴区社会治安综合治理信息平台兼容，并\n\n实现必要功能。\n\n  5.质保时间：所提供的设备质保均不低于2年。\n\n  6.交付地点：北京市大兴区安定镇。\n\n  7.交付时间：签订合同之日起10日内。\n\n\n\n\n\n                                                  47",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 49,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n  第二包：\n\n  一、采购标的\n\n  1.采购标的：安定镇外围防线105国道市界至检查站区段视频监控建设\n\n项目配套安装工程（第二包）\n              采购包预算金\n包号    标的名称          数量   简要技术需求或服务要求\n               额（万元）\n                        提供项目现场电力、网络、监控\n    安定镇外围防线105国道\n                        杆、挖沟铺设管线及配套工程安\n   市界至检查站区段视频\n                               83.02      装服务及整体设备集成软件调试\n  02 监控建设项目配套安装                1                        与北京市大兴区社会治安综合治\n   工程（第二包）\n                        理信息平台对接服务。\n\n  2.项目背景\n\n  大兴区是首都南大门，外围防线建设是保卫中央、防控风险、维护稳\n\n定的重要举措，为保证外围防线整体效果，补充缺失部分，完善安定镇外\n\n围防线105 国道至检查站区段视频监控设施，保障安定镇范围内外围防线\n\n的完整性，并方便安定镇对区域范围内防线的管控，同时完成大兴区指办\n\n任务。\n\n  3.建设内容\n\n   安定镇105 国道两侧长度合计4.8 公里建设技防系统，主要内容如下：\n\n  对项目现场进行整体配套安装施工，完成电力供电、网络搭建和配套\n\n管线等施工安装工作，为设备提供正常安装的基础环境并完成设备集成和\n\n软硬件调试，同时对接北京市大兴区社会治安综合治理信息平台，实现其\n\n必要功能。\n\n  二、商务要求\n\n    1. 交付（实施）的时间（期限）和地点（范围）\n\n  合同履行期限：签订合同之日起60 日内\n\n  地点：北京市大兴区安定镇\n\n  2.付款条件（进度和方式）\n\n  签订合同后发包方支付承包方合同金额30%，项目完成验收合格且审计\n\n结束，承包方缴纳审定金额3%质保金至发包方账户后，发包方按照审定金\n\n额支付尾款。待质保到期复验合格后无息返还承包方缴纳3%质保金，付款\n\n前承包方需要向发包方提供同等金额增值税普通发票。\n\n\n                                                  48",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [
+            {
+              "headers": [
+                "包号",
+                "标的名称",
+                "采购包预算金\n额（万元）",
+                "数量",
+                "简要技术需求或服务要求"
+              ],
+              "rows": [
+                [
+                  "02",
+                  "安定镇外围防线105国道\n市界至检查站区段视频\n监控建设项目配套安装\n工程（第二包）",
+                  "83.02",
+                  "1",
+                  "提供项目现场电力、网络、监控\n杆、挖沟铺设管线及配套工程安\n装服务及整体设备集成软件调试\n与北京市大兴区社会治安综合治\n理信息平台对接服务。"
+                ]
+              ]
+            }
+          ],
+          "sheet": null
+        },
+        {
+          "number": 50,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n  三、安装工程需求\n\n                 安装工程\n\n序号  项目名称         项目特征描述        计量单位 工程量\n\n  1  国网电力报装 国家电网用电申报安装            点        5\n\n            6.5m金属监控杆，加厚版、带≥2米横臂、\n  2  周界立杆                         根       29\n          横撑、避雷针、钢钎、扁钢、地笼等配件\n            1、箱体采用不小于1.5mm厚的冷轧钢板制作\n          ，表面喷塑，箱门应留以存放技术资料的文\n           件夹（既A4页面）。\n          2、箱体采用压缩式门锁以防止有人非法打\n          开机柜。门锁将锁舌固定于门框后，并以连\n           接的1/2转运动将其拉紧，压缩运动相应将\n           之向拉动6mm以上，以提供密封时的辅导保\n          护,所有的锁应可以用一把公用的钥匙操作\n          。\n          3、箱体采用底部进线，拖杆底座安装，具\n          有良好的防水、防尘、防锈、散热、防盗、\n           防寒、防暴晒的结构，防护等级不低于IP65\n          。\n          4、箱体设置可靠的接地汇流排和接线端子\n          ，接线端子带放松脱得紧固螺栓用来连接接\n          地导体。接地汇流排和接线端子置于箱体底\n  3  监控设备箱                        个       29\n          部，过门接地线应满足经常开门的要求。\n          5、箱体门上喷涂业主单位名称及有电危险\n          警告标志，具体内容待定。\n          6、箱体侧面用铆钉固定前端设备编号标牌\n          ，箱体正面喷涂箱体编号，编号规则参照设\n          计文件。\n          7、配电箱内元器件可采用导轨或固定安装\n          型式，安装应牢固，在额定极限短路电流电\n          动力作用下不应松动、移位、变形等。\n            8、配电箱应留有10%至15%的元器件安装空\n          间，以备元器件调整用。\n          9、配电箱内设置总开关、分路开关、电源\n          防雷器等。具体空气开关数量，根据每个接\n          入点设备功率进行合理灵活配置。\n            10、抱杆，16A总控空开，防雷，4个5孔插\n                座，镀锌钢板1.5厚300*400*500mm\n            1、箱体采用不小于1.5mm厚的冷轧钢板制作\n  4  光交箱    ，表面喷塑，箱门应留以存放技术资料的文   个        2\n           件夹（既A4页面）。\n\n\n                                                  49",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [
+            {
+              "headers": [
+                "安装工程",
+                null,
+                null,
+                null,
+                null
+              ],
+              "rows": [
+                [
+                  "序号",
+                  "项目名称",
+                  "项目特征描述",
+                  "计量单位",
+                  "工程量"
+                ],
+                [
+                  "1",
+                  "国网电力报装",
+                  "国家电网用电申报安装",
+                  "点",
+                  "5"
+                ],
+                [
+                  "2",
+                  "周界立杆",
+                  "6.5m金属监控杆，加厚版、带≥2米横臂、\n横撑、避雷针、钢钎、扁钢、地笼等配件",
+                  "根",
+                  "29"
+                ],
+                [
+                  "3",
+                  "监控设备箱",
+                  "1、箱体采用不小于1.5mm厚的冷轧钢板制作\n，表面喷塑，箱门应留以存放技术资料的文\n件夹（既A4页面）。\n2、箱体采用压缩式门锁以防止有人非法打\n开机柜。门锁将锁舌固定于门框后，并以连\n接的1/2转运动将其拉紧，压缩运动相应将\n之向拉动6mm以上，以提供密封时的辅导保\n护,所有的锁应可以用一把公用的钥匙操作\n。\n3、箱体采用底部进线，拖杆底座安装，具\n有良好的防水、防尘、防锈、散热、防盗、\n防寒、防暴晒的结构，防护等级不低于IP65\n。\n4、箱体设置可靠的接地汇流排和接线端子\n，接线端子带放松脱得紧固螺栓用来连接接\n地导体。接地汇流排和接线端子置于箱体底\n部，过门接地线应满足经常开门的要求。\n5、箱体门上喷涂业主单位名称及有电危险\n警告标志，具体内容待定。\n6、箱体侧面用铆钉固定前端设备编号标牌\n，箱体正面喷涂箱体编号，编号规则参照设\n计文件。\n7、配电箱内元器件可采用导轨或固定安装\n型式，安装应牢固，在额定极限短路电流电\n动力作用下不应松动、移位、变形等。\n8、配电箱应留有10%至15%的元器件安装空\n间，以备元器件调整用。\n9、配电箱内设置总开关、分路开关、电源\n防雷器等。具体空气开关数量，根据每个接\n入点设备功率进行合理灵活配置。\n10、抱杆，16A总控空开，防雷，4个5孔插\n座，镀锌钢板1.5厚300*400*500mm",
+                  "个",
+                  "29"
+                ],
+                [
+                  "4",
+                  "光交箱",
+                  "1、箱体采用不小于1.5mm厚的冷轧钢板制作\n，表面喷塑，箱门应留以存放技术资料的文\n件夹（既A4页面）。",
+                  "个",
+                  "2"
+                ]
+              ]
+            }
+          ],
+          "sheet": null
+        },
+        {
+          "number": 51,
+          "text": "北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n          2、箱体采用压缩式门锁以防止有人非法打\n         开机柜。门锁将锁舌固定于门框后，并以连\n          接的1/2转运动将其拉紧，压缩运动相应将\n          之向拉动6mm以上，以提供密封时的辅导保\n          护,所有的锁应可以用一把公用的钥匙操作\n         。\n          3、箱体采用底部进线，拖杆底座安装，具\n         有良好的防水、防尘、防锈、散热、防盗、\n          防寒、防暴晒的结构，防护等级不低于IP65\n         。\n          4、箱体设置可靠的接地汇流排和接线端子\n         ，接线端子带放松脱得紧固螺栓用来连接接\n         地导体。接地汇流排和接线端子置于箱体底\n         部，过门接地线应满足经常开门的要求。\n          5、箱体门上喷涂业主单位名称及有电危险\n         警告标志，具体内容待定。\n          6、箱体侧面用铆钉固定前端设备编号标牌\n         ，箱体正面喷涂箱体编号，编号规则参照设\n         计文件。\n          7、配电箱内元器件可采用导轨或固定安装\n         型式，安装应牢固，在额定极限短路电流电\n         动力作用下不应松动、移位、变形等。\n           8、配电箱应留有10%至15%的元器件安装空\n         间，以备元器件调整用。\n          9、配电箱内设置总开关、分路开关、电源\n         防雷器等。具体空气开关数量，根据每个接\n         入点设备功率进行合理灵活配置。\n            10、防雷1个，24个5孔插座，\n                   300*400*500mm\n         铝合金底板，贴反光膜，按照公安标识国标\n5  周界提示牌  要求定制，印制甲方定制字体，每个出入口   套       41\n          2个，每个治安监控点1个。\n           直径25，水平2-3米不弯折，金属内径，室\n6  金属软管   外管线。高强度金属软管。室外墙面金属管   米       580\n         网敷设，防锈\n                 1200mm×1200mm×1400mm\n         现场排水沟附近，人工开挖基础，采用泵车\n7  基础                           套       29\n          、混凝土C30浇筑，线管预留，结构件预埋\n         ，吊车租赁，防护围挡。\n          29个施工位置，设备安装费及施工辅材，地\n8  辅材配件                         套       29\n         埋管道辅材、线缆辅材、管材辅料等\n            深600mm宽600mm，现场需人工开挖，无法使\n9  挖沟恢复夯实                       米      4890\n         用机械\n\n\n\n                                                50",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [
+            {
+              "headers": [
+                "",
+                "",
+                "2、箱体采用压缩式门锁以防止有人非法打\n开机柜。门锁将锁舌固定于门框后，并以连\n接的1/2转运动将其拉紧，压缩运动相应将\n之向拉动6mm以上，以提供密封时的辅导保\n护,所有的锁应可以用一把公用的钥匙操作\n。\n3、箱体采用底部进线，拖杆底座安装，具\n有良好的防水、防尘、防锈、散热、防盗、\n防寒、防暴晒的结构，防护等级不低于IP65\n。\n4、箱体设置可靠的接地汇流排和接线端子\n，接线端子带放松脱得紧固螺栓用来连接接\n地导体。接地汇流排和接线端子置于箱体底\n部，过门接地线应满足经常开门的要求。\n5、箱体门上喷涂业主单位名称及有电危险\n警告标志，具体内容待定。\n6、箱体侧面用铆钉固定前端设备编号标牌\n，箱体正面喷涂箱体编号，编号规则参照设\n计文件。\n7、配电箱内元器件可采用导轨或固定安装\n型式，安装应牢固，在额定极限短路电流电\n动力作用下不应松动、移位、变形等。\n8、配电箱应留有10%至15%的元器件安装空\n间，以备元器件调整用。\n9、配电箱内设置总开关、分路开关、电源\n防雷器等。具体空气开关数量，根据每个接\n入点设备功率进行合理灵活配置。\n10、防雷1个，24个5孔插座，\n300*400*500mm",
+                "",
+                ""
+              ],
+              "rows": [
+                [
+                  "5",
+                  "周界提示牌",
+                  "铝合金底板，贴反光膜，按照公安标识国标\n要求定制，印制甲方定制字体，每个出入口\n2个，每个治安监控点1个。",
+                  "套",
+                  "41"
+                ],
+                [
+                  "6",
+                  "金属软管",
+                  "直径25，水平2-3米不弯折，金属内径，室\n外管线。高强度金属软管。室外墙面金属管\n网敷设，防锈",
+                  "米",
+                  "580"
+                ],
+                [
+                  "7",
+                  "基础",
+                  "1200mm×1200mm×1400mm\n现场排水沟附近，人工开挖基础，采用泵车\n、混凝土C30浇筑，线管预留，结构件预埋\n，吊车租赁，防护围挡。",
+                  "套",
+                  "29"
+                ],
+                [
+                  "8",
+                  "辅材配件",
+                  "29个施工位置，设备安装费及施工辅材，地\n埋管道辅材、线缆辅材、管材辅料等",
+                  "套",
+                  "29"
+                ],
+                [
+                  "9",
+                  "挖沟恢复夯实",
+                  "深600mm宽600mm，现场需人工开挖，无法使\n用机械",
+                  "米",
+                  "4890"
+                ]
+              ]
+            }
+          ],
+          "sheet": null
+        },
+        {
+          "number": 52,
+          "text": "北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n\n10 弱电埋管    放置地埋加厚32PE管             米      4980\n\n11 强电埋管    放置地埋加厚32PE管             米      4980\n\n12 弱电布线   穿8芯室外铠装光纤             米      5850\n\n           1、箱体采用不小于1.5mm厚的冷轧钢板制作\n          ，表面喷塑，箱门应留以存放技术资料的文\n           件夹（既A4页面）。\n          2、箱体采用压缩式门锁以防止有人非法打\n          开机柜。门锁将锁舌固定于门框后，并以连\n          接的1/2转运动将其拉紧，压缩运动相应将\n          之向拉动6mm以上，以提供密封时的辅导保\n          护,所有的锁应可以用一把公用的钥匙操作\n          。\n          3、箱体采用底部进线，拖杆底座安装，具\n          有良好的防水、防尘、防锈、散热、防盗、\n           防寒、防暴晒的结构，防护等级不低于IP65\n          。\n          4、箱体设置可靠的接地汇流排和接线端子\n          ，接线端子带放松脱得紧固螺栓用来连接接\n          地导体。接地汇流排和接线端子置于箱体底\n13  5路配电箱   部，过门接地线应满足经常开门的要求。    个        4\n          5、箱体门上喷涂业主单位名称及有电危险\n          警告标志，具体内容待定。\n          6、箱体侧面用铆钉固定前端设备编号标牌\n          ，箱体正面喷涂箱体编号，编号规则参照设\n          计文件。\n          7、配电箱内元器件可采用导轨或固定安装\n          型式，安装应牢固，在额定极限短路电流电\n          动力作用下不应松动、移位、变形等。\n           8、配电箱应留有10%至15%的元器件安装空\n          间，以备元器件调整用。\n          9、配电箱内设置总开关、分路开关、电源\n          防雷器等。具体空气开关数量，根据每个接\n          入点设备功率进行合理灵活配置。\n             10、抱杆，1个3P32A总控空开，5个2P16A分\n           空开，10KA防雷，3个5孔插座，镀锌钢板\n                 1.5厚300*400*500mm，\n           1、箱体采用不小于1.5mm厚的冷轧钢板制作\n          ，表面喷塑，箱门应留以存放技术资料的文\n           件夹（既A4页面）。\n14  14路配电箱                        个        1\n          2、箱体采用压缩式门锁以防止有人非法打\n          开机柜。门锁将锁舌固定于门框后，并以连\n          接的1/2转运动将其拉紧，压缩运动相应将\n\n                                                51",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [
+            {
+              "headers": [
+                "10",
+                "弱电埋管",
+                "放置地埋加厚32PE管",
+                "米",
+                "4980"
+              ],
+              "rows": [
+                [
+                  "11",
+                  "强电埋管",
+                  "放置地埋加厚32PE管",
+                  "米",
+                  "4980"
+                ],
+                [
+                  "12",
+                  "弱电布线",
+                  "穿8芯室外铠装光纤",
+                  "米",
+                  "5850"
+                ],
+                [
+                  "13",
+                  "5路配电箱",
+                  "1、箱体采用不小于1.5mm厚的冷轧钢板制作\n，表面喷塑，箱门应留以存放技术资料的文\n件夹（既A4页面）。\n2、箱体采用压缩式门锁以防止有人非法打\n开机柜。门锁将锁舌固定于门框后，并以连\n接的1/2转运动将其拉紧，压缩运动相应将\n之向拉动6mm以上，以提供密封时的辅导保\n护,所有的锁应可以用一把公用的钥匙操作\n。\n3、箱体采用底部进线，拖杆底座安装，具\n有良好的防水、防尘、防锈、散热、防盗、\n防寒、防暴晒的结构，防护等级不低于IP65\n。\n4、箱体设置可靠的接地汇流排和接线端子\n，接线端子带放松脱得紧固螺栓用来连接接\n地导体。接地汇流排和接线端子置于箱体底\n部，过门接地线应满足经常开门的要求。\n5、箱体门上喷涂业主单位名称及有电危险\n警告标志，具体内容待定。\n6、箱体侧面用铆钉固定前端设备编号标牌\n，箱体正面喷涂箱体编号，编号规则参照设\n计文件。\n7、配电箱内元器件可采用导轨或固定安装\n型式，安装应牢固，在额定极限短路电流电\n动力作用下不应松动、移位、变形等。\n8、配电箱应留有10%至15%的元器件安装空\n间，以备元器件调整用。\n9、配电箱内设置总开关、分路开关、电源\n防雷器等。具体空气开关数量，根据每个接\n入点设备功率进行合理灵活配置。\n10、抱杆，1个3P32A总控空开，5个2P16A分\n空开，10KA防雷，3个5孔插座，镀锌钢板\n1.5厚300*400*500mm，",
+                  "个",
+                  "4"
+                ],
+                [
+                  "14",
+                  "14路配电箱",
+                  "1、箱体采用不小于1.5mm厚的冷轧钢板制作\n，表面喷塑，箱门应留以存放技术资料的文\n件夹（既A4页面）。\n2、箱体采用压缩式门锁以防止有人非法打\n开机柜。门锁将锁舌固定于门框后，并以连\n接的1/2转运动将其拉紧，压缩运动相应将",
+                  "个",
+                  "1"
+                ]
+              ]
+            }
+          ],
+          "sheet": null
+        },
+        {
+          "number": 53,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n           之向拉动6mm以上，以提供密封时的辅导保\n           护,所有的锁应可以用一把公用的钥匙操作\n          。\n           3、箱体采用底部进线，拖杆底座安装，具\n          有良好的防水、防尘、防锈、散热、防盗、\n           防寒、防暴晒的结构，防护等级不低于IP65\n          。\n           4、箱体设置可靠的接地汇流排和接线端子\n          ，接线端子带放松脱得紧固螺栓用来连接接\n          地导体。接地汇流排和接线端子置于箱体底\n          部，过门接地线应满足经常开门的要求。\n           5、箱体门上喷涂业主单位名称及有电危险\n          警告标志，具体内容待定。\n           6、箱体侧面用铆钉固定前端设备编号标牌\n          ，箱体正面喷涂箱体编号，编号规则参照设\n          计文件。\n           7、配电箱内元器件可采用导轨或固定安装\n          型式，安装应牢固，在额定极限短路电流电\n          动力作用下不应松动、移位、变形等。\n            8、配电箱应留有10%至15%的元器件安装空\n          间，以备元器件调整用。\n           9、配电箱内设置总开关、分路开关、电源\n          防雷器等。具体空气开关数量，根据每个接\n          入点设备功率进行合理灵活配置。\n              10、抱杆，1个3P63A总控空开，14个2P16A\n            分空开，10KA防雷，3个5孔插座，镀锌钢板\n                  1.5厚300*400*500mm，\n 15 强电布线     放置地埋ZR-YJV3*4²电源线          米      4445\n\n 16 杆上电源线   杆内部穿设备供电RVV3*1.0电源线       米       760\n\n            杆内部穿六类非屏蔽网线,UTP-6室外环保型\n 17 杆上网线   六类非屏蔽对绞数据线缆;裸铜线径为     米       760\n                0.565mm（线规为23AWG）\n            砌筑手孔井，采用复合材质盖板600*600。\n 18 手孔井      外径900*900规格，内径不低于500*600，预   座       29\n          留积水罐\n\n 19 设备集成   软件对接调试，设备功能测试等        项        1\n\n  六、技术要求\n\n  1.配套安装工程需为采购的设备提供稳定的现场使用环境，提供符合\n\n国家标准的施工。\n\n  2.相关使用的线缆及配电箱、监控杆等符合国家相关标准，并具备合\n\n\n                                                  52",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [
+            {
+              "headers": [
+                "",
+                "",
+                "之向拉动6mm以上，以提供密封时的辅导保\n护,所有的锁应可以用一把公用的钥匙操作\n。\n3、箱体采用底部进线，拖杆底座安装，具\n有良好的防水、防尘、防锈、散热、防盗、\n防寒、防暴晒的结构，防护等级不低于IP65\n。\n4、箱体设置可靠的接地汇流排和接线端子\n，接线端子带放松脱得紧固螺栓用来连接接\n地导体。接地汇流排和接线端子置于箱体底\n部，过门接地线应满足经常开门的要求。\n5、箱体门上喷涂业主单位名称及有电危险\n警告标志，具体内容待定。\n6、箱体侧面用铆钉固定前端设备编号标牌\n，箱体正面喷涂箱体编号，编号规则参照设\n计文件。\n7、配电箱内元器件可采用导轨或固定安装\n型式，安装应牢固，在额定极限短路电流电\n动力作用下不应松动、移位、变形等。\n8、配电箱应留有10%至15%的元器件安装空\n间，以备元器件调整用。\n9、配电箱内设置总开关、分路开关、电源\n防雷器等。具体空气开关数量，根据每个接\n入点设备功率进行合理灵活配置。\n10、抱杆，1个3P63A总控空开，14个2P16A\n分空开，10KA防雷，3个5孔插座，镀锌钢板\n1.5厚300*400*500mm，",
+                "",
+                ""
+              ],
+              "rows": [
+                [
+                  "15",
+                  "强电布线",
+                  "放置地埋ZR-YJV3*4²电源线",
+                  "米",
+                  "4445"
+                ],
+                [
+                  "16",
+                  "杆上电源线",
+                  "杆内部穿设备供电RVV3*1.0电源线",
+                  "米",
+                  "760"
+                ],
+                [
+                  "17",
+                  "杆上网线",
+                  "杆内部穿六类非屏蔽网线,UTP-6室外环保型\n六类非屏蔽对绞数据线缆;裸铜线径为\n0.565mm（线规为23AWG）",
+                  "米",
+                  "760"
+                ],
+                [
+                  "18",
+                  "手孔井",
+                  "砌筑手孔井，采用复合材质盖板600*600。\n外径900*900规格，内径不低于500*600，预\n留积水罐",
+                  "座",
+                  "29"
+                ],
+                [
+                  "19",
+                  "设备集成",
+                  "软件对接调试，设备功能测试等",
+                  "项",
+                  "1"
+                ]
+              ]
+            }
+          ],
+          "sheet": null
+        },
+        {
+          "number": 54,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n格证。\n\n  3.工程质量标准：合格。\n\n  4.质保时间：所提供的配套安装项目质保不低于2 年。\n\n  5.施工范围：安定镇105 国道市界至检查站区段。\n\n  6.工期：签订合同之日起60 日内。\n\n\n\n\n\n                                                  53",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 55,
+          "text": "  北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n        第六章  拟签订的合同文本\n\n\n   说明：\n\n   1.为更大力度激发市场活力和社会创造力，增强发展动力，按照《北\n\n 京市全面优化营商环境助力企业高质量发展实施方案》（京政办发〔2023〕\n\n 8号）部署，进一步加强政府采购合同线上融资“一站式”服务（以下简称\n\n“政采贷”），北京市财政局、中国人民银行营业管理部联合发布《关于推\n\n 进政府采购合同线上融资有关工作的通知》（京财采购〔2023〕637号）。\n\n有需求的供应商，可按上述通知要求办理“政采贷”。采购人应积极配合\n\n供应商获得政府采购合同融资贷款，无特殊原因，应在收到供应商因融资\n\n 需要发起的变更收款账户申请后10个工作日内确认通过。\n\n   2.采购人应严格按照要求，在中标、成交通知书发出之日起30日内签\n\n订采购合同，鼓励采购人在线签订电子合同，完善电子签章管理、合同审\n\n核等配套内控机制，进一步缩短合同签订期限。\n\n   3.合同类型按照民法典规定的典型合同类别，结合采购标的的实际情\n\n况确定。合同文本应当符合民法典及《政府采购需求管理办法》（财库\n\n〔2021〕22号）的要求，包含法定必备条款和采购需求的所有内容，并至少\n\n包括以下内容：标的名称，采购标的质量、数量（规模），履行时间（期\n\n限）、地点和方式，包装方式，价款或者报酬、付款进度安排、资金支付\n\n方式，验收、交付标准和方法，质量保修范围和保修期，违约责任与解决\n\n争议的方法等。\n\n   4.合同条款中应规定，乙方完全遵守《中华人民共和国妇女权益保障\n\n法》中关于“劳动和社会保障权益”的有关要求。\n\n   5.对于通过预留采购项目、预留专门采购包、要求以联合体形式参加\n\n或者合同分包等措施签订的采购合同，应当明确标注本合同为中小企业预\n\n留合同。其中，要求以联合体形式参加采购活动或者合同分包的，应当将\n\n联合协议或者分包意向协议作为采购合同的组成部分。\n\n   6.政府采购合同设定首付款支付方式的，首付款支付比例原则上不低\n\n 于合同金额的30%；对于中小企业，首付款支付比例原则上不低于合同金额\n\n 的50%。\n\n\n                                                   54",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 56,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n  7.政府采购合同应当约定资金支付的方式、时间和条件，明确逾期支\n\n付资金的违约责任。对于满足合同约定支付条件的，采购人原则上应当自\n\n收到发票后10个工作日内将资金支付到合同约定的供应商账户，鼓励采购\n\n人完善内部流程，自收到发票后1个工作日内完成资金支付事宜。采购人和\n\n供应商对资金支付产生争议的，应当按照法律规定和合同约定及时解决，\n\n保证资金支付效率。\n\n  8.采购文件对商品包装和快递包装提出具体要求的，政府采购合同应\n\n当载明对政府采购供应商提供产品及相关快递服务的具体包装要求和履约\n\n验收相关条款，必要时要求中标、成交供应商在履约验收环节出具检测报\n\n告。\n\n  9.履约验收方案应当在合同中约定。履约验收方案要明确履约验收的\n\n主体、时间、方式、程序、内容和验收标准等事项。采购人、采购代理机\n\n构可以邀请参加本项目的其他供应商或者第三方专业机构及专家参与验收，\n\n相关验收意见作为验收的参考资料。政府向社会公众提供的公共服务项目，\n\n验收时应当邀请服务对象参与并出具意见，验收结果应当向社会公告。\n\n\n\n\n\n                                                  55",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 57,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n\n\n  安定镇外围防线105国道市界至检查站区段视频监控建设设备采购合同\n\n\n\n  采购单位(甲方)：北京市大兴区安定镇人民政府\n\n\n   供货服务商(乙方)：\n\n\n  根据《中华人民共和国民法典》等相关法律，甲乙双方就采购安定镇\n\n外围防线105国道市界至检查站区段视频监控建设设备采购事宜签订采购供\n\n货合同并共同遵守履行。\n\n  第一条采购内容\n\n  甲方根据实际使用需求，要求乙方提供的相关设备（以下简称“合同\n\n货物”）如下：\n\n                     单价       金额\n序号  品目  品牌   产品型号        数量       是否进口\n                     （元）      （元）\n\n   区镇接入\n  1                                                   2         否\n   交换机\n   室外光汇\n  2                                                   3         否\n   聚交换机\n   周界光端\n  3                                                  29         否\n   机\n   千兆光模\n  4                                                  29         否\n   块\n    48盘位云\n  5                                                   1         否\n   存储节点\n   云存储电\n  6                                                   1         否\n   源模块\n   云存储电\n  7                                                   1         否\n   池模块\n   云存储专\n  8                                                  12         否\n   用硬盘\n    400万智                                    否\n  9  能双光警                                       18\n   戒枪机\n\n\n\n                                                   56",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [
+            {
+              "headers": [
+                "序号",
+                "品目",
+                "品牌",
+                "产品型号",
+                "单价\n（元）",
+                "数量",
+                "金额\n（元）",
+                "是否进口"
+              ],
+              "rows": [
+                [
+                  "1",
+                  "区镇接入\n交换机",
+                  "",
+                  "",
+                  "",
+                  "2",
+                  "",
+                  "否"
+                ],
+                [
+                  "2",
+                  "室外光汇\n聚交换机",
+                  "",
+                  "",
+                  "",
+                  "3",
+                  "",
+                  "否"
+                ],
+                [
+                  "3",
+                  "周界光端\n机",
+                  "",
+                  "",
+                  "",
+                  "29",
+                  "",
+                  "否"
+                ],
+                [
+                  "4",
+                  "千兆光模\n块",
+                  "",
+                  "",
+                  "",
+                  "29",
+                  "",
+                  "否"
+                ],
+                [
+                  "5",
+                  "48盘位云\n存储节点",
+                  "",
+                  "",
+                  "",
+                  "1",
+                  "",
+                  "否"
+                ],
+                [
+                  "6",
+                  "云存储电\n源模块",
+                  "",
+                  "",
+                  "",
+                  "1",
+                  "",
+                  "否"
+                ],
+                [
+                  "7",
+                  "云存储电\n池模块",
+                  "",
+                  "",
+                  "",
+                  "1",
+                  "",
+                  "否"
+                ],
+                [
+                  "8",
+                  "云存储专\n用硬盘",
+                  "",
+                  "",
+                  "",
+                  "12",
+                  "",
+                  "否"
+                ],
+                [
+                  "9",
+                  "400万智\n能双光警\n戒枪机",
+                  "",
+                  "",
+                  "",
+                  "18",
+                  "",
+                  "否"
+                ]
+              ]
+            }
+          ],
+          "sheet": null
+        },
+        {
+          "number": 58,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n\n10 抱杆支架                                       18         否\n\n  枪机三维\n11                                                  18         否\n  支架\n\n12 枪机电源                                       18         否\n\n13 路口球机                                        1         否\n\n  路口球机\n14                                                  1         否\n  吊装盘\n  路口球机\n15                                                  1         否\n  抱杆支架\n    400万40                                    否\n16 倍变焦球                                       19\n  机\n  变焦球机                                    否\n17 球机吊装                                       19\n  盘\n  变焦球机\n18                                                  19         否\n  抱杆支架\n\n19 周界雷达                                       19         否\n\n  雷达抱杆\n20                                                  19         否\n  支架\n  智能防水                                    否\n21 音柱（内                                       19\n  置功放）\n  雷达周界                                    否\n  视频联动\n22                                                  19\n  报警服务\n  模块\n  视频接入\n23                                                  1         否\n  引擎\n  视频数据\n24                                                  1         否\n  中心主机\n  数据中心\n25                                                  1         否\n  电源\n  智能分析\n26                                                  1         否\n  板卡\n  全结构化\n27                                                  5         否\n  分析授权\n\n  合计\n\n  第二条交付与验收\n\n                                                 57",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 59,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n  1．“合同货物”的交付地点为安定镇。\n\n  2．“合同货物”的交付时间为签订合同之日起10日内。\n\n  3．甲方应在交货时对所供“合同货物”的质量、规格、性能和数量等\n\n进行详细而全面的检验，但不被视为最终检验。\n\n  4．甲方在验收时对“合同货物”的型号、颜色和外观等有异议，或对\n\n“合同货物”的性能进行测试后，就质量、技术性能等方面的问题可要求\n\n乙方免费换货。\n\n  5、交货验收后，甲方在任何时间发现货物存在假冒伪劣、以次充好或\n\n者质量不符合国家标准、合同要求等情况的，均有权要求乙方更换货物或\n\n者退货，并有权要求乙方赔偿所有的经济损失。\n\n  第三条质量标准及售后服务\n\n  1．乙方应保证提供的“合同货物”是全新、未经使用过的，并完全符\n\n合供货合同规定的质量、规格和性能的要求，同时确保提供的“合同货物”\n\n经正确安装、正常运转和保养在其使用寿命期内应具有国家相关技术标准\n\n规定的性能。“合同货物”质保时间：所提供的设备质保2年，乙方应对由\n\n于设计、工艺或材料的缺陷而发生的任何不足或故障负责。\n\n  2．乙方在接到甲方报修电话或通知后，应三日内消除故障，如不能消\n\n除故障的必须在甲方指定的时间内提供同型号备用产品。\n\n  3．乙方应定期进行服务质量的现场检查及电话回访。\n\n  4．乙方应满足甲方提出与所提供的“合同货物”相关且经双方同意的\n\n其它要求。\n\n  5．乙方除满足中标商承诺的标准服务外，还应提供投标时承诺的特色\n\n服务。\n\n  第四条甲方责任\n\n  1．甲方应检查乙方交付内容是否与合同内容、产品实物一致，并不得\n\n随意变更品目、品牌、规格、型号、数量和金额，否则乙方有权拒绝供货。\n\n  2．甲方应按合同规定的期限及时支付货款。\n\n  第五条乙方责任\n\n\n\n\n\n                                                  58",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 60,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n  1．乙方应按照合同所列货物品目、品牌、规格、型号和数量等具体内\n\n容向甲方供货。乙方必须保证按照合同的约定负责为甲方免费上门安装、\n\n调试至正常使用，遇有特殊情况，以甲乙双方商定的供货时间为准。\n\n  2．乙方在接到甲方停止供货的通知后未停止供货的，造成的损失由乙\n\n方承担。\n\n  3．乙方向甲方供货过程中发生的相关费用，包括运输费、装卸费、安\n\n装费、调试费、验收费及与“合同货物”有关的费用均由乙方负担。\n\n  第六条付款结算\n\n    1. 结算方式：经甲方验收合格且审计结束后支付乙方审定金额100%。\n\n    2. 甲方付款前，乙方应先向甲方提供有效等额增值税普通发票。\n\n  第七条违约责任\n\n  1．乙方未能按合同约定交货及提供服务，甲方可以从货款中扣除违约\n\n赔偿费，赔偿费应按每迟交一日，按迟交货物或未提供服务交货价的2%计\n\n收。但违约赔偿费的最高限额为迟交货物或没有提供服务的合同价的20%。\n\n如果乙方在达到最高限额后仍未交付货物，甲方可向乙方发出通知，解除\n\n合同，并要求乙方赔偿全部的经济损失。\n\n  2．乙方交付的货物质量不合格的，应当在收到甲方通知后及时更换，\n\n经更换后仍不能满足甲方需求的，甲方有权解除本合同，并要求乙方承担\n\n合同金额20%的违约金并赔偿甲方全部的经济损失。\n\n  3．如果乙方未能履行合同规定的义务，甲方可向乙方发出书面通知，\n\n部分或全部解除合同，并要求乙方赔偿给甲方造成的全部经济损失。\n\n  第八条争议的解决\n\n  双方就合同发生争议，应先本着公平诚信的原则进行友好协商，如达\n\n不成一致，可向甲方所在地人民法院提起诉讼。\n\n  第九条不可抗力\n\n  1．如果甲乙双方中任何一方遭遇战争、火灾、水灾、台风和地震等不\n\n可抗力的因素，致使本合同履行受阻时，履行本合同的期限应予延长，延\n\n长的期限应相当于不可抗力所影响的时间。\n\n\n\n\n\n                                                  59",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 61,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n  2．受不可抗力影响的一方应在不可抗力发生后，以最快的方式在最短\n\n的时间内通知另一方，并在不可抗力发生后10日内，将有关部门出具的证\n\n明文件直接送达、邮寄或留置另一方。\n\n  3．如果不可抗力影响延续90日以上的，甲乙双方应通过友好协商，在\n\n合理时间内达成进一步履行本合同的协议。\n\n  第十条其他\n\n  1．本合同由甲乙双方授权代表签字并加盖公章之日起生效。\n\n  2．本合同正本一式六份，甲方持四份，乙方持二份。合同文本具有同\n\n等的法律效力。\n\n  3．甲乙双方可对本合同未尽事项另行协商，本合同部分条款的无效不\n\n影响其它条款的效力。\n\n\n\n\n发包人（盖章）：        承包人（盖章）：\n\n\n\n\n法定代表人           法定代表人\n\n或委托代理人签字（盖章）    或委托代理人签字（盖章）\n\n\n\n\n\n签订日期：年月日\n\n\n\n\n\n                                                  60",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 62,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n\n\n\n\n安定镇外围防线105国道市界至检查站区段视频监控建设项目配套安装工程\n\n\n\n\n\n  甲方（发包人）：北京市大兴区安定镇人民政府\n\n  乙方（承包人）：\n\n 工程名称：\n\n  工程地点：大兴区安定镇\n\n 承包方式：\n\n\n\n\n\n                                                 61",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 63,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n               合同书\n\n  依照《中华人民共和国民法典》及其它有关法律、行政法规，就本项\n\n安装有关事项，遵循平等、自愿、公平和诚实信用的原则，经双方协商达\n\n成如下协议：\n\n  第1条工程概况\n\n    1.1 工程名称：\n\n    1.2 建设地点：大兴区安定镇\n\n    1.3 工程内容：\n\n    1.4 工期：总工期天数：  天。\n\n    1.5 合同总价：小写人民币    元，大写人民    元整。\n\n  第2条工期\n\n  2.1本合同工程定于  年 月 日开工，于   年  月\n\n日竣工。合同工期天数为  天。\n\n  2.2工期提前或延误的奖罚：提前者无奖励，因承包人原因延期者，每\n\n日核减施工费用的万分之一。\n\n  第3条承包人工作\n\n  3.1遵守国家及本市有关部门对安装现场的交通和安装噪音等管理规定，\n\n负责安全保卫、整洁卫生等各项工作，做好安装现场周围建筑物、构筑物(\n\n含文物保护建筑)、古树名木和地下管线的保护。发现地下障碍和文物时，\n\n及时报告有关部门并采取有效保护措施，按有关具体规定处置，发包人承\n\n担由此发生的费用，延误的工期相应顺延。\n\n  第5条工程质量检查及验收\n\n  5.15.1工程具备竣工验收条件，向发包人提供完整竣工资料和竣工验\n\n收报告，至验收合格之日起质保期2年。\n\n  第6条承包人责任\n\n  6.1承包人不得雇佣18岁以下及不宜从事此项工作的现场作业人员，否\n\n则发生一切责任，由承包人自行承担。\n\n  6.2承包人委派人员担任现场管理，负责履行本合同安装期间的质量、\n\n安全等相关事宜。\n\n\n\n\n                                                  62",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 64,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n  6.3人员进场必须做好安全教育工作，及时做好书面安全交底及安全措\n\n施工作，严格按照现行有关安全操作规程施工，执行发包人和工地有关安\n\n全生产制度（处罚标准），用电机具要专人管理专人操作，若违反规定造\n\n成工伤事故由承包人负责。\n\n  6.4安装现场承包人必须有专人负责安全管理和监控工作，及时做好安\n\n全自检与整改工作。\n\n  6.5承包人应与工人签订劳动合同，并依法缴纳各项社会保险。承包人\n\n自行负责工人的劳保用品、福利及施工过程中工伤事故处理的一切费用。\n\n工人因劳动用工产生的一切纠纷由承包人自行解决，并承担一切法律责任\n\n及赔偿责任。\n\n  6.6对于承包人雇佣的工人的伤害或赔偿，应由承包人自行负责并保证\n\n发包人不负任何责任。\n\n  6.7由于承包人管理不善，造成任何第三方的损害，由承包人承担一切\n\n责任。\n\n  6.8承包人安装中每天做到工完料清,工程竣工后的场地清理。\n\n  第7条工程价款及结算\n\n  签订合同后发包方支付承包方合同金额30%，项目完成验收合格且审计\n\n结束，承包方缴纳审定金额3%质保金至发包方账户后，发包方按照审定金\n\n额支付尾款。待质保到期复验合格后无息返还承包方缴纳3%质保金，付款\n\n前承包方需要向发包方提供同等金额增值税普通发票。\n\n  第8条争议解决\n\n  发包人、承包人双方发生争议时，可以通过协商解决。协商不能达成\n\n一致的，向工程所在地人民法院起诉解决。\n\n  第9条违约责任\n\n  发包人或承包人不能按本合同条款约定内容履行自己的各项义务及发\n\n生使合同无法履行的行为，应承担相应的违约责任，包括支付违约金，赔\n\n偿因其违约给对方造成的全部经济损失。\n\n  承包人出现下列情形时，视为违约：\n\n  （1）承包人延期完工超过30日的；\n\n\n\n\n                                                  63",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 65,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n  （2）承包人交付不符合本合同约定标准、不满足发包人要求或经检验\n\n存在质量问题的；\n\n  （3）承包人未按照本合同约定履行义务的其他情形；\n\n  承包人出现上述情形时，发包人可要求承包人支付本合同总价款的20%\n\n作为违约金，如对发包人造成实际损失的，承包人还需赔偿发包人一切实\n\n际损失。\n\n  除非双方协议将合同终止，或因一方违约使合同无法履行，违约方承\n\n担上述违约责任后仍应继续履行合同。\n\n  第10条合同份数\n\n  本合同一式六份，自双方签字盖章之日起生效；甲方执四份、乙方执\n\n二份，具有同等法律效力。\n\n第11条补充条款\n\n  1、承包人负责现场施工组织、因承包人原因造成的质量、安全事故由\n\n承包人自负；\n\n  2、发包人根据合同约定拨付工程款。\n\n  3、本工程项目技术标准优先执行国家标准。\n\n\n\n\n  （以下无正文）\n\n发包人（盖章）：        承包人（盖章）：\n\n\n\n\n法定代表人           法定代表人\n\n或委托代理人签字（盖章）    或委托代理人签字（盖章）\n\n\n\n\n\n签订日期：年月日\n\n\n\n\n\n                                                  64",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 66,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n        第七章  投标文件格式\n\n\n  投标人编制文件须知\n\n  1、投标人按照本部分的顺序编制投标文件（资格证明文件）、投标文\n\n件（商务技术文件），编制中涉及格式资料的，应按照本部分提供的内容\n\n和格式（所有表格的格式可扩展）填写提交。\n\n  2、对于招标文件中标记了“实质性格式”文件的，投标人不得改变格\n\n式中给定的文字所表达的含义，不得删减格式中的实质性内容，不得自行\n\n添加与格式中给定的文字内容相矛盾的内容，不得对应当填写的空格不填\n\n写或不实质性响应，否则投标无效。未标记“实质性格式”的文件和招标\n\n文件未提供格式的内容，可由投标人自行编写。\n\n  3、全部声明和问题的回答及所附材料必须是真实的、准确的和完整的。\n\n\n\n\n\n                                                  65",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 67,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n一、资格证明文件格式\n\n\n\n\n投标文件（资格证明文件）封面（非实质性格式）\n\n\n\n\n  投标文件\n     （资格证明文件）\n\n\n\n\n\n  项目名称:\n  项目编号：\n  投标人名称：\n\n\n\n\n\n                                             66",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 68,
+          "text": "北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n  1 满足《中华人民共和国政府采购法》第二十二条规定\n\n 1-1营业执照等证明文件\n\n\n\n\n\n                                           67",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 69,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n   1-2 投标人资格声明书（实质性格式）\n\n            投标人资格声明书\n\n  致：（采购人或采购代理机构）\n\n  在参与本次项目投标中，我单位承诺：\n\n  （一）具有良好的商业信誉和健全的财务会计制度；\n\n  （二）具有履行合同所必需的设备和专业技术能力；\n\n  （三）有依法缴纳税收和社会保障资金的良好记录；\n\n  （四）参加政府采购活动前三年内，在经营活动中没有重大违法记录\n\n（重大违法记录指因违法经营受到刑事处罚或者责令停产停业、吊销许可\n\n证或者执照、较大数额罚款等行政处罚，不包括因违法经营被禁止在一定\n\n期限内参加政府采购活动，但期限已经届满的情形）；\n\n  （五）我单位不属于政府采购法律、行政法规规定的公益一类事业单\n\n位、或使用事业编制且由财政拨款保障的群团组织（仅适用于政府购买服\n\n务项目）；\n\n  （六）我单位不存在为采购项目提供整体设计、规范编制或者项目管\n\n理、监理、检测等服务后，再参加该采购项目的其他采购活动的情形（单\n\n一来源采购项目除外）；\n\n  （七）与我单位存在“单位负责人为同一人或者存在直接控股、管理\n\n关系”的其他法人单位信息如下（如有，不论其是否参加同一合同项下的\n\n政府采购活动均须填写）：\n\n序号        单位名称           相互关系\n\n  1\n\n  2\n\n …\n\n  上述声明真实有效，否则我方负全部责任。\n\n                    投标人名称（加盖公章）：____________\n\n                             日期：_____年______月______日\n\n  说明：供应商承诺不实的，依据《政府采购法》第七十七条“提供虚\n\n假材料谋取中标、成交的”有关规定予以处理。\n\n\n                                             68",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 70,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n    2 落实政府采购政策需满足的资格要求（如有）\n\n  2-1中小企业政策证明文件\n\n  说明：\n\n  （1）如本项目（包）不专门面向中小企业预留采购份额，资格证明文\n\n件部分无需提供《中小企业声明函》或《残疾人福利性单位声明函》或由\n\n省级以上监狱管理局、戒毒管理局（含新疆生产建设兵团）出具的属于监\n\n狱企业的证明文件；供应商如具有上述证明文件，建议在商务技术文件中\n\n提供。\n\n  （2）如本项目（包）专门面向中小企业采购，投标文件中须提供《中\n\n小企业声明函》或《残疾人福利性单位声明函》或由省级以上监狱管理局、\n\n戒毒管理局（含新疆生产建设兵团）出具的属于监狱企业的证明文件，且\n\n建议在资格证明文件部分提供。\n\n  （3）如本项目（包）预留部分采购项目预算专门面向中小企业采购，\n\n且要求获得采购合同的供应商将采购项目中的一定比例分包给一家或者多\n\n家中小企业的，如供应商因落实政府采购政策拟进行分包的，投标文件中\n\n除须提供《中小企业声明函》或《残疾人福利性单位声明函》或由省级以\n\n上监狱管理局、戒毒管理局（含新疆生产建设兵团）出具的属于监狱企业\n\n的证明文件，还须同时提供《拟分包情况说明》及《分包意向协议》，且\n\n建议在资格证明文件部分提供。\n\n  （4）如本项目（包）预留部分采购项目预算专门面向中小企业采购，\n\n且要求供应商以联合体形式参加采购活动，如供应商为联合体的，投标文\n\n件中除须提供《中小企业声明函》或《残疾人福利性单位声明函》或由省\n\n级以上监狱管理局、戒毒管理局（含新疆生产建设兵团）出具的属于监狱\n\n企业的证明文件，还须同时提供《联合协议》；上述文件建议在资格证明\n\n文件部分提供。\n  （5）中小企业声明函填写注意事项\n\n  1）《中小企业声明函》由参加政府采购活动的投标人出具。联合体投\n\n标的，《中小企业声明函》可由牵头人出具。\n\n  2）对于联合体中由中小企业承担的部分，或者分包给中小企业的部分，\n\n必须全部由中小企业制造、承建或者承接。供应商应当在声明函“标的名\n\n                                             69",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 71,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n称”部分标明联合体中中小企业承担的具体内容或者中小企业的具体分包\n\n内容。\n\n  3）对于多标的采购项目，投标人应充分、准确地了解所提供货物的制\n\n造企业、提供服务的承接企业信息。对相关情况了解不清楚的，不建议填\n\n报本声明函。\n\n  （6）温馨提示：为方便广大中小企业识别企业规模类型，工业和信息\n\n化部组织开发了中小企业规模类型自测小程序，在国务院客户端和工业和\n\n信息化部网站上均有链接，投标人填写所属的行业和指标数据可自动生成\n\n企业规模类型测试结果。本项目中小企业划分标准所属行业详见第二章《\n\n投标人须知资料表》，如在该程序中未找到本项目文件规定的中小企业划\n\n分标准所属行业，则按照《关于印发中小企业划型标准规定的通知（工信\n\n部联企业﹝2011﹞300号）》及《金融业企业划型标准规定》（〔2015〕\n\n309号）等国务院批准的中小企业划分标准执行。\n\n\n\n\n\n                                             70",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 72,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n    2-1-1 中小企业证明文件\n\n      中小企业声明函（货物）格式（适用于第一包）\n\n  本公司（联合体）郑重声明，根据《政府采购促进中小企业发展管理\n\n办法》（财库﹝2020﹞46 号）的规定，本公司（联合体）参加（单位名\n\n称）的（项目名称）采购活动，提供的货物全部由符合政策要求的中小企\n\n业制造。相关企业（含联合体中的中小企业、签订分包意向协议的中小企\n\n业）的具体情况如下：\n\n  1.（标的名称），属于（采购文件中明确的所属行业）行业；制造商\n\n为（企业名称），从业人员______人，营业收入为______万元，资产总额\n\n为______万元 1，属于（中型企业、小型企业、微型企业）；\n\n  2.（标的名称），属于（采购文件中明确的所属行业）行业；制造商\n\n为（企业名称），从业人员______人，营业收入为______万元，资产总额\n\n为______万元，属于（中型企业、小型企业、微型企业）；\n\n  ……\n\n  以上企业，不属于大企业的分支机构，不存在控股股东为大企业的情\n\n形，也不存在与大企业的负责人为同一人的情形。\n\n  本企业对上述声明内容的真实性负责。如有虚假，将依法承担相应责\n\n任。\n\n\n                        企业名称（盖章）：________\n\n                                   日期：________\n\n\n\n1从业人员、营业收入、资产总额填报上一年度数据，无上一年度数据\n\n的新成立企业可不填报。\n\n\n\n\n\n                                             71",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 73,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n\n\n    中小企业声明函（工程、服务）格式（适用于第二包）\n\n  本公司（联合体）郑重声明，根据《政府采购促进中小企业发展管理\n\n办法》（财库﹝2020﹞46 号）的规定，本公司（联合体）参加（单位名\n\n称）的（项目名称）采购活动，工程的施工单位全部为符合政策要求的中\n\n小企业（或者：服务全部由符合政策要求的中小企业承接）。相关企业（\n\n含联合体中的中小企业、签订分包意向协议的中小企业）的具体情况如下：\n\n  1.（标的名称），属于（采购文件中明确的所属行业）行业；承建（\n\n承接）企业为（企业名称），从业人员______人，营业收入为______万元，\n资产总额为______万元 1，属于（中型企业、小型企业、微型企业）；\n\n  2.（标的名称），属于（采购文件中明确的所属行业）行业；承建（\n\n承接）企业为（企业名称），从业人员______人，营业收入为______万元，\n\n资产总额为______万元，属于（中型企业、小型企业、微型企业）；\n\n\n  ……\n\n  以上企业，不属于大企业的分支机构，不存在控股股东为大企业的情\n\n形，也不存在与大企业的负责人为同一人的情形。\n\n  本企业对上述声明内容的真实性负责。如有虚假，将依法承担相应责\n\n任。\n\n\n                          企业名称（盖章）：________\n\n                                     日期：________\n\n\n\n\n1从业人员、营业收入、资产总额填报上一年度数据，无上一年度数据\n\n的新成立企业可不填报。\n\n\n\n\n\n                                             72",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 74,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n          残疾人福利性单位声明函格式\n\n\n  本单位郑重声明，根据《财政部民政部中国残疾人联合会关于促进\n\n残疾人就业政府采购政策的通知》（财库〔2017〕141号）的规定，本单\n\n位（请进行勾选）：\n\n  □不属于符合条件的残疾人福利性单位。\n\n  □属于符合条件的残疾人福利性单位，且本单位参加______单位的\n\n______项目采购活动提供本单位制造的货物（由本单位承担工程/提供服\n\n务），或者提供其他残疾人福利性单位制造的货物（不包括使用非残疾人\n\n福利性单位注册商标的货物）。\n\n  本单位对上述声明的真实性负责。如有虚假，将依法承担相应责任。\n\n\n\n\n                单位名称（盖章）：\n\n                 日 期：\n\n\n\n\n\n                                             73",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 75,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n  2-1-2拟分包情况说明及分包意向协议（实质性格式）（如有）\n\n\n             拟分包情况说明\n\n 致：（采购人或采购代理机构）\n\n  我单位参加贵单位组织采购的项目编号为_______的_______项目（填\n\n写采购项目名称）中___包（填写包号）的投标。拟签订分包合同的单位情\n\n况如下表所示，我单位承诺一旦在该项目中获得采购合同将按下表所列情\n\n况进行分包，同时承诺分包承担主体不再次分包。\n         分包承担              拟分包  占该采购包\n 序 分包承担             拟分包\n         主体类型 资质等级        合同金额  合同金额的\n 号 主体名称             合同内容\n         （选择）            （人民币元） 比例（%）\n        □中型企业\n  1       □小微企业\n         □其他\n        □中型企业\n  2       □小微企业\n         □其他\n\n …\n\n\n                      合计：\n\n\n\n\n                    投标人名称（加盖公章）：____________\n\n                             日期：_____年______月______日\n\n\n  注：\n\n  如本招标文件《投标人须知资料表》载明本项目分包承担主体应具备\n\n的相应资质条件，则投标人须在本表中列明分包承担主体的资质等级，并\n\n后附资质证书电子件，否则投标无效。\n\n\n\n\n\n                                             74",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 76,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n\n\n        分包意向协议（实质性格式）（如有）\n\n   甲方（投标人）：________\n\n   乙方（拟分包单位）：________\n\n  甲方承诺，一旦在_____（采购项目名称）（项目编号/包号为：_____）\n\n招标采购项目中获得采购合同，将按照下述约定将合同项下部分内容分包\n\n给乙方：\n\n   1.分包内容：_____。\n\n  2.分包金额：_____，该金额占该采购包合同金额的比例为___%。\n\n  乙方承诺将在上述情况下与甲方签订分包合同。\n\n  本协议自各方盖章之日起生效，如甲方未在该项目（采购包）中标，\n\n本协议自动终止。\n\n\n 甲方（盖章）：_________            乙方（盖章）：_________\n\n\n                             日期：_____年______月______日\n\n\n 注：\n\n 本协议仅在投标人“为落实政府采购政策”而向中小企业分包时必须提供，\n\n否则投标无效；且投标人须与所有拟分包单位分别签订《分包意向协议》，\n\n每单位签订一份，并在投标文件中提交全部协议原件的电子件，否则投标\n\n无效。\n\n\n\n\n\n                                             75",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 77,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n2-2 其它落实政府采购政策的资格要求（如有）\n\n\n\n\n\n                                             76",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 78,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n3 本项目的特定资格要求（如有）\n\n3-1联合协议（如有）（实质性格式）\n\n              联合协议\n\n   ______、_____及_____就“________（项目名称）”____包招标项目\n\n的投标事宜，经各方充分协商一致，达成如下协议：\n\n   一、由_________牵头，_________、_______参加，组成联合体共同进\n\n行招标项目的投标工作。\n\n  二、联合体中标后，联合体各方共同与采购人签订合同，就采购合同\n\n约定的事项对采购人承担连带责任。\n\n  三、联合体各方均同意由牵头人代表其他联合体成员单位按招标文件\n\n要求出具《授权委托书》。\n\n  四、牵头人为项目的总负责单位；组织各参加方进行项目实施工作。\n\n  五、______负责_____，具体工作范围、内容以投标文件及合同为准。\n\n  六、______负责_____，具体工作范围、内容以投标文件及合同为准。\n\n  七、______负责_____（如有），具体工作范围、内容以投标文件及合\n\n同为准。\n\n  八、本项目联合协议合同总额为_____元，联合体各成员按照如下比例\n\n分摊（按联合体成员分别列明）：\n\n  （1）______为□大型企业□中型企业、□小微企业（包含监狱企业、\n\n残疾人福利性单位）、□其他，合同金额为_____元；\n\n  （2）______为□大型企业□中型企业、□小微企业（包含监狱企业、\n\n残疾人福利性单位）、□其他，合同金额为_____元；\n\n  （…）______为□大型企业□中型企业、□小微企业（包含监狱企业、\n\n残疾人福利性单位）、□其他，合同金额为_____元。\n\n  九、以联合体形式参加政府采购活动的，联合体各方不得再单独参加\n\n或者与其他供应商另外组成联合体参加同一合同项下的政府采购活动。\n\n  十、其他约定（如有）：_______。\n\n  本协议自各方盖章后生效，采购合同履行完毕后自动失效。如未中标，\n\n本协议自动终止。\n\n\n\n\n                                             77",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 79,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n联合体牵头人名称：______          联合体成员名称：______\n\n盖章：______                    盖章：______\n\n\n\n\n联合体成员名称：______\n\n盖章：______\n\n\n\n\n\n                             日期：_____年______月______日\n\n\n\n\n\n  注：\n\n    1. 如本项目（包）接受供应商以联合体形式参加采购活动，且供应商\n\n以联合体形式参与时，须提供《联合协议》，否则投标无效。\n\n    2. 联合体各方成员需在本协议上共同盖章。\n\n\n\n\n\n                                             78",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 80,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n3-2其他特定资格要求\n\n\n\n\n\n                                             79",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 81,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n4 投标保证金凭证/交款单据电子件（不适用）\n\n\n\n\n\n                                             80",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 82,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n二、商务技术文件格式\n\n\n投标文件（商务技术文件）封面（非实质性格式）\n\n\n\n\n  投标文件\n\n\n\n     （商务技术文件）\n\n\n\n\n\n 项目名称:\n 项目编号：\n 投标人名称：\n\n\n\n\n\n                                             81",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 83,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n    1 投标书（实质性格式）\n\n\n                投标书\n\n  致：（采购人或采购代理机构）\n\n\n  我方参加你方就___________（项目名称，项目编号）组织的招标活动，\n\n并对此项目进行投标。\n\n    1. 我方已详细审查全部招标文件，自愿参与投标并承诺如下：\n\n  （1）本投标有效期为自提交投标文件的截止之日起_____个日历日。\n\n  （2）除合同条款及采购需求偏离表列出的偏离外，我方响应招标文件\n\n的全部要求。\n\n  （3）我方已提供的全部文件资料是真实、准确的，并对此承担一切法\n\n律后果。\n\n  （4）如我方中标，我方将在法律规定的期限内与你方签订合同，按照\n\n招标文件要求提交履约保证金，并在合同约定的期限内完成合同规定的全\n\n部义务。\n\n   2.其他补充条款（如有）：___________。\n\n  与本投标有关的一切正式往来信函请寄：\n\n\n    地址_________________________传真_________________________\n\n    电话_________________________电子函件_____________________\n\n\n   投标人名称（加盖公章）___________\n\n   日期：_____年______月______日\n\n\n\n\n\n                                             82",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 84,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n    2 授权委托书（实质性格式）\n\n               授权委托书\n\n   本人_______（姓名）系________________（投标人名称）的法定代表\n\n人（单位负责人），现委托_______（姓名）为我方代理人。代理人根据授\n\n权，以我方名义签署、澄清确认、提交、撤回、修改_____________（项目\n\n名称）投标文件和处理有关事宜，其法律后果由我方承担。\n\n  委托期限：自本授权委托书签署之日起至投标有效期届满之日止。\n\n  代理人无转委托权。\n\n   投标人名称（加盖公章）：________________\n\n   法定代表人（单位负责人）（签字或盖章）：________________\n\n   委托代理人（签字）：________________\n\n   日期：_____年______月______日\n\n  附：法定代表人（单位负责人）及委托代理人身份证明文件电子件：\n\n\n\n\n\n  说明：\n\n  1.若供应商为事业单位或其他组织或分支机构，则法定代表人（单位\n\n负责人）处的签署人可为单位负责人。\n\n  2.若投标文件中签字之处均为法定代表人（单位负责人）本人签署，\n\n则可不提供本《授权委托书》，但须提供《法定代表人（单位负责人）身\n\n份证明》；否则，不需要提供《法定代表人（单位负责人）身份证明》。\n\n  3.供应商为自然人的情形，可不提供本《授权委托书》。\n\n  4.供应商应随本《授权委托书》同时提供法定代表人（单位负责人）\n\n及委托代理人的有效的身份证或护照等身份证明文件电子件。提供身份证\n\n的，应同时提供身份证双面电子件。\n\n\n\n\n\n                                             83",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 85,
+          "text": "北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n\n        法定代表人（单位负责人）身份证明\n\n\n 致：（采购人或采购代理机构）\n\n\n 兹证明，\n\n\n  姓名：____性别：____年龄：____职务：____\n\n\n\n\n 系     （投标人名称）的法定代表人（单位负责人）。\n\n\n\n\n\n 附：法定代表人（单位负责人）身份证或护照等身份证明文件电子件：\n\n\n\n\n\n  投标人名称（加盖公章）：________________\n\n 法定代表人（单位负责人）（签字或盖章）：_______\n\n\n  日期：_____年______月______日\n\n\n\n\n\n                                           84",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 86,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n    3 开标一览表（实质性格式）\n\n               开标一览表\n\n\n   项目编号：___________________项目名称：____________\n\n              投标报价（元）\n 序号  投标人名称               合同履行期限   备注\n              大写    小写\n\n\n\n\n\n注：1.此表中，每包的投标报价应和《投标分项报价表》中的总价相一致。\n\n  2.本表必须按包分别填写。（如有）\n\n\n\n\n   投标人名称（加盖公章）：____________\n\n   日期：_____年______月______日\n\n\n\n\n\n                                             85",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 87,
+          "text": " 北京盛标建筑造价咨询有限责任公司                                                              招标编码DL2026-002-007\n\n4 投标分项报价表（实质性格式）\n\n                 投标分项报价表（适用于第一包）\n项目编号：________ 项目名称：__________                     报价单位：人民币元\n                 制造商\n序             产地/        制造商 制造商所 外商投资      规格、型  单价      合价\n  分项名称 制造商     统一社会信                 品牌            数量\n号           国别        规模  属性别   类型        号  （元）     （元）\n                 用代码\n\n 1\n\n 2\n\n 3\n\n 4\n\n…\n\n                        总价（元）\n\n注：1.本表应按包分别填写。\n\n  2.上述各项的详细规格（如有），可另页描述。\n\n  3.制造商规模列应填写“大型”、“中型”、“小型”、“微型”或“其他”，且不应与《中小企业声明函》\n\n或《拟分包情况说明》中内容矛盾。制造商所属性别请填写“男”或“女”，指拥有制造商51%以上绝对所有权\n\n的性别；绝对所有权拥有者可以是一个人，也可以是多人合计计算。外商投资类型请填写“外商单独投资”、“外\n\n商部分投资”或“内资”。\n\n\n   投标人名称（加盖公章）：____________\n\n   日期：_____年______月______日\n\n\n                                                                     86",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [
+            {
+              "headers": [
+                "序\n号",
+                "__\n分项名称",
+                "______\n制造商",
+                "产地/\n国别",
+                "________\n制造商\n统一社会信\n用代码",
+                "__\n制造商\n规模",
+                "制造商所\n属性别",
+                "外商投资\n类型",
+                "品牌",
+                "规格、型\n号",
+                "单价\n（元）",
+                "数量",
+                "合价\n（元）"
+              ],
+              "rows": [
+                [
+                  "1",
+                  "",
+                  "",
+                  "",
+                  "",
+                  "",
+                  "",
+                  "",
+                  "",
+                  "",
+                  "",
+                  "",
+                  ""
+                ],
+                [
+                  "2",
+                  "",
+                  "",
+                  "",
+                  "",
+                  "",
+                  "",
+                  "",
+                  "",
+                  "",
+                  "",
+                  "",
+                  ""
+                ],
+                [
+                  "3",
+                  "",
+                  "",
+                  "",
+                  "",
+                  "",
+                  "",
+                  "",
+                  "",
+                  "",
+                  "",
+                  "",
+                  ""
+                ],
+                [
+                  "4",
+                  "",
+                  "",
+                  "",
+                  "",
+                  "",
+                  "",
+                  "",
+                  "",
+                  "",
+                  "",
+                  "",
+                  ""
+                ],
+                [
+                  "…",
+                  "",
+                  "",
+                  "",
+                  "",
+                  "",
+                  "",
+                  "",
+                  "",
+                  "",
+                  "",
+                  "",
+                  ""
+                ],
+                [
+                  "总价（元）",
+                  null,
+                  null,
+                  null,
+                  null,
+                  null,
+                  null,
+                  null,
+                  null,
+                  null,
+                  null,
+                  null,
+                  ""
+                ]
+              ]
+            }
+          ],
+          "sheet": null
+        },
+        {
+          "number": 88,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n\n         投标分项报价表（适用于第二包）\n\n项目编号：________ 项目名称：__________ 报价单位：人民币元\n\n                 配套工程费用估算\n\n\n                 单价\n  名称      单位            数量     总计(元)     备注\n                     (元/人月)\n\n 电力报装\n\n国网电力报装    点                          5\n\n 配套工程费\n\n 周界立杆     根                         29\n\n 监控设备箱     个                         29\n\n  光交箱      个                          2\n\n 周界提示牌     套                         41\n\n 金属软管     米                         580\n\n  基础      套                         29\n\n 辅材配件     套                         29\n\n挖沟恢复夯实    米                        4890\n\n 弱电埋管     米                        4980\n\n 强电埋管     米                        4980\n\n 弱电布线     米                        5850\n\n 5路配电箱     个                          4\n\n 14路配电箱     个                          1\n\n 强电布线     米                        4445\n\n 杆上电源线     米                         760\n\n 杆上网线     米                         760\n\n  手孔井      座                         29\n\n 设备集成                                      1\n\n  合计\n\n\n投标人名称（加盖公章）：____________\n\n日期：_____年______月______日\n\n\n\n                                             87",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [
+            {
+              "headers": [
+                "________ __________\n配套工程费用估算",
+                null,
+                null,
+                null,
+                null,
+                null
+              ],
+              "rows": [
+                [
+                  "名称",
+                  "单位",
+                  "单价\n(元/人月)",
+                  "数量",
+                  "总计(元)",
+                  "备注"
+                ],
+                [
+                  "电力报装",
+                  "",
+                  "",
+                  "",
+                  "",
+                  ""
+                ],
+                [
+                  "国网电力报装",
+                  "点",
+                  "",
+                  "5",
+                  "",
+                  ""
+                ],
+                [
+                  "配套工程费",
+                  "",
+                  "",
+                  "",
+                  "",
+                  ""
+                ],
+                [
+                  "周界立杆",
+                  "根",
+                  "",
+                  "29",
+                  "",
+                  ""
+                ],
+                [
+                  "监控设备箱",
+                  "个",
+                  "",
+                  "29",
+                  "",
+                  ""
+                ],
+                [
+                  "光交箱",
+                  "个",
+                  "",
+                  "2",
+                  "",
+                  ""
+                ],
+                [
+                  "周界提示牌",
+                  "套",
+                  "",
+                  "41",
+                  "",
+                  ""
+                ],
+                [
+                  "金属软管",
+                  "米",
+                  "",
+                  "580",
+                  "",
+                  ""
+                ],
+                [
+                  "基础",
+                  "套",
+                  "",
+                  "29",
+                  "",
+                  ""
+                ],
+                [
+                  "辅材配件",
+                  "套",
+                  "",
+                  "29",
+                  "",
+                  ""
+                ],
+                [
+                  "挖沟恢复夯实",
+                  "米",
+                  "",
+                  "4890",
+                  "",
+                  ""
+                ],
+                [
+                  "弱电埋管",
+                  "米",
+                  "",
+                  "4980",
+                  "",
+                  ""
+                ],
+                [
+                  "强电埋管",
+                  "米",
+                  "",
+                  "4980",
+                  "",
+                  ""
+                ],
+                [
+                  "弱电布线",
+                  "米",
+                  "",
+                  "5850",
+                  "",
+                  ""
+                ],
+                [
+                  "5路配电箱",
+                  "个",
+                  "",
+                  "4",
+                  "",
+                  ""
+                ],
+                [
+                  "14路配电箱",
+                  "个",
+                  "",
+                  "1",
+                  "",
+                  ""
+                ],
+                [
+                  "强电布线",
+                  "米",
+                  "",
+                  "4445",
+                  "",
+                  ""
+                ],
+                [
+                  "杆上电源线",
+                  "米",
+                  "",
+                  "760",
+                  "",
+                  ""
+                ],
+                [
+                  "杆上网线",
+                  "米",
+                  "",
+                  "760",
+                  "",
+                  ""
+                ],
+                [
+                  "手孔井",
+                  "座",
+                  "",
+                  "29",
+                  "",
+                  ""
+                ],
+                [
+                  "设备集成",
+                  "",
+                  "",
+                  "1",
+                  "",
+                  ""
+                ],
+                [
+                  "合计",
+                  "",
+                  "",
+                  "",
+                  "",
+                  ""
+                ]
+              ]
+            }
+          ],
+          "sheet": null
+        },
+        {
+          "number": 89,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n    5 合同条款偏离表（实质性格式）\n\n\n              合同条款偏离表\n\n\n项目编号：_____________________    项目名称：_____________\n\n    招标文件条目\n序号         招标文件要求  投标文件内容   偏离情况   说明\n    号（页码）\n\n对本项目合同条款的偏离情况（应进行选择，未选择投标无效）：\n□无偏离（如无偏离，仅选择无偏离即可；无偏离即为对合同条款中的所有要求，均视\n作供应商已对之理解和响应。）\n□有偏离（如有偏离，则应在本表中对负偏离项逐一列明，否则投标无效；对合同条款\n中的所有要求，除本表列明的偏离外，均视作供应商已对之理解和响应。）\n\n\n\n\n\n  注：“偏离情况”列应据实填写“正偏离”或“负偏离”。\n\n\n\n\n   投标人名称（加盖公章）：___________\n\n   日期：_____年______月______日\n\n\n\n\n\n                                             88",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 90,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n 6 采购需求偏离表（实质性格式）\n\n             采购需求偏离表\n\n 项目编号：_____________________    项目名称：____________\n\n\n   招标文件条\n序号         招标文件要求   投标响应内容   偏离情况   说明\n    目号(页码)\n\n\n\n\n\n  注：\n\n     1. 对招标文件中的所有商务、技术要求，除本表所列明的所有偏离外，\n\n均视作供应商已对之理解和响应。此表中若无任何文字说明，内容为空白，\n\n投标无效。\n\n  2.“偏离情况”列应据实填写“无偏离”、“正偏离”或“负偏离”。\n\n\n   投标人名称（加盖公章）：____________\n\n    日期：_____年______月______日\n\n\n\n\n\n                                              89",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 91,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n   7 中小企业证明文件\n\n  说明：\n\n  1）中小企业参加政府采购活动，应当出具《中小企业声明函》或《残\n\n疾人福利性单位声明函》或由省级以上监狱管理局、戒毒管理局（含新疆\n\n生产建设兵团）出具的属于监狱企业的证明文件，以证明中小企业身份。\n\n《中小企业声明函》由参加政府采购活动的投标人出具。联合体投标的，\n\n《中小企业声明函》可由牵头人出具。\n\n  2）对于联合体中由中小企业承担的部分，或者分包给中小企业的部分，\n\n必须全部由中小企业制造、承建或者承接。供应商应当在声明函“标的名\n\n称”部分标明联合体中中小企业承担的具体内容或者中小企业的具体分包\n\n内容。\n\n  3）对于多标的采购项目，投标人应充分、准确地了解所提供货物的制\n\n造企业、提供服务的承接企业信息。对相关情况了解不清楚的，不建议填\n\n报本声明函。\n\n  4）温馨提示：为方便广大中小企业识别企业规模类型，工业和信息化\n\n部组织开发了中小企业规模类型自测小程序，在国务院客户端和工业和信\n\n息化部网站上均有链接，投标人填写所属的行业和指标数据可自动生成企\n\n业规模类型测试结果。本项目中小企业划分标准所属行业详见第二章《投\n\n标人须知资料表》，如在该程序中未找到本项目文件规定的中小企业划分\n\n标准所属行业，则按照《关于印发中小企业划型标准规定的通知（工信部\n\n联企业﹝2011﹞300号）》及本项目文件规定的中小企业划分标准所属行业\n\n执行。\n\n\n\n\n\n                                             90",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 92,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n\n\n      中小企业声明函（货物）格式（适用于第一包）\n\n  本公司（联合体）郑重声明，根据《政府采购促进中小企业发展管理\n\n办法》（财库﹝2020﹞46 号）的规定，本公司（联合体）参加（单位名\n\n称）的（项目名称）采购活动，提供的货物全部由符合政策要求的中小企\n\n业制造。相关企业（含联合体中的中小企业、签订分包意向协议的中小企\n\n业）的具体情况如下：\n\n  1.（标的名称），属于（采购文件中明确的所属行业）行业；制造商\n\n为（企业名称），从业人员______人，营业收入为______万元，资产总\n\n额为______万元 1，属于（中型企业、小型企业、微型企业）；\n\n  2.（标的名称），属于（采购文件中明确的所属行业）行业；制造商\n\n为（企业名称），从业人员______人，营业收入为______万元，资产总\n\n额为______万元，属于（中型企业、小型企业、微型企业）；\n\n  ……\n\n  以上企业，不属于大企业的分支机构，不存在控股股东为大企业的情\n\n形，也不存在与大企业的负责人为同一人的情形。\n\n  本企业对上述声明内容的真实性负责。如有虚假，将依法承担相应责\n\n任。\n\n\n                        企业名称（盖章）：________\n\n                                   日期：________\n\n\n\n\n1从业人员、营业收入、资产总额填报上一年度数据，无上一年度数据\n\n的新成立企业可不填报。\n\n\n\n\n\n                                             91",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 93,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n\n\n    中小企业声明函（工程、服务）格式（适用于第二包）\n\n  本公司（联合体）郑重声明，根据《政府采购促进中小企业发展管理\n\n办法》（财库﹝2020﹞46 号）的规定，本公司（联合体）参加（单位名\n\n称）的（项目名称）采购活动，工程的施工单位全部为符合政策要求的中\n\n小企业（或者：服务全部由符合政策要求的中小企业承接）。相关企业（\n\n含联合体中的中小企业、签订分包意向协议的中小企业）的具体情况如下：\n\n  1.（标的名称），属于（采购文件中明确的所属行业）行业；承建（\n\n承接）企业为（企业名称），从业人员______人，营业收入为______万\n\n元，资产总额为______万元 1，属于（中型企业、小型企业、微型企业）；\n\n  2.（标的名称），属于（采购文件中明确的所属行业）行业；承建（\n\n承接）企业为（企业名称），从业人员______人，营业收入为______万\n\n元，资产总额为______万元，属于（中型企业、小型企业、微型企业）；\n\n\n  ……\n\n  以上企业，不属于大企业的分支机构，不存在控股股东为大企业的情\n\n形，也不存在与大企业的负责人为同一人的情形。\n\n  本企业对上述声明内容的真实性负责。如有虚假，将依法承担相应责\n\n任。\n\n\n                          企业名称（盖章）：________\n\n                                     日期：________\n\n\n\n\n1从业人员、营业收入、资产总额填报上一年度数据，无上一年度数据\n\n的新成立企业可不填报。\n\n\n\n\n\n                                             92",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 94,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n\n\n           残疾人福利性单位声明函格式\n\n\n  本单位郑重声明，根据《财政部民政部中国残疾人联合会关于促进\n\n残疾人就业政府采购政策的通知》（财库〔2017〕141号）的规定，本单\n\n位（请进行选择）：\n\n  □不属于符合条件的残疾人福利性单位。\n\n  □属于符合条件的残疾人福利性单位，且本单位参加______单位的\n\n______项目采购活动提供本单位制造的货物（由本单位承担工程/提供服\n\n务），或者提供其他残疾人福利性单位制造的货物（不包括使用非残疾人\n\n福利性单位注册商标的货物）。\n\n  本单位对上述声明的真实性负责。如有虚假，将依法承担相应责任。\n\n\n\n\n                单位名称（盖章）：\n\n                 日 期：\n\n\n\n\n\n                                             93",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 95,
+          "text": "  北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n     8 拟分包情况说明（如有）\n\n              拟分包情况说明\n\n 致：（采购人或采购代理机构）\n\n   我单位参加贵单位组织采购的项目编号为_______的_________项目\n\n（填写采购项目名称）中___包（填写包号）的投标。拟签订分包合同的单\n\n位情况如下表所示，我单位承诺一旦在该项目中获得采购合同将按下表所\n\n列情况进行分包，同时承诺分包承担主体不再次分包。\n         分包承担              拟分包\n 序 分包承担             拟分包         占合同金额\n         主体类型  资质等级        合同金额\n 号 主体名称             合同内容         的比例（%）\n         （选择）            （人民币元）\n         □中型企业\n   1       □小微企业\n          □其他\n         □中型企业\n   2       □小微企业\n          □其他\n\n …\n\n\n                      合计：\n\n  注：\n\n   1.如本项目（包）允许分包，且投标人拟进行分包时，必须提供；如\n\n未提供，或提供了但未填写分包承担主体名称、拟分包合同内容、拟分包\n\n合同金额，投标无效。\n\n   2.如本招标文件《投标人须知资料表》载明本项目分包承担主体应具\n\n备的相应资质条件，则投标人须在本表中列明分包承担主体的资质等级，\n\n并后附资质证书电子件，否则投标无效。\n\n   3.投标人“为落实政府采购政策”而向中小企业分包时请仔细阅读资\n\n 格证明文件格式2-1中说明，并建议按要求在资格证明文件中提供相关全部\n\n文件；投标人非“为落实政府采购政策”而向中小企业分包时，建议在本\n\n册提供。\n\n                         投标人名称（盖章）：______\n\n                              日期：_____年______月______日\n\n\n\n                                              94",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 96,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n           分包意向协议（如有）\n\n   甲方（投标人）：________\n\n   乙方（拟分包单位）：________\n\n  甲方承诺，一旦在_____（采购项目名称）（项目编号/包号为：_____）\n\n招标采购项目中获得采购合同，将按照下述约定将合同项下部分内容分包\n\n给乙方：\n\n   1.分包内容：_____。\n\n  2.分包金额：_____，该金额占该采购包合同金额的比例为___%。\n\n  乙方承诺将在上述情况下与甲方签订分包合同。\n\n  本协议自各方盖章之日起生效，如甲方未在该项目（采购包）中标，\n\n本协议自动终止。\n\n\n 甲方（盖章）：_________            乙方（盖章）：_________\n\n\n                             日期：_____年______月______日\n\n\n注：\n\n1.投标人“为落实政府采购政策”而向中小企业分包时必须提供，否则投\n\n标无效；且建议按照采购文件要求在资格证明文件部分提供；\n\n2.投标人满足《政府采购促进中小企业发展管理办法》（财库〔2020〕46\n\n号）第九条有关规定，拟享受中小企业政策优惠措施的，仍需提供本协议，\n\n否则不予认可；\n\n3.投标人须与所有拟分包单位分别签订《分包意向协议》，每单位签订一\n\n份，并在投标文件中提交全部协议原件的电子件，否则不予认可。\n\n\n\n\n\n                                             95",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 97,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n9 招标文件要求提供或投标人认为应附的其他材料\n\n9.1 供应商信息采集表\n\n  供应商名称      供应商所属性别    外商投资类型\n\n\n\n\n\n注：1.供应商如为联合体，则应填写联合体各成员信息。\n\n  2.供应商所属性别请填写“男”或“女”，指拥有供应商51%以上绝对\n\n所有权的性别；绝对所有权拥有者可以是一个人，也可以是多人合计计算。\n\n  3.外商投资类型请填写“外商单独投资”、“外商部分投资”或“内\n\n资”。\n\n9.2 企业业绩\n\n9.2.1 近五年类似的项目业绩表（供应商必须提供能够证明上述案例真实\n\n性的合同扫描件，需提供近五年（2021年02月至2026年02月）（以采购合\n\n同签订日期为准）具有监控设备供货业绩（含合同首页、金额页、签署日\n\n期页、双方签字盖章页等）扫描件加盖投标人公章）。（适用于第一包）\n\n9.2.2 近五年类似的项目业绩表（供应商必须提供能够证明上述案例真实\n\n性的合同扫描件，需提供近五年（2021年02月至2026年02月）（以采购合\n\n同签订日期为准）具有电子与智能化施工业绩（含合同首页、金额页、签\n\n署日期页、双方签字盖章页等）扫描件加盖投标人公章）。（适用于第二\n\n包）\n\n9.3 拟投入工作人员配备情况（备注：1.格式自拟；2.拟投入本项目人员\n\n需后附毕业证（如有）、执业资格证书（如有）、身份证（正、反面）扫\n\n描件加盖单位公章）。\n\n\n\n\n\n                                             96",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        },
+        {
+          "number": 98,
+          "text": " 北京盛标建筑造价咨询有限责任公司                        招标编码DL2026-002-007\n\n10 技术格式自拟\n\n\n\n\n\n                                             97",
+          "has_image": true,
+          "kind": "pdf_page",
+          "tables": [],
+          "sheet": null
+        }
+      ]
+    }
+  ]
+}

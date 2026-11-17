@@ -13,18 +13,35 @@ from ict.concurrency import LOCAL_GATE
 
 def read_docx(path: Path) -> list[dict]:
     import docx
+    import base64
+    from docx.oxml.ns import qn
+    from docx.text.paragraph import Paragraph
+    from docx.table import Table
 
     document = docx.Document(str(path))
-    parts = [paragraph.text for paragraph in document.paragraphs if paragraph.text.strip()]
-    tables = []
-    for index, table in enumerate(document.tables):
-        rows = [[cell.text.strip() for cell in row.cells] for row in table.rows]
-        rows = [row for row in rows if any(row)]
-        tables.append({"table_index": index, "headers": rows[0] if rows else [], "rows": rows[1:]})
-        for row in rows:
-            parts.append(" | ".join(row))
+    parts, tables, blocks = [], [], []
+    for element in document.element.body:
+        if element.tag == qn("w:p"):
+            text = Paragraph(element, document).text
+            parts.append(text)
+            blocks.append({"text": text, "tables": []})
+        elif element.tag == qn("w:tbl"):
+            rows = [[cell.text.strip() for cell in row.cells] for row in Table(element, document).rows]
+            table = {"table_index": len(tables), "headers": rows[0] if rows else [], "rows": rows[1:]}
+            tables.append(table)
+            parts.extend(" | ".join(row) for row in rows)
+            blocks.append({"text": "", "tables": [table]})
+        else:
+            continue
+        images = []
+        for image in element.iter(qn("a:blip")):
+            part = document.part.related_parts[image.get(qn("r:embed"))]
+            images.append("data:%s;base64,%s" % (part.content_type, base64.b64encode(part.blob).decode("ascii")))
+        if images:
+            blocks[-1]["images"] = images
     text = "\n".join(parts)
-    return [{"page_no": 1, "text": text, "tables": tables, "chars": len(text), "source": "docx"}]
+    return [{"page_no": 1, "text": text, "tables": tables, "blocks": blocks,
+             "chars": len(text), "source": "docx", "coordinate_kind": "native_segment"}]
 
 
 def read_xlsx(path: Path) -> list[dict]:
@@ -36,10 +53,11 @@ def read_xlsx(path: Path) -> list[dict]:
         rows = [["" if cell is None else str(cell) for cell in row]
                 for row in sheet.iter_rows(values_only=True)]
         rows = [row for row in rows if any(row)]
-        text = "\n".join("\t".join(row) for row in rows[:400])
+        text = "\n".join("\t".join(row) for row in rows)
         pages.append({"page_no": index, "text": text,
                       "tables": [{"table_index": 0, "headers": rows[0] if rows else [], "rows": rows[1:]}],
-                      "chars": len(text), "source": "xlsx"})
+                      "chars": len(text), "source": "xlsx", "sheet_name": sheet.title,
+                      "coordinate_kind": "worksheet"})
     book.close()
     return pages
 

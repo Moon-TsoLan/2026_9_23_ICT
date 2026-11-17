@@ -75,8 +75,9 @@ def test_single_worker_claims_accounts_and_preserves_owner(tmp_path, monkeypatch
     def fake_run(aid, **kwargs):
         calls.append((kwargs["html_dir"].read_text() if kwargs["html_dir"].is_file() else
                       (kwargs["html_dir"] / f"{aid}.html").read_text(), kwargs["runs_root"].parent.name))
+        yield from ()
         return SimpleNamespace(status="success")
-    monkeypatch.setattr(worker, "run_announcement", fake_run)
+    monkeypatch.setattr(worker, "announcement_chain", fake_run)
     monkeypatch.setattr(worker, "_load_to_db", lambda run, tenant: None)
     for job, item in claimed:
         worker.process_item(job, item, verbose=False)

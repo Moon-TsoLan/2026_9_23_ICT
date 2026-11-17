@@ -7,6 +7,7 @@ import time
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import httpx
 from tenacity import (Retrying, retry_if_exception_type, stop_after_attempt,
@@ -58,6 +59,7 @@ class LLMResult:
     # Kept only where thinking is switched on, for the audit trail. No rule reads it.
     reasoning: str = ""
     usage: dict = field(default_factory=dict)
+    finish_reason: str | None = None
 
 
 class LLMError(RuntimeError):
@@ -100,6 +102,15 @@ class OpenAICompatibleClient(LLMClient):
         self.timeout = timeout
         self.connect_timeout = connect_timeout
 
+    def _thinking_parameters(self, enabled: bool) -> dict:
+        """Translate the same switch to the endpoint's wire protocol, not the model name."""
+        host = (urlsplit(self.base_url).hostname or "").lower()
+        if host.endswith(".maas.aliyuncs.com") or host in {
+            "dashscope.aliyuncs.com", "dashscope-intl.aliyuncs.com", "dashscope-us.aliyuncs.com",
+        }:
+            return {"enable_thinking": enabled}
+        return {"thinking": {"type": "enabled" if enabled else "disabled"}}
+
     def _send_once(self, step: str, request: dict) -> httpx.Response:
         """One attempt: hold the process-wide gate, post, and say whether it is worth retrying."""
         with LLM_GATE:
@@ -128,13 +139,12 @@ class OpenAICompatibleClient(LLMClient):
                 {"role": "user", "content": user},
             ],
         }
-        if thinking:
-            # Thinking and a forced json_object response do not mix reliably on this endpoint, so
-            # the JSON is read out of the text instead: parse_json_object already strips fences and
-            # prose. Every other step keeps the strict shape it always had.
-            request["thinking"] = {"type": "enabled"}
-        else:
-            request["thinking"] = {"type": "disabled"}
+        from ict.fields import PROMPT_OUTPUT_LIMITS
+        if prompt_version in PROMPT_OUTPUT_LIMITS:
+            request["max_tokens"] = PROMPT_OUTPUT_LIMITS[prompt_version]
+        request.update(self._thinking_parameters(thinking))
+        # Thinking keeps the existing free-text JSON extraction; other steps keep forced JSON.
+        if not thinking:
             request["response_format"] = {"type": "json_object"}
         response = self._post(step, request)
         latency_ms = int((time.perf_counter() - started) * 1000)
@@ -149,7 +159,8 @@ class OpenAICompatibleClient(LLMClient):
             # only when the visible text holds no JSON at all keeps a real answer untouched and
             # avoids the whole package silently falling back to the baseline.
             text = reasoning
-        return LLMResult(text, self.model, self.model, prompt_version, latency_ms, reasoning, payload.get("usage") or {})
+        return LLMResult(text, self.model, self.model, prompt_version, latency_ms, reasoning, payload.get("usage") or {},
+                         payload["choices"][0].get("finish_reason"))
 
     def complete_with_images(self, *, step: str, prompt_version: str, images: list[str],
                              user_text: str) -> LLMResult:
@@ -162,7 +173,7 @@ class OpenAICompatibleClient(LLMClient):
             "model": self.model,
             "temperature": 0,
             "max_tokens": 300,
-            "thinking": {"type": "disabled"},
+            **self._thinking_parameters(False),
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": content},
@@ -173,7 +184,8 @@ class OpenAICompatibleClient(LLMClient):
             raise LLMError(f"{step} http {response.status_code}: {response.text[:300]}")
         payload = response.json()
         produced = payload["choices"][0]["message"]["content"]
-        return LLMResult(produced, self.model, self.model, prompt_version, latency_ms, usage=payload.get("usage") or {})
+        return LLMResult(produced, self.model, self.model, prompt_version, latency_ms, usage=payload.get("usage") or {},
+                         finish_reason=payload["choices"][0].get("finish_reason"))
 
 
 class FakeLLMClient(LLMClient):
@@ -240,6 +252,7 @@ def complete_json(
     thinking: bool = False,
     notes: dict | None = None,
     receiver=None,
+    images: list[str] | None = None,
 ) -> dict:
     """Repair representation/plan errors once; a receiver may retain independent valid items.
 
@@ -250,18 +263,33 @@ def complete_json(
     payload = user
     attempts, issues = [], []
     for attempt in range(2):
+        started = time.perf_counter()
         try:
-            result = llm.complete(step=step, prompt_version=prompt_version, user=payload,
-                                  thinking=thinking)
-        except LLMError as exc:
+            result = (llm.complete_with_images(step=step, prompt_version=prompt_version,
+                                              images=images, user_text=payload) if images is not None else
+                      llm.complete(step=step, prompt_version=prompt_version, user=payload,
+                                   thinking=thinking))
+        except (LLMError, LLMRetryable, httpx.TransportError, NotImplementedError) as exc:
+            if hasattr(counter, "record_call"):
+                counter.record_call(step=step, prompt_version=prompt_version, error=str(exc), usage=None,
+                                    latency_ms=int((time.perf_counter() - started) * 1000))
             if receiver is None or not receiver.received:
-                raise
+                if isinstance(exc, LLMError):
+                    raise
+                raise LLMError(str(exc)) from exc
             attempts.append({"attempt": attempt + 1, "issues": [ValidationIssue(str(exc), "transport").as_dict()]})
+            if notes is not None:
+                notes["attempts"] = attempts
             return receiver.result(attempts)
+        if hasattr(counter, "record_call"):
+            counter.record_call(step=step, prompt_version=prompt_version, model_name=result.model_name,
+                                latency_ms=result.latency_ms, usage=result.usage)
         if notes is not None:
+            notes.setdefault("responses", []).append(result.text)
             notes["reasoning"] = (getattr(result, "reasoning", "") or "")[:1200]
             notes.setdefault("calls", []).append({"attempt": attempt + 1,
                 "latency_ms": result.latency_ms, "usage": getattr(result, "usage", {}),
+                "finish_reason": getattr(result, "finish_reason", None),
                 "prompt_version": prompt_version, "model_name": result.model_name})
         if counter is not None:
             bump_count(counter, step)
@@ -292,7 +320,7 @@ def complete_json(
         if attempt == 0:
             repair = {"previous_response": result.text,
                       "validation_issues": [item.as_dict() for item in issues]}
-            if receiver is not None:
+            if receiver is not None and receiver.received:
                 repair["accepted_independent_outputs"] = receiver.result(attempts)
             payload = (user + "\n\n协议修复：以下是上次回答与具体错误。保留合法信息，只修复列出的错误；"
                        "带依赖的计划须返回完整合法计划。独立通道已接收的条目由程序保留，不必重复。\n" +

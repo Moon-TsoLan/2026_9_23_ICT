@@ -39,7 +39,7 @@ DETAIL_ROLES = {"cob_detail", "winner"}
 EXCLUDE_KINDS = ("subtotal_row", "project_row", "index_row", "not_an_object")
 DELTA_ORDER = ("exclude", "split", "merge", "sum", "name_from", "price_from", "fields_from",
                "category_from_announcement")
-PROMPT = "merge-objects-v6"
+PROMPT = "merge-objects-v9"
 # What fields_from is allowed to move onto a group. The two money numbers are deliberately not
 # here: a unit price from one row joined to a quantity from another invents a total nobody wrote.
 # They can still arrive through price_from with an explicit key list, where the source is named.
@@ -543,9 +543,31 @@ def _ask_merge(ctx: _Context, groups: list[Group], cobs: list[Candidate], amount
     payload["package_amount_evidence"] = amount_evidence or {}
     if evidence is not None:
         payload["package_registry"] = evidence.package_registry
-        payload["evidence_context"] = {"attachment_pages": evidence.attachment_pages,
-                                       "native_extraction": evidence.native_extraction,
-                                       "amount_observations": evidence.amount_observations.get(ctx.package_no, [])}
+        amount_observations = evidence.amount_observations.get(ctx.package_no, [])
+        page_keys = {f"{item.source.file_id}:{item.source.page_no}" for item in cobs
+                     if item.source.file_id is not None and item.source.page_no is not None}
+        source_refs = {ref for item in cobs if item.evidence for ref in item.evidence.source_refs}
+        for observation in amount_observations:
+            source_refs.update(observation.get("source_refs", []))
+            if observation.get("source_ref"):
+                source_refs.add(observation["source_ref"])
+            if observation.get("file_id") is not None and observation.get("page_no") is not None:
+                page_keys.add(f"{observation['file_id']}:{observation['page_no']}")
+        for ref in source_refs:
+            source = evidence.source_contexts.get(ref, {})
+            if source.get("file_id") is not None and source.get("page_no") is not None:
+                page_keys.add(f"{source['file_id']}:{source['page_no']}")
+        source_contexts = {ref: evidence.source_contexts[ref] for ref in sorted(source_refs)
+                           if ref in evidence.source_contexts}
+        for candidate in payload["candidates"]:
+            refs = candidate.get("source_refs", [])
+            if refs and all(ref in source_contexts for ref in refs):
+                candidate.pop("row_text", None)
+        payload["evidence_context"] = {
+            "source_contexts": source_contexts,
+            "attachment_pages": {key: page for key, page in evidence.attachment_pages.items() if key in page_keys},
+            "native_extraction": evidence.native_extraction,
+            "amount_observations": amount_observations}
 
     def validate(parsed):
         invalid["parsed"] = parsed

@@ -174,6 +174,7 @@ class CallCounter:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._counts: Counter = Counter()
+        self._model_calls: list[dict] = []
 
     def add(self, key: str, amount: int = 1) -> None:
         with self._lock:
@@ -182,6 +183,14 @@ class CallCounter:
     def snapshot(self) -> dict:
         with self._lock:
             return dict(self._counts)
+
+    def record_call(self, **record):
+        with self._lock:
+            self._model_calls.append(record)
+
+    def model_calls(self):
+        with self._lock:
+            return list(self._model_calls)
 
     def __getitem__(self, key: str) -> int:
         with self._lock:

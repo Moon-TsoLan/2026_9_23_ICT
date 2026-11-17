@@ -103,7 +103,25 @@ def test_current_run_state_is_used(tmp_path: Path) -> None:
     assert item["run_started"] is True
     # 分母是整条流程的步数（12），不是"这条 run 已经登记了几步"（夹具里只有 5 步）
     from ict.state import STEP_TOTAL
-    assert item["progress"] == {"done": 3, "total": STEP_TOTAL, "current_step": "s1", "status": None}
+    assert item["progress"] == {"done": 3, "total": STEP_TOTAL, "current_step": "s1", "status": None,
+                                "merge_wait": None, "merge_timing": None}
+
+
+def test_suspended_merge_keeps_record_running_and_step_unfinished(tmp_path):
+    directory = tmp_path / "t1"
+    directory.mkdir()
+    for phase in ("queued", "running", "resuming"):
+        (directory / "run_state.json").write_text(json.dumps({
+            "created_at": "2026-11-12T10:00:01+08:00", "status": "running",
+            "current_step": "merge_candidates", "merge_wait": phase,
+            "steps": [{"step": "normalize_candidates", "status": "success"},
+                      {"step": "merge_candidates", "status": "running"}]}), encoding="utf-8")
+        jobs = [job("j1", "2026-11-12T10:00:02+08:00", [("t1", "running", None)],
+                    created_at="2026-11-12T10:00:00+08:00")]
+        item = ingest.merge_records(jobs, [], 1, 20, roots=[tmp_path])["items"][0]
+        assert item["status"] == "running"
+        assert item["progress"]["done"] == 1
+        assert item["progress"]["merge_wait"] == phase
 
 
 def test_finished_run_reads_full_marks(tmp_path: Path) -> None:

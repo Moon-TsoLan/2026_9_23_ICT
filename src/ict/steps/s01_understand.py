@@ -10,7 +10,6 @@ from ict.llm import LLMClient, LLMError
 from ict.money import parse_amount
 from ict.schemas import Amount, AnnouncementUnderstanding, Failure, ModelMetadata, PackageUnderstanding
 
-PROMPT = "announcement-v4"
 from ict.packages import registry_references
 
 
@@ -56,12 +55,16 @@ def _confidence(value, default: float = 0.9) -> float:
 
 
 def _amount(raw: str | None, scope: str, confidence: float | None = 0.9,
-            amount_kind: str = "unknown", source_ref: str | None = None) -> Amount | None:
+            amount_kind: str = "unknown", source_ref: str | None = None, unit_header: str | None = None) -> Amount | None:
     if not raw:
         return None
     yuan, _ = parse_amount(raw)
+    if unit_header:
+        from ict.money import parse_price_cell
+        yuan = parse_price_cell(raw, unit_header)["value"]
     return Amount(raw_text=raw, amount_yuan=yuan, scope=scope, confidence=confidence,
-                  amount_kind=amount_kind, source_ref=source_ref)
+                  amount_kind=amount_kind, source_ref=source_ref,
+                  binding={"unit_header": unit_header} if unit_header else {})
 
 
 def seal(run_id: str, proposed: dict, metadata: ModelMetadata | None, failures: list[Failure]) -> AnnouncementUnderstanding:
@@ -84,7 +87,7 @@ def seal(run_id: str, proposed: dict, metadata: ModelMetadata | None, failures: 
                 continue
             alt = _amount(entry.get("raw_text") or entry.get("raw_amount"), "package",
                           _confidence(entry.get("confidence")), entry.get("amount_kind", "unknown"),
-                          entry.get("source_ref"))
+                          entry.get("source_ref"), entry.get("unit_header"))
             if alt is not None:
                 alternatives.append(alt)
         packages.append(
@@ -97,7 +100,8 @@ def seal(run_id: str, proposed: dict, metadata: ModelMetadata | None, failures: 
                 project_id=make_project_id(name, package_no) if name else "",
                 package_evidence_text=evidence,
                 package_amount=_amount(raw_amount, "package", amount_kind=(item.get("package_amount") or {}).get("amount_kind", "unknown"),
-                                       source_ref=(item.get("package_amount") or {}).get("source_ref")),
+                                       source_ref=(item.get("package_amount") or {}).get("source_ref"),
+                                       unit_header=(item.get("package_amount") or {}).get("unit_header")),
                 amount_alternatives=alternatives,
             )
         )
@@ -135,7 +139,8 @@ def seal(run_id: str, proposed: dict, metadata: ModelMetadata | None, failures: 
         packages=[] if status == "failed" and not name else packages,
         summary_amount=_amount(proposed.get("summary_raw"), "announcement",
                                amount_kind=(proposed.get("summary_amount") or {}).get("amount_kind", "unknown"),
-                               source_ref=(proposed.get("summary_amount") or {}).get("source_ref")),
+                               source_ref=(proposed.get("summary_amount") or {}).get("source_ref"),
+                               unit_header=(proposed.get("summary_amount") or {}).get("unit_header")),
         announcement_categories=categories,
         unclear_reason=proposed.get("unclear_reason"),
         model_metadata=metadata,
@@ -143,81 +148,89 @@ def seal(run_id: str, proposed: dict, metadata: ModelMetadata | None, failures: 
     )
 
 
-def _validate_announcement(parsed: dict) -> str:
-    mode = parsed.get("package_mode")
-    if mode is not None and (not isinstance(mode, str) or mode not in {"single", "multi", "unclear", ""}):
-        return "package_mode 不在 single、multi、unclear 之中"
-    kind = parsed.get("announcement_type")
-    if kind is not None and (not isinstance(kind, str) or kind not in {"winning_announcement", "deal_announcement", "unknown", ""}):
-        return "announcement_type 不在允许值内"
-    packages = parsed.get("packages", [])
-    if not isinstance(packages, list) or any(not isinstance(item, dict) for item in packages):
-        return "packages 必须为对象数组"
-    for key in ("project_name", "purchaser", "source_project_no", "summary_raw"):
-        if parsed.get(key) is not None and not isinstance(parsed[key], str):
-            return f"{key} 必须为字符串或 null"
-    amounts = [(parsed.get("summary_amount"), "announcement")]
-    for package in packages:
-        if package.get("package_kind", "unknown") not in ("lot", "contract_package", "unpartitioned", "unknown"):
-            return "package_kind 无效"
-        if package.get("package_name") is not None and not isinstance(package["package_name"], str):
-            return "package_name 必须为字符串或 null"
-        if package.get("package_no") is not None and not isinstance(package["package_no"], str):
-            return "package_no 必须为字符串或 null"
-        alternatives = package.get("amount_alternatives", [])
-        if not isinstance(alternatives, list):
-            return "amount_alternatives 必须为数组"
-        amounts.extend((item, "package") for item in [package.get("package_amount")] + alternatives)
-    for item, scope in amounts:
-        if item is not None and (not isinstance(item, dict) or
-                not isinstance(item.get("amount_kind", "unknown"), str) or
-                item.get("amount_kind", "unknown") not in {"award", "budget", "ceiling", "unknown"}):
-            return "金额需要合法的 amount_kind"
-        if item is not None and (item.get("scope", scope) != scope or
-                                item.get("raw_text") is not None and not isinstance(item["raw_text"], str) or
-                                item.get("source_ref") is not None and not isinstance(item["source_ref"], str)):
-            return "金额的 scope 与承载位必须一致，raw_text 必须为字符串"
-    return ""
-
-
-def understand(run_id: str, notice: ParsedNotice, llm: LLMClient | None, counter=None) -> AnnouncementUnderstanding:
+def read_announcement(run_id, notice, llm, counter=None, *, provisional=False):
+    """Two independent full-context extractions, followed by one local assembly."""
     import json
-
-    from ict.html_context import fill_package_amounts, step1_payload
+    from concurrent.futures import ThreadPoolExecutor
     from ict.llm import complete_json
+    from ict.observations import seal_observations
+    from ict.announcement_receiving import AnnouncementReceiver
+    from ict.schemas import CandidateFile, HtmlTable, HtmlTables
+    from bs4 import BeautifulSoup
 
-    failures: list[Failure] = []
-    if llm is None:
-        failures.append(Failure(failure_code="llm_call_failed", failure_message="未配置 DeepSeek"))
-        return seal(run_id, {"package_mode": "unclear", "unclear_reason": "未配置 DeepSeek"}, None, failures)
-    try:
-        proposed = complete_json(
-            llm,
-            step="understand_announcement",
-            prompt_version=PROMPT,
-            user=json.dumps(step1_payload(notice), ensure_ascii=False),
-            validate=_validate_announcement,
-            counter=counter,
-        )
-    except (LLMError, ValueError) as exc:
-        code = "llm_call_failed" if isinstance(exc, LLMError) else "llm_schema_invalid"
-        failures.append(Failure(failure_code=code, failure_message=str(exc)))
-        return seal(run_id, {"package_mode": "unclear", "unclear_reason": str(exc)}, None, failures)
-    metadata = ModelMetadata(
-        model_name=getattr(llm, "model", "configured"),
-        model_version=getattr(llm, "model", "configured"),
-        prompt_version=PROMPT,
-        latency_ms=0,
-    )
-    if "summary_raw" not in proposed:
-        summary = proposed.get("summary_amount") or {}
-        proposed["summary_raw"] = summary.get("raw_text") if isinstance(summary, dict) else None
-    kept, dropped = checked_categories(proposed.get("announcement_categories"),
-                                       notice.summary.get("品目"))
-    proposed["announcement_categories"] = kept
-    for text in dropped:
-        failures.append(Failure(failure_code="category_item_not_in_summary",
-                                failure_message="公告概要里没有这一段：" + text))
-    understanding = seal(run_id, proposed, metadata, failures)
-    fill_package_amounts(understanding, notice)
-    return understanding
+    contexts = [{"file_id": None, "page_no": None, "source_type": "html",
+                 "source_segments": list(notice.source_contexts.values())}]
+    branch_refs = {}
+    for branch, html in (("summary", notice.summary_html), ("body", notice.body_html)):
+        branch_refs[branch] = {tag["data-source-ref"] for tag in BeautifulSoup(html, "lxml").find_all(attrs={"data-source-ref": True})}
+        branch_refs[branch].add("html:" + branch)
+
+    def ask(branch):
+        notes = {}
+        receiver = AnnouncementReceiver(branch, contexts, branch_refs[branch], {table.table_index for table in notice.tables})
+        try:
+            if llm is None:
+                raise LLMError("未配置模型")
+            request = {"source_ref": "html:" + branch,
+                       "html": notice.summary_html if branch == "summary" else notice.body_html}
+            if provisional and branch == "body":
+                request["任务说明"] = ("未明示包归属的供应商、成交额、得分保存在同一个顶层SUB观测。"
+                    "供应商表与采购需求分包目录不得按顺序配对。仅写详见附件的汇总行不制造独立成交标的。"
+                    "项目名或采购单元未知时仍保留能确认的事实。")
+            value = complete_json(llm, step="read_announcement_" + branch,
+                prompt_version="announcement-summary-v2" if branch == "summary" else "announcement-body-v6",
+                user=json.dumps(request, ensure_ascii=False),
+                validate=receiver.validate, receiver=receiver, counter=counter, notes=notes)
+            failure = (Failure(failure_code="llm_schema_invalid", location=branch,
+                               failure_message="独立观测存在未修复错误；见reception")
+                       if value["reception"]["unrepaired"] else None)
+            return value, notes, failure
+        except (LLMError, ValueError) as exc:
+            return {}, notes, Failure(failure_code="llm_call_failed" if isinstance(exc, LLMError) else "llm_schema_invalid",
+                                      location=branch, failure_message=str(exc))
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        summary_job, body_job = pool.submit(ask, "summary"), pool.submit(ask, "body")
+        summary, summary_notes, summary_error = summary_job.result()
+        body, body_notes, body_error = body_job.result()
+    failures = [error for error in (summary_error, body_error) if error]
+    proposed = dict(body)
+    conflicts = []
+    for key in ("project_name", "purchaser", "source_project_no", "announcement_type"):
+        left, right = summary.get(key), body.get(key)
+        selected = "body" if right not in (None, "", "unknown") else "summary"
+        if provisional and left not in (None, "", "unknown") and right not in (None, "", "unknown") and _pack(left) != _pack(right):
+            selected = None
+        if left and right and left != right:
+            conflicts.append({"field": key, "summary": left, "body": right, "selected": selected})
+        proposed[key] = (right if selected == "body" else left) if selected else None
+    raw_packages = body.get("packages", [])
+    proposed["packages"] = [dict(item, package_no=item.get("source_package_no")) for item in raw_packages]
+    proposed["summary_amount"] = summary.get("summary_amount")
+    proposed["summary_raw"] = (summary.get("summary_amount") or {}).get("raw_text")
+    categories, dropped = checked_categories(summary.get("announcement_categories"), notice.summary.get("品目"))
+    proposed["announcement_categories"] = categories
+    failures.extend(Failure(failure_code="category_item_not_in_summary", failure_message=text) for text in dropped)
+    understanding = seal(run_id, proposed, None, failures)
+    if provisional and not understanding.project_name and raw_packages:
+        provisional_input = dict(proposed, project_name=run_id)
+        understanding.packages = seal(run_id, provisional_input, None, []).packages
+    understanding.branch_audit = {"summary": {"output": summary, **summary_notes},
+                                  "body": {"output": body, **body_notes}, "conflicts": conflicts}
+    candidates, seq = [], 1
+    for raw, package in zip(raw_packages, understanding.packages):
+        rows, seq = seal_observations(raw.get("candidates", []), contexts, understanding.project_name or run_id, seq, package=package)
+        candidates.extend(rows)
+    rows, seq = seal_observations(body.get("candidates", []), contexts, understanding.project_name or "", seq)
+    candidates.extend(rows)
+    has_facts = (candidates or understanding.packages or understanding.project_name
+                 or understanding.purchaser or understanding.source_project_no or understanding.summary_amount
+                 or understanding.announcement_categories)
+    if provisional and understanding.status == "failed" and has_facts:
+        understanding.status = "partial"
+    tables = HtmlTables(run_id=run_id, status="partial" if body_error else "success", tables=[
+        HtmlTable(**(row | {"package_scope": "announcement", "status": "success"})) for row in body.get("tables", [])])
+    return understanding, tables, CandidateFile(run_id=run_id, status=understanding.status,
+                                               candidates=candidates, failures=failures,
+                                               reception=[{"branch": branch, **value["reception"]} for branch, value in
+                                                          (("summary", summary), ("body", body)) if "reception" in value])

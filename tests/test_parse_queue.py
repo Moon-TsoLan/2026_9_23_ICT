@@ -88,28 +88,3 @@ def test_two_inflight_workers_really_run_two_documents():
     assert first.result(timeout=10) == "ok"
     assert second.result(timeout=10) == "ok"
     queue.shutdown()
-
-
-def test_parse_pages_hands_the_announcement_to_the_queue(monkeypatch, tmp_path):
-    """Rotation keys on the owner, so step 4c has to pass one. Without it, rotation is a no-op."""
-    document = tmp_path / "a.pdf"
-    document.write_bytes(b"%PDF-1.4\n")
-    owners: list[str] = []
-
-    def fake_submit(owner, func, *args, **kwargs):
-        owners.append(owner)
-        future: Future = Future()
-        future.set_result({"pages": [{"page_no": 1, "markdown": ""}], "meta": {}})
-        return future
-
-    monkeypatch.setattr(s04_attach.PARSE_QUEUE, "submit", fake_submit)
-    # `client.parse` is read as the argument to submit(), so the stub needs the attribute.
-    monkeypatch.setattr(s04_attach, "_client", lambda: SimpleNamespace(parse=lambda *a, **k: None))
-    index = AttachmentIndex(announcement_id="demo", attachment_directory=str(tmp_path), files=[
-        IndexedFile(file_id="a001", display_name="a.pdf", relative_path="a.pdf", extension=".pdf",
-                    readability="text_extractable", fmt="image", page_count=1)])
-    files = FileDecisions(run_id="run_demo", status="success", file_decisions=[
-        FileDecision(file_id="a001", file_class="bid_quote", priority=90.0,
-                     read_strategy="target_pages", reason="test")])
-    s04_attach.parse_pages("run_demo", files, index, [])
-    assert owners == ["run_demo"]

@@ -1,0 +1,142 @@
+[
+  {
+    "file": "src/ict/steps/s01_understand.py",
+    "line": 194,
+    "step": "understand_announcement",
+    "prompt_version": "announcement-v4",
+    "validate": "_validate_announcement",
+    "receiver": null,
+    "thinking": "默认关闭",
+    "call": "complete_json"
+  },
+  {
+    "file": "src/ict/steps/s02_html.py",
+    "line": 84,
+    "step": "understand_html_tables",
+    "prompt_version": "html-tables-v6",
+    "validate": "lambda item: _validate_table(item, package_nos)",
+    "receiver": null,
+    "thinking": "默认关闭",
+    "call": "complete_json"
+  },
+  {
+    "file": "src/ict/steps/s02_html.py",
+    "line": 195,
+    "step": "extract_html_candidates",
+    "prompt_version": "html-candidates-v5",
+    "validate": "lambda item: _validate_source_candidates(item, payload['source_rows'])",
+    "receiver": null,
+    "thinking": "默认关闭",
+    "call": "complete_json"
+  },
+  {
+    "file": "src/ict/steps/s02_html.py",
+    "line": 278,
+    "step": "extract_html_candidates",
+    "prompt_version": "html-candidates-v5",
+    "validate": "lambda item: _validate_source_candidates(item, body_sections)",
+    "receiver": null,
+    "thinking": "默认关闭",
+    "call": "complete_json"
+  },
+  {
+    "file": "src/ict/steps/s04_attach.py",
+    "line": 399,
+    "step": "locate_pages",
+    "prompt_version": "locate-pages-v5",
+    "validate": "_validate_pages",
+    "receiver": null,
+    "thinking": "默认关闭",
+    "call": "complete_json"
+  },
+  {
+    "file": "src/ict/steps/s04_attach.py",
+    "line": 529,
+    "step": "extract_attachment_candidates",
+    "prompt_version": "attachment-extract-v5",
+    "validate": "_validate_candidates",
+    "receiver": "ExtractionReceiver(chunk, needs=payload['current_package']['needs'])",
+    "thinking": "默认关闭",
+    "call": "complete_json"
+  },
+  {
+    "file": "src/ict/steps/s04_attach.py",
+    "line": 794,
+    "step": "review_native_continuation",
+    "prompt_version": "native-continuation-v1",
+    "validate": "validate",
+    "receiver": null,
+    "thinking": "默认关闭",
+    "call": "complete_json"
+  },
+  {
+    "file": "src/ict/steps/s08b_repair.py",
+    "line": 100,
+    "step": "repair_packages",
+    "prompt_version": "repair-package-v1",
+    "validate": "validate",
+    "receiver": null,
+    "thinking": "默认关闭",
+    "call": "complete_json"
+  },
+  {
+    "file": "src/ict/steps/s08_merge.py",
+    "line": 567,
+    "step": "merge_candidates",
+    "prompt_version": "merge-objects-v6",
+    "validate": "validate",
+    "receiver": null,
+    "thinking": "MERGE_THINKING",
+    "call": "complete_json"
+  },
+  {
+    "file": "src/ict/steps/s09_supplier.py",
+    "line": 50,
+    "step": "complete_suppliers",
+    "prompt_version": "supplier-completion-v1",
+    "validate": "validate",
+    "receiver": null,
+    "thinking": "默认关闭",
+    "call": "complete_json"
+  },
+  {
+    "file": "src/ict/bindings.py",
+    "line": 193,
+    "step": "bind_packages",
+    "prompt_version": "package-binding-v4",
+    "validate": "validate_body",
+    "receiver": null,
+    "thinking": "默认关闭",
+    "call": "complete_json"
+  },
+  {
+    "file": "src/ict/sub_merge.py",
+    "line": 75,
+    "step": "merge_subs",
+    "prompt_version": "merge-subs-v2",
+    "validate": "validate",
+    "receiver": null,
+    "thinking": "默认关闭",
+    "call": "complete_json"
+  },
+  {
+    "file": "src/ict/parse/screen.py",
+    "line": 160,
+    "step": "screen_files",
+    "prompt_version": "screen-file-v4",
+    "validate": "lambda value: _validate(value) or ('evidence_refs 必须引用给出的 source_segments' if any((not isinstance(ref, str) or ref not in {segment['source_ref'] for segment in peek.segments} for ref in value.get('evidence_refs', []))) else '') or _validate_need_ids(value, needs)",
+    "receiver": null,
+    "thinking": "默认关闭",
+    "call": "complete_json"
+  },
+  {
+    "file": "src/ict/parse/screen.py",
+    "line": 176,
+    "step": "screen_images",
+    "prompt_version": "screen-page-v4",
+    "validate": "图像通道自行校验",
+    "receiver": null,
+    "thinking": "默认关闭",
+    "call": "llm.complete_with_images"
+  }
+]

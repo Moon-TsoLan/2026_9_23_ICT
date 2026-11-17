@@ -61,7 +61,7 @@ FileClass = Literal[
 ]
 ReadStrategy = Literal["skip", "target_pages", "unsupported"]
 ExtractionMode = Literal["text", "table", "text_and_table", "unsupported"]
-SourceType = Literal["html", "pdf", "docx", "doc", "xlsx"]
+SourceType = Literal["html", "pdf", "docx", "doc", "xlsx", "text"]
 MatchType = Literal[
     "exact_code", "exact_path", "exact_name", "normalized_name", "parent_name", "fuzzy", "unmatched"
 ]
@@ -134,7 +134,6 @@ class HtmlTable(Model):
     table_role: TableRole
     package_scope: str
     row_grain: RowGrain
-    column_mapping: dict[str, str] = Field(default_factory=dict)
     unmapped_columns: list[str] = Field(default_factory=list)
     confidence: float | None = None
     issues: list[str] = Field(default_factory=list)
@@ -205,7 +204,7 @@ class Candidate(Model):
 class PackageAmountObservation(Model):
     """A package-level award amount copied verbatim from an attachment page."""
 
-    package_no: str
+    package_no: str | None = None
     raw_text: str
     amount_yuan: float | None = None
     source_type: str = "pdf"
@@ -227,7 +226,6 @@ class CandidateFile(Model):
     page_quality: list[dict[str, Any]] | None = None
     package_amounts: list[PackageAmountObservation] = Field(default_factory=list)
     reception: list[dict[str, Any]] = Field(default_factory=list)
-    need_resolutions: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class FieldStat(Model):
@@ -244,15 +242,7 @@ class ProjectPlan(Model):
     package_kind: PackageKind = "unknown"
     package_name: str | None = None
     source_package_no: str | None = None
-    cob_candidate_ids: list[str] = Field(default_factory=list)
-    sub_candidate_ids: list[str] = Field(default_factory=list)
-    field_stats: dict[str, FieldStat] = Field(default_factory=list if False else dict)
-    missing_fields: list[str] = Field(default_factory=list)
     needs: list[dict[str, Any]] = Field(default_factory=list)
-    suspects: list[str] = Field(default_factory=list)
-    has_attachment: bool
-    needs_attachment: bool
-    search_queries: list[str] = Field(default_factory=list)
     status: StepStatus
 
 
@@ -288,9 +278,9 @@ class AttachmentIndex(Model):
 
 
 class FileDecision(Model):
+    """Historical report shape; not used by the current attachment scheduler."""
     file_id: str
     file_class: FileClass
-    expected_fields: list[str] = Field(default_factory=list)
     possible_packages: list[str] = Field(default_factory=list)
     priority: float
     read_strategy: ReadStrategy
@@ -301,11 +291,6 @@ class FileDecision(Model):
     # notice. Step 6 only looks for a winner supplier when this left it empty.
     quote_supplier: str | None = None
     is_award_notice: bool | None = None
-    native_segments: list[dict[str, Any]] = Field(default_factory=list)
-    evidence_refs: list[str] = Field(default_factory=list)
-    reuse_status: str | None = None
-    needs_hit_ids: list[str] = Field(default_factory=list)
-    continuation_audit: dict[str, Any] = Field(default_factory=dict)
 
 
 class FileDecisions(Model):
@@ -316,10 +301,10 @@ class FileDecisions(Model):
 
 
 class PageDecision(Model):
+    """Historical page-location report shape."""
     file_id: str
     page_no: int
     relevance: float
-    expected_fields: list[str] = Field(default_factory=list)
     package_scope: str
     extraction_mode: ExtractionMode
     reason: str
@@ -440,6 +425,13 @@ class RunStep(Model):
     failure_message: str | None = None
 
 
+class MergeTiming(Model):
+    queued_at: str | None = None
+    started_at: str | None = None
+    returned_at: str | None = None
+    resumed_at: str | None = None
+
+
 class RunState(Model):
     run_id: str
     announcement_id: str
@@ -447,6 +439,9 @@ class RunState(Model):
     updated_at: str
     status: RunStatus
     current_step: str
+    # Scheduling display only; not a business state or an input to any model.
+    merge_wait: Literal["queued", "running", "resuming"] | None = None
+    merge_timing: MergeTiming = Field(default_factory=MergeTiming)
     steps: list[RunStep] = Field(default_factory=list)
     counts: dict[str, int] = Field(default_factory=dict)
     review_required: bool = False
@@ -457,6 +452,7 @@ class RunReport(Model):
     announcement_id: str
     status: RunStatus
     duration_ms: int
+    merge_timing: MergeTiming | None = None
     counts: dict[str, int]
     llm_calls: dict[str, int]
     failure_summary: list[dict[str, Any]]

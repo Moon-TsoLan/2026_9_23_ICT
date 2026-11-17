@@ -2,7 +2,7 @@
 import { Check, CircleDashed, LoaderCircle, Minus, TriangleAlert, X } from 'lucide-vue-next'
 import MetricCard from '@/components/MetricCard.vue'
 import type { RunState, RunStep, StepStatus } from '@/types/ingest'
-import { FAILURE_LABEL, STEP_LABEL } from '@/types/ingest'
+import { FAILURE_LABEL, mergeWaitText, STEP_LABEL } from '@/types/ingest'
 
 defineProps<{ run: RunState }>()
 
@@ -49,7 +49,8 @@ function failureText(step: RunStep): string {
         <span class="no num">{{ String(i + 1).padStart(2, '0') }}</span>
         <span class="name">{{ STEP_LABEL[step.step] ?? step.step }}</span>
         <span class="ms num">{{ stepMs(step) }}</span>
-        <span class="status">{{ meta(step.status).label }}</span>
+        <span class="status">{{ step.step === 'merge_candidates' && step.status === 'running' && run.merge_wait
+          ? mergeWaitText(run.merge_wait, run.merge_timing) : meta(step.status).label }}</span>
         <p v-if="step.status === 'failed' && (step.failure_code || step.failure_message)" class="fail">
           {{ failureText(step) }}
         </p>
@@ -122,7 +123,7 @@ function failureText(step: RunStep): string {
 }
 
 .status {
-  width: 60px;
+  min-width: 84px;
   text-align: right;
   color: var(--muted);
   font-size: 12px;

@@ -19,66 +19,23 @@ HTML = """<!doctype html><html><head>
 """
 
 
-def test_fake_llm_writes_run_files(monkeypatch):
-    root = Path("work/test_pipeline")
-    html_dir = root / "html"
-    html_dir.mkdir(parents=True, exist_ok=True)
-    (html_dir / "demo001.html").write_text(HTML, encoding="utf-8")
-    monkeypatch.setattr("ict.pipeline.ATTACHMENTS_ROOT", root / "missing")
-    monkeypatch.setattr("ict.state.RUNS_ROOT", root / "runs")
-    client = FakeLLMClient(
-        {
-            "understand_announcement": json.dumps(
-                {
-                    "project_name": "示例项目",
-                    "purchaser": "示例单位",
-                    "source_project_no": "DEMO001",
-                    "announcement_type": "winning_announcement",
-                    "package_mode": "single",
-                    "packages": [
-                        {
-                            "package_no": "1",
-                            "title": "示例项目",
-                            "package_evidence_text": "示例项目中标公告",
-                            "package_amount": None,
-                        }
-                    ],
-                    "summary_amount": {"raw_text": "￥10 万元", "amount_yuan": 1, "scope": "announcement", "amount_kind": "award"},
-                },
-                ensure_ascii=False,
-            ),
-            "understand_html_tables": json.dumps(
-                {
-                    "table_role": "cob_detail",
-                    "package_scope": "1",
-                    "row_grain": "cob",
-                    "column_mapping": {"object_name": "货物名称", "brand": "品牌", "quantity": "数量", "unit_price": "单价(元)"},
-                    "issues": [],
-                    "confidence": 0.9,
-                }
-            ),
-            "extract_html_candidates": json.dumps(
-                {
-                    "candidates": [
-                        {
-                            "entity_type": "cob",
-                            "package_no": "1",
-                            "fields": {"object_name": "显示屏", "brand": "创维", "quantity": "2块", "unit_price": "100"},
-                            "issues": [],
-                        }
-                    ]
-                }
-            ),
-        }
-    )
-    report = run_announcement("demo001", llm=client, html_dir=html_dir)
-    run_dir = root / "runs" / "demo001"
-    assert report.status in {"success", "partial"}
-    assert (run_dir / "09_merged_projects.json").exists()
-    assert (run_dir / "10_run_report.json").exists()
-    projects = json.loads((run_dir / "projects.json").read_text(encoding="utf-8"))
-    assert projects["project_name"] == report.result["project_name"]
-    projects = projects["packages"]
-    assert projects[0]["cobs"][0]["object_name"] == "显示屏"
-    assert projects[0]["package_total_amount"] == 100000
-    assert "provenance" not in projects[0]
+def test_fake_llm_writes_run_files(tmp_path, monkeypatch):
+    html_dir = tmp_path / 'html'
+    html_dir.mkdir()
+    (html_dir / 'demo001.html').write_text(HTML, encoding='utf-8')
+    monkeypatch.setattr('ict.pipeline.load_index', lambda *args: None)
+    body = {'project_name': '示例项目', 'package_mode': 'single', 'packages': [
+        {'source_package_no': '1', 'candidates': [{'entity_type': 'cob', 'source_ref': 'html:body',
+         'source_class': 'cob_detail', 'fields': {'object_name': '显示屏', 'brand': '创维', 'quantity': '2块', 'unit_price': '100'}}]}]}
+    summary = {'project_name': '概要名称', 'purchaser': '示例单位', 'summary_amount': {'raw_text': '￥10万元', 'amount_kind': 'award', 'source_ref': 'html:summary'}}
+    client = FakeLLMClient({'read_announcement_summary': json.dumps(summary), 'read_announcement_body': json.dumps(body)})
+    report = run_announcement('demo001', llm=client, html_dir=html_dir, runs_root=tmp_path / 'runs')
+    run_dir = tmp_path / 'runs/demo001'
+    assert report.status in {'success', 'partial'}
+    result = json.loads((run_dir / 'projects.json').read_text(encoding='utf-8'))
+    assert result['project_name'] == '示例项目'
+    assert result['packages'][0]['cobs'][0]['object_name'] == '显示屏'
+    assert result['packages'][0]['package_total_amount'] == 100000
+    assert 'provenance' not in result['packages'][0]
+    state = json.loads((run_dir / 'run_state.json').read_text(encoding='utf-8'))
+    assert not {'understand_html_tables','extract_html_candidates','extract_native_evidence','locate_pages','triage_files'} & {s['step'] for s in state['steps']}

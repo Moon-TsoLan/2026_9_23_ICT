@@ -1,0 +1,5431 @@
+{
+  "Failure": {
+    "additionalProperties": true,
+    "properties": {
+      "failure_code": {
+        "enum": [
+          "no_attachment",
+          "attachment_index_miss",
+          "unsupported_image",
+          "scanned_or_low_text_pdf",
+          "encrypted_pdf",
+          "watermark_interference",
+          "document_parse_failed",
+          "package_structure_unclear",
+          "llm_schema_invalid",
+          "llm_plan_invalid",
+          "llm_validator_incompatible",
+          "llm_call_failed",
+          "no_text_extractable",
+          "no_candidate_extracted",
+          "field_normalization_failed",
+          "merge_conflict_unresolved",
+          "page_context_truncated",
+          "page_context_split",
+          "consistency_check_failed",
+          "parse_unreachable",
+          "parse_http_failed",
+          "parse_refused",
+          "office_convert_failed",
+          "category_item_not_in_summary",
+          "unexpected_error"
+        ],
+        "title": "Failure Code",
+        "type": "string"
+      },
+      "failure_message": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Failure Message"
+      },
+      "location": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Location"
+      }
+    },
+    "required": [
+      "failure_code"
+    ],
+    "title": "Failure",
+    "type": "object"
+  },
+  "ModelMetadata": {
+    "additionalProperties": true,
+    "properties": {
+      "model_name": {
+        "title": "Model Name",
+        "type": "string"
+      },
+      "model_version": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Model Version"
+      },
+      "prompt_version": {
+        "title": "Prompt Version",
+        "type": "string"
+      },
+      "latency_ms": {
+        "title": "Latency Ms",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "model_name",
+      "prompt_version",
+      "latency_ms"
+    ],
+    "title": "ModelMetadata",
+    "type": "object"
+  },
+  "Amount": {
+    "additionalProperties": true,
+    "properties": {
+      "raw_text": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Raw Text"
+      },
+      "amount_yuan": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Amount Yuan"
+      },
+      "scope": {
+        "enum": [
+          "package",
+          "announcement"
+        ],
+        "title": "Scope",
+        "type": "string"
+      },
+      "confidence": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Confidence"
+      },
+      "amount_kind": {
+        "default": "unknown",
+        "enum": [
+          "award",
+          "budget",
+          "ceiling",
+          "unknown"
+        ],
+        "title": "Amount Kind",
+        "type": "string"
+      },
+      "source_type": {
+        "default": "html",
+        "title": "Source Type",
+        "type": "string"
+      },
+      "source_ref": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Source Ref"
+      },
+      "source_refs": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Source Refs",
+        "type": "array"
+      },
+      "binding": {
+        "title": "Binding",
+        "type": "object"
+      }
+    },
+    "required": [
+      "scope"
+    ],
+    "title": "Amount",
+    "type": "object"
+  },
+  "PackageUnderstanding": {
+    "$defs": {
+      "Amount": {
+        "additionalProperties": true,
+        "properties": {
+          "raw_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Raw Text"
+          },
+          "amount_yuan": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Amount Yuan"
+          },
+          "scope": {
+            "enum": [
+              "package",
+              "announcement"
+            ],
+            "title": "Scope",
+            "type": "string"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Confidence"
+          },
+          "amount_kind": {
+            "default": "unknown",
+            "enum": [
+              "award",
+              "budget",
+              "ceiling",
+              "unknown"
+            ],
+            "title": "Amount Kind",
+            "type": "string"
+          },
+          "source_type": {
+            "default": "html",
+            "title": "Source Type",
+            "type": "string"
+          },
+          "source_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Source Ref"
+          },
+          "source_refs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Source Refs",
+            "type": "array"
+          },
+          "binding": {
+            "title": "Binding",
+            "type": "object"
+          }
+        },
+        "required": [
+          "scope"
+        ],
+        "title": "Amount",
+        "type": "object"
+      }
+    },
+    "additionalProperties": true,
+    "properties": {
+      "package_no": {
+        "title": "Package No",
+        "type": "string"
+      },
+      "package_kind": {
+        "default": "unknown",
+        "enum": [
+          "lot",
+          "contract_package",
+          "unpartitioned",
+          "unknown"
+        ],
+        "title": "Package Kind",
+        "type": "string"
+      },
+      "package_name": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Package Name"
+      },
+      "source_package_no": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Source Package No"
+      },
+      "title": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Title"
+      },
+      "project_id": {
+        "title": "Project Id",
+        "type": "string"
+      },
+      "package_evidence_text": {
+        "title": "Package Evidence Text",
+        "type": "string"
+      },
+      "package_amount": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/Amount"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null
+      },
+      "amount_alternatives": {
+        "items": {
+          "$ref": "#/$defs/Amount"
+        },
+        "title": "Amount Alternatives",
+        "type": "array"
+      }
+    },
+    "required": [
+      "package_no",
+      "project_id",
+      "package_evidence_text"
+    ],
+    "title": "PackageUnderstanding",
+    "type": "object"
+  },
+  "AnnouncementUnderstanding": {
+    "$defs": {
+      "Amount": {
+        "additionalProperties": true,
+        "properties": {
+          "raw_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Raw Text"
+          },
+          "amount_yuan": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Amount Yuan"
+          },
+          "scope": {
+            "enum": [
+              "package",
+              "announcement"
+            ],
+            "title": "Scope",
+            "type": "string"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Confidence"
+          },
+          "amount_kind": {
+            "default": "unknown",
+            "enum": [
+              "award",
+              "budget",
+              "ceiling",
+              "unknown"
+            ],
+            "title": "Amount Kind",
+            "type": "string"
+          },
+          "source_type": {
+            "default": "html",
+            "title": "Source Type",
+            "type": "string"
+          },
+          "source_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Source Ref"
+          },
+          "source_refs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Source Refs",
+            "type": "array"
+          },
+          "binding": {
+            "title": "Binding",
+            "type": "object"
+          }
+        },
+        "required": [
+          "scope"
+        ],
+        "title": "Amount",
+        "type": "object"
+      },
+      "Failure": {
+        "additionalProperties": true,
+        "properties": {
+          "failure_code": {
+            "enum": [
+              "no_attachment",
+              "attachment_index_miss",
+              "unsupported_image",
+              "scanned_or_low_text_pdf",
+              "encrypted_pdf",
+              "watermark_interference",
+              "document_parse_failed",
+              "package_structure_unclear",
+              "llm_schema_invalid",
+              "llm_plan_invalid",
+              "llm_validator_incompatible",
+              "llm_call_failed",
+              "no_text_extractable",
+              "no_candidate_extracted",
+              "field_normalization_failed",
+              "merge_conflict_unresolved",
+              "page_context_truncated",
+              "page_context_split",
+              "consistency_check_failed",
+              "parse_unreachable",
+              "parse_http_failed",
+              "parse_refused",
+              "office_convert_failed",
+              "category_item_not_in_summary",
+              "unexpected_error"
+            ],
+            "title": "Failure Code",
+            "type": "string"
+          },
+          "failure_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Failure Message"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Location"
+          }
+        },
+        "required": [
+          "failure_code"
+        ],
+        "title": "Failure",
+        "type": "object"
+      },
+      "ModelMetadata": {
+        "additionalProperties": true,
+        "properties": {
+          "model_name": {
+            "title": "Model Name",
+            "type": "string"
+          },
+          "model_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Model Version"
+          },
+          "prompt_version": {
+            "title": "Prompt Version",
+            "type": "string"
+          },
+          "latency_ms": {
+            "title": "Latency Ms",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "model_name",
+          "prompt_version",
+          "latency_ms"
+        ],
+        "title": "ModelMetadata",
+        "type": "object"
+      },
+      "PackageUnderstanding": {
+        "additionalProperties": true,
+        "properties": {
+          "package_no": {
+            "title": "Package No",
+            "type": "string"
+          },
+          "package_kind": {
+            "default": "unknown",
+            "enum": [
+              "lot",
+              "contract_package",
+              "unpartitioned",
+              "unknown"
+            ],
+            "title": "Package Kind",
+            "type": "string"
+          },
+          "package_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Package Name"
+          },
+          "source_package_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Source Package No"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Title"
+          },
+          "project_id": {
+            "title": "Project Id",
+            "type": "string"
+          },
+          "package_evidence_text": {
+            "title": "Package Evidence Text",
+            "type": "string"
+          },
+          "package_amount": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Amount"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "amount_alternatives": {
+            "items": {
+              "$ref": "#/$defs/Amount"
+            },
+            "title": "Amount Alternatives",
+            "type": "array"
+          }
+        },
+        "required": [
+          "package_no",
+          "project_id",
+          "package_evidence_text"
+        ],
+        "title": "PackageUnderstanding",
+        "type": "object"
+      }
+    },
+    "additionalProperties": true,
+    "properties": {
+      "run_id": {
+        "title": "Run Id",
+        "type": "string"
+      },
+      "status": {
+        "enum": [
+          "pending",
+          "running",
+          "success",
+          "partial",
+          "failed",
+          "skipped"
+        ],
+        "title": "Status",
+        "type": "string"
+      },
+      "project_name": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Project Name"
+      },
+      "purchaser": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Purchaser"
+      },
+      "source_project_no": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Source Project No"
+      },
+      "announcement_type": {
+        "enum": [
+          "winning_announcement",
+          "deal_announcement",
+          "unknown"
+        ],
+        "title": "Announcement Type",
+        "type": "string"
+      },
+      "package_mode": {
+        "enum": [
+          "single",
+          "multi",
+          "unclear"
+        ],
+        "title": "Package Mode",
+        "type": "string"
+      },
+      "packages": {
+        "items": {
+          "$ref": "#/$defs/PackageUnderstanding"
+        },
+        "title": "Packages",
+        "type": "array"
+      },
+      "summary_amount": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/Amount"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null
+      },
+      "announcement_categories": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Announcement Categories",
+        "type": "array"
+      },
+      "unclear_reason": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Unclear Reason"
+      },
+      "model_metadata": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/ModelMetadata"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null
+      },
+      "failures": {
+        "items": {
+          "$ref": "#/$defs/Failure"
+        },
+        "title": "Failures",
+        "type": "array"
+      }
+    },
+    "required": [
+      "run_id",
+      "status",
+      "announcement_type",
+      "package_mode"
+    ],
+    "title": "AnnouncementUnderstanding",
+    "type": "object"
+  },
+  "HtmlTable": {
+    "additionalProperties": true,
+    "properties": {
+      "table_index": {
+        "title": "Table Index",
+        "type": "integer"
+      },
+      "table_role": {
+        "enum": [
+          "cob_detail",
+          "cob_summary",
+          "sub_score",
+          "sub_info",
+          "winner",
+          "agency_fee",
+          "other"
+        ],
+        "title": "Table Role",
+        "type": "string"
+      },
+      "package_scope": {
+        "title": "Package Scope",
+        "type": "string"
+      },
+      "row_grain": {
+        "enum": [
+          "cob",
+          "supplier",
+          "project",
+          "other"
+        ],
+        "title": "Row Grain",
+        "type": "string"
+      },
+      "column_mapping": {
+        "additionalProperties": {
+          "type": "string"
+        },
+        "title": "Column Mapping",
+        "type": "object"
+      },
+      "unmapped_columns": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Unmapped Columns",
+        "type": "array"
+      },
+      "confidence": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Confidence"
+      },
+      "issues": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Issues",
+        "type": "array"
+      },
+      "status": {
+        "enum": [
+          "pending",
+          "running",
+          "success",
+          "partial",
+          "failed",
+          "skipped"
+        ],
+        "title": "Status",
+        "type": "string"
+      }
+    },
+    "required": [
+      "table_index",
+      "table_role",
+      "package_scope",
+      "row_grain",
+      "status"
+    ],
+    "title": "HtmlTable",
+    "type": "object"
+  },
+  "HtmlTables": {
+    "$defs": {
+      "Failure": {
+        "additionalProperties": true,
+        "properties": {
+          "failure_code": {
+            "enum": [
+              "no_attachment",
+              "attachment_index_miss",
+              "unsupported_image",
+              "scanned_or_low_text_pdf",
+              "encrypted_pdf",
+              "watermark_interference",
+              "document_parse_failed",
+              "package_structure_unclear",
+              "llm_schema_invalid",
+              "llm_plan_invalid",
+              "llm_validator_incompatible",
+              "llm_call_failed",
+              "no_text_extractable",
+              "no_candidate_extracted",
+              "field_normalization_failed",
+              "merge_conflict_unresolved",
+              "page_context_truncated",
+              "page_context_split",
+              "consistency_check_failed",
+              "parse_unreachable",
+              "parse_http_failed",
+              "parse_refused",
+              "office_convert_failed",
+              "category_item_not_in_summary",
+              "unexpected_error"
+            ],
+            "title": "Failure Code",
+            "type": "string"
+          },
+          "failure_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Failure Message"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Location"
+          }
+        },
+        "required": [
+          "failure_code"
+        ],
+        "title": "Failure",
+        "type": "object"
+      },
+      "HtmlTable": {
+        "additionalProperties": true,
+        "properties": {
+          "table_index": {
+            "title": "Table Index",
+            "type": "integer"
+          },
+          "table_role": {
+            "enum": [
+              "cob_detail",
+              "cob_summary",
+              "sub_score",
+              "sub_info",
+              "winner",
+              "agency_fee",
+              "other"
+            ],
+            "title": "Table Role",
+            "type": "string"
+          },
+          "package_scope": {
+            "title": "Package Scope",
+            "type": "string"
+          },
+          "row_grain": {
+            "enum": [
+              "cob",
+              "supplier",
+              "project",
+              "other"
+            ],
+            "title": "Row Grain",
+            "type": "string"
+          },
+          "column_mapping": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Column Mapping",
+            "type": "object"
+          },
+          "unmapped_columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unmapped Columns",
+            "type": "array"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Confidence"
+          },
+          "issues": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Issues",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "running",
+              "success",
+              "partial",
+              "failed",
+              "skipped"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "table_index",
+          "table_role",
+          "package_scope",
+          "row_grain",
+          "status"
+        ],
+        "title": "HtmlTable",
+        "type": "object"
+      }
+    },
+    "additionalProperties": true,
+    "properties": {
+      "run_id": {
+        "title": "Run Id",
+        "type": "string"
+      },
+      "status": {
+        "enum": [
+          "pending",
+          "running",
+          "success",
+          "partial",
+          "failed",
+          "skipped"
+        ],
+        "title": "Status",
+        "type": "string"
+      },
+      "tables": {
+        "items": {
+          "$ref": "#/$defs/HtmlTable"
+        },
+        "title": "Tables",
+        "type": "array"
+      },
+      "failures": {
+        "items": {
+          "$ref": "#/$defs/Failure"
+        },
+        "title": "Failures",
+        "type": "array"
+      }
+    },
+    "required": [
+      "run_id",
+      "status"
+    ],
+    "title": "HtmlTables",
+    "type": "object"
+  },
+  "Source": {
+    "additionalProperties": true,
+    "properties": {
+      "source_type": {
+        "enum": [
+          "html",
+          "pdf",
+          "docx",
+          "doc",
+          "xlsx"
+        ],
+        "title": "Source Type",
+        "type": "string"
+      },
+      "file_id": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "File Id"
+      },
+      "page_no": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Page No"
+      }
+    },
+    "required": [
+      "source_type"
+    ],
+    "title": "Source",
+    "type": "object"
+  },
+  "CandidateEvidence": {
+    "additionalProperties": true,
+    "description": "Provenance below file level. Step 8 cannot recover any of it later.\n\nThe design contract used to stop provenance at the file. Identity resolution between two\nrows needs to know which table and which line each value came from, and who owns a quote,\nso these are stamped at extraction time. They are evidence for the merge model and for\naudit; no rule branches on their wording.",
+    "properties": {
+      "table_index": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Table Index"
+      },
+      "row_index": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Row Index"
+      },
+      "source_refs": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Source Refs",
+        "type": "array"
+      },
+      "row_text": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Row Text"
+      },
+      "column_units": {
+        "additionalProperties": {
+          "type": "string"
+        },
+        "title": "Column Units",
+        "type": "object"
+      },
+      "quote_supplier": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Quote Supplier"
+      },
+      "bidder_supplier": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Bidder Supplier"
+      },
+      "winner_supplier": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Winner Supplier"
+      }
+    },
+    "title": "CandidateEvidence",
+    "type": "object"
+  },
+  "FieldObservation": {
+    "additionalProperties": true,
+    "properties": {
+      "raw_value": {
+        "default": null,
+        "title": "Raw Value"
+      },
+      "normalized_value": {
+        "default": null,
+        "title": "Normalized Value"
+      },
+      "status": {
+        "enum": [
+          "present",
+          "missing",
+          "points_to_attachment",
+          "unparsable",
+          "low_confidence",
+          "conflict",
+          "unsupported"
+        ],
+        "title": "Status",
+        "type": "string"
+      },
+      "confidence": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Confidence"
+      },
+      "normalization": {
+        "anyOf": [
+          {
+            "type": "object"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Normalization"
+      }
+    },
+    "required": [
+      "status"
+    ],
+    "title": "FieldObservation",
+    "type": "object"
+  },
+  "Candidate": {
+    "$defs": {
+      "CandidateEvidence": {
+        "additionalProperties": true,
+        "description": "Provenance below file level. Step 8 cannot recover any of it later.\n\nThe design contract used to stop provenance at the file. Identity resolution between two\nrows needs to know which table and which line each value came from, and who owns a quote,\nso these are stamped at extraction time. They are evidence for the merge model and for\naudit; no rule branches on their wording.",
+        "properties": {
+          "table_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Table Index"
+          },
+          "row_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Row Index"
+          },
+          "source_refs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Source Refs",
+            "type": "array"
+          },
+          "row_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Row Text"
+          },
+          "column_units": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Column Units",
+            "type": "object"
+          },
+          "quote_supplier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Quote Supplier"
+          },
+          "bidder_supplier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Bidder Supplier"
+          },
+          "winner_supplier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Winner Supplier"
+          }
+        },
+        "title": "CandidateEvidence",
+        "type": "object"
+      },
+      "FieldObservation": {
+        "additionalProperties": true,
+        "properties": {
+          "raw_value": {
+            "default": null,
+            "title": "Raw Value"
+          },
+          "normalized_value": {
+            "default": null,
+            "title": "Normalized Value"
+          },
+          "status": {
+            "enum": [
+              "present",
+              "missing",
+              "points_to_attachment",
+              "unparsable",
+              "low_confidence",
+              "conflict",
+              "unsupported"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Confidence"
+          },
+          "normalization": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Normalization"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "FieldObservation",
+        "type": "object"
+      },
+      "Source": {
+        "additionalProperties": true,
+        "properties": {
+          "source_type": {
+            "enum": [
+              "html",
+              "pdf",
+              "docx",
+              "doc",
+              "xlsx"
+            ],
+            "title": "Source Type",
+            "type": "string"
+          },
+          "file_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "File Id"
+          },
+          "page_no": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Page No"
+          }
+        },
+        "required": [
+          "source_type"
+        ],
+        "title": "Source",
+        "type": "object"
+      }
+    },
+    "additionalProperties": true,
+    "properties": {
+      "candidate_id": {
+        "title": "Candidate Id",
+        "type": "string"
+      },
+      "entity_type": {
+        "enum": [
+          "cob",
+          "sub"
+        ],
+        "title": "Entity Type",
+        "type": "string"
+      },
+      "project_id": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Project Id"
+      },
+      "package_no": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Package No"
+      },
+      "source": {
+        "$ref": "#/$defs/Source"
+      },
+      "source_priority": {
+        "title": "Source Priority",
+        "type": "integer"
+      },
+      "fields": {
+        "additionalProperties": {
+          "$ref": "#/$defs/FieldObservation"
+        },
+        "title": "Fields",
+        "type": "object"
+      },
+      "issues": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Issues",
+        "type": "array"
+      },
+      "validation_errors": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Validation Errors",
+        "type": "array"
+      },
+      "warnings": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Warnings",
+        "type": "array"
+      },
+      "source_class": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Source Class"
+      },
+      "evidence": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/CandidateEvidence"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null
+      },
+      "binding": {
+        "title": "Binding",
+        "type": "object"
+      },
+      "unmapped_fields": {
+        "title": "Unmapped Fields",
+        "type": "object"
+      }
+    },
+    "required": [
+      "candidate_id",
+      "entity_type",
+      "source",
+      "source_priority",
+      "fields"
+    ],
+    "title": "Candidate",
+    "type": "object"
+  },
+  "PackageAmountObservation": {
+    "additionalProperties": true,
+    "description": "A package-level award amount copied verbatim from an attachment page.",
+    "properties": {
+      "package_no": {
+        "title": "Package No",
+        "type": "string"
+      },
+      "raw_text": {
+        "title": "Raw Text",
+        "type": "string"
+      },
+      "amount_yuan": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Amount Yuan"
+      },
+      "source_type": {
+        "default": "pdf",
+        "title": "Source Type",
+        "type": "string"
+      },
+      "file_id": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "File Id"
+      },
+      "file_name": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "File Name"
+      },
+      "page_no": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Page No"
+      },
+      "file_class": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "File Class"
+      },
+      "scope": {
+        "const": "package",
+        "default": "package",
+        "enum": [
+          "package"
+        ],
+        "title": "Scope",
+        "type": "string"
+      },
+      "amount_kind": {
+        "default": "unknown",
+        "enum": [
+          "award",
+          "budget",
+          "ceiling",
+          "unknown"
+        ],
+        "title": "Amount Kind",
+        "type": "string"
+      },
+      "source_ref": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Source Ref"
+      },
+      "binding": {
+        "title": "Binding",
+        "type": "object"
+      }
+    },
+    "required": [
+      "package_no",
+      "raw_text"
+    ],
+    "title": "PackageAmountObservation",
+    "type": "object"
+  },
+  "CandidateFile": {
+    "$defs": {
+      "Candidate": {
+        "additionalProperties": true,
+        "properties": {
+          "candidate_id": {
+            "title": "Candidate Id",
+            "type": "string"
+          },
+          "entity_type": {
+            "enum": [
+              "cob",
+              "sub"
+            ],
+            "title": "Entity Type",
+            "type": "string"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Project Id"
+          },
+          "package_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Package No"
+          },
+          "source": {
+            "$ref": "#/$defs/Source"
+          },
+          "source_priority": {
+            "title": "Source Priority",
+            "type": "integer"
+          },
+          "fields": {
+            "additionalProperties": {
+              "$ref": "#/$defs/FieldObservation"
+            },
+            "title": "Fields",
+            "type": "object"
+          },
+          "issues": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Issues",
+            "type": "array"
+          },
+          "validation_errors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Validation Errors",
+            "type": "array"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          },
+          "source_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Source Class"
+          },
+          "evidence": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/CandidateEvidence"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "binding": {
+            "title": "Binding",
+            "type": "object"
+          },
+          "unmapped_fields": {
+            "title": "Unmapped Fields",
+            "type": "object"
+          }
+        },
+        "required": [
+          "candidate_id",
+          "entity_type",
+          "source",
+          "source_priority",
+          "fields"
+        ],
+        "title": "Candidate",
+        "type": "object"
+      },
+      "CandidateEvidence": {
+        "additionalProperties": true,
+        "description": "Provenance below file level. Step 8 cannot recover any of it later.\n\nThe design contract used to stop provenance at the file. Identity resolution between two\nrows needs to know which table and which line each value came from, and who owns a quote,\nso these are stamped at extraction time. They are evidence for the merge model and for\naudit; no rule branches on their wording.",
+        "properties": {
+          "table_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Table Index"
+          },
+          "row_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Row Index"
+          },
+          "source_refs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Source Refs",
+            "type": "array"
+          },
+          "row_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Row Text"
+          },
+          "column_units": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Column Units",
+            "type": "object"
+          },
+          "quote_supplier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Quote Supplier"
+          },
+          "bidder_supplier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Bidder Supplier"
+          },
+          "winner_supplier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Winner Supplier"
+          }
+        },
+        "title": "CandidateEvidence",
+        "type": "object"
+      },
+      "Failure": {
+        "additionalProperties": true,
+        "properties": {
+          "failure_code": {
+            "enum": [
+              "no_attachment",
+              "attachment_index_miss",
+              "unsupported_image",
+              "scanned_or_low_text_pdf",
+              "encrypted_pdf",
+              "watermark_interference",
+              "document_parse_failed",
+              "package_structure_unclear",
+              "llm_schema_invalid",
+              "llm_plan_invalid",
+              "llm_validator_incompatible",
+              "llm_call_failed",
+              "no_text_extractable",
+              "no_candidate_extracted",
+              "field_normalization_failed",
+              "merge_conflict_unresolved",
+              "page_context_truncated",
+              "page_context_split",
+              "consistency_check_failed",
+              "parse_unreachable",
+              "parse_http_failed",
+              "parse_refused",
+              "office_convert_failed",
+              "category_item_not_in_summary",
+              "unexpected_error"
+            ],
+            "title": "Failure Code",
+            "type": "string"
+          },
+          "failure_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Failure Message"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Location"
+          }
+        },
+        "required": [
+          "failure_code"
+        ],
+        "title": "Failure",
+        "type": "object"
+      },
+      "FieldObservation": {
+        "additionalProperties": true,
+        "properties": {
+          "raw_value": {
+            "default": null,
+            "title": "Raw Value"
+          },
+          "normalized_value": {
+            "default": null,
+            "title": "Normalized Value"
+          },
+          "status": {
+            "enum": [
+              "present",
+              "missing",
+              "points_to_attachment",
+              "unparsable",
+              "low_confidence",
+              "conflict",
+              "unsupported"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Confidence"
+          },
+          "normalization": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Normalization"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "FieldObservation",
+        "type": "object"
+      },
+      "PackageAmountObservation": {
+        "additionalProperties": true,
+        "description": "A package-level award amount copied verbatim from an attachment page.",
+        "properties": {
+          "package_no": {
+            "title": "Package No",
+            "type": "string"
+          },
+          "raw_text": {
+            "title": "Raw Text",
+            "type": "string"
+          },
+          "amount_yuan": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Amount Yuan"
+          },
+          "source_type": {
+            "default": "pdf",
+            "title": "Source Type",
+            "type": "string"
+          },
+          "file_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "File Id"
+          },
+          "file_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "File Name"
+          },
+          "page_no": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Page No"
+          },
+          "file_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "File Class"
+          },
+          "scope": {
+            "const": "package",
+            "default": "package",
+            "enum": [
+              "package"
+            ],
+            "title": "Scope",
+            "type": "string"
+          },
+          "amount_kind": {
+            "default": "unknown",
+            "enum": [
+              "award",
+              "budget",
+              "ceiling",
+              "unknown"
+            ],
+            "title": "Amount Kind",
+            "type": "string"
+          },
+          "source_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Source Ref"
+          },
+          "binding": {
+            "title": "Binding",
+            "type": "object"
+          }
+        },
+        "required": [
+          "package_no",
+          "raw_text"
+        ],
+        "title": "PackageAmountObservation",
+        "type": "object"
+      },
+      "Source": {
+        "additionalProperties": true,
+        "properties": {
+          "source_type": {
+            "enum": [
+              "html",
+              "pdf",
+              "docx",
+              "doc",
+              "xlsx"
+            ],
+            "title": "Source Type",
+            "type": "string"
+          },
+          "file_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "File Id"
+          },
+          "page_no": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Page No"
+          }
+        },
+        "required": [
+          "source_type"
+        ],
+        "title": "Source",
+        "type": "object"
+      }
+    },
+    "additionalProperties": true,
+    "properties": {
+      "run_id": {
+        "title": "Run Id",
+        "type": "string"
+      },
+      "status": {
+        "enum": [
+          "pending",
+          "running",
+          "success",
+          "partial",
+          "failed",
+          "skipped"
+        ],
+        "title": "Status",
+        "type": "string"
+      },
+      "candidates": {
+        "items": {
+          "$ref": "#/$defs/Candidate"
+        },
+        "title": "Candidates",
+        "type": "array"
+      },
+      "failures": {
+        "items": {
+          "$ref": "#/$defs/Failure"
+        },
+        "title": "Failures",
+        "type": "array"
+      },
+      "page_quality": {
+        "anyOf": [
+          {
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Page Quality"
+      },
+      "package_amounts": {
+        "items": {
+          "$ref": "#/$defs/PackageAmountObservation"
+        },
+        "title": "Package Amounts",
+        "type": "array"
+      },
+      "reception": {
+        "items": {
+          "type": "object"
+        },
+        "title": "Reception",
+        "type": "array"
+      },
+      "need_resolutions": {
+        "items": {
+          "type": "object"
+        },
+        "title": "Need Resolutions",
+        "type": "array"
+      }
+    },
+    "required": [
+      "run_id",
+      "status"
+    ],
+    "title": "CandidateFile",
+    "type": "object"
+  },
+  "FieldStat": {
+    "additionalProperties": true,
+    "properties": {
+      "total": {
+        "title": "Total",
+        "type": "integer"
+      },
+      "present": {
+        "title": "Present",
+        "type": "integer"
+      },
+      "points_to_attachment": {
+        "title": "Points To Attachment",
+        "type": "integer"
+      },
+      "missing": {
+        "title": "Missing",
+        "type": "integer"
+      },
+      "coverage": {
+        "title": "Coverage",
+        "type": "number"
+      }
+    },
+    "required": [
+      "total",
+      "present",
+      "points_to_attachment",
+      "missing",
+      "coverage"
+    ],
+    "title": "FieldStat",
+    "type": "object"
+  },
+  "ProjectPlan": {
+    "$defs": {
+      "FieldStat": {
+        "additionalProperties": true,
+        "properties": {
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "present": {
+            "title": "Present",
+            "type": "integer"
+          },
+          "points_to_attachment": {
+            "title": "Points To Attachment",
+            "type": "integer"
+          },
+          "missing": {
+            "title": "Missing",
+            "type": "integer"
+          },
+          "coverage": {
+            "title": "Coverage",
+            "type": "number"
+          }
+        },
+        "required": [
+          "total",
+          "present",
+          "points_to_attachment",
+          "missing",
+          "coverage"
+        ],
+        "title": "FieldStat",
+        "type": "object"
+      }
+    },
+    "additionalProperties": true,
+    "properties": {
+      "project_id": {
+        "title": "Project Id",
+        "type": "string"
+      },
+      "package_no": {
+        "title": "Package No",
+        "type": "string"
+      },
+      "package_kind": {
+        "default": "unknown",
+        "enum": [
+          "lot",
+          "contract_package",
+          "unpartitioned",
+          "unknown"
+        ],
+        "title": "Package Kind",
+        "type": "string"
+      },
+      "package_name": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Package Name"
+      },
+      "source_package_no": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Source Package No"
+      },
+      "cob_candidate_ids": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Cob Candidate Ids",
+        "type": "array"
+      },
+      "sub_candidate_ids": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Sub Candidate Ids",
+        "type": "array"
+      },
+      "field_stats": {
+        "additionalProperties": {
+          "$ref": "#/$defs/FieldStat"
+        },
+        "title": "Field Stats",
+        "type": "object"
+      },
+      "missing_fields": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Missing Fields",
+        "type": "array"
+      },
+      "needs": {
+        "items": {
+          "type": "object"
+        },
+        "title": "Needs",
+        "type": "array"
+      },
+      "suspects": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Suspects",
+        "type": "array"
+      },
+      "has_attachment": {
+        "title": "Has Attachment",
+        "type": "boolean"
+      },
+      "needs_attachment": {
+        "title": "Needs Attachment",
+        "type": "boolean"
+      },
+      "search_queries": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Search Queries",
+        "type": "array"
+      },
+      "status": {
+        "enum": [
+          "pending",
+          "running",
+          "success",
+          "partial",
+          "failed",
+          "skipped"
+        ],
+        "title": "Status",
+        "type": "string"
+      }
+    },
+    "required": [
+      "project_id",
+      "package_no",
+      "has_attachment",
+      "needs_attachment",
+      "status"
+    ],
+    "title": "ProjectPlan",
+    "type": "object"
+  },
+  "ProjectPlans": {
+    "$defs": {
+      "Failure": {
+        "additionalProperties": true,
+        "properties": {
+          "failure_code": {
+            "enum": [
+              "no_attachment",
+              "attachment_index_miss",
+              "unsupported_image",
+              "scanned_or_low_text_pdf",
+              "encrypted_pdf",
+              "watermark_interference",
+              "document_parse_failed",
+              "package_structure_unclear",
+              "llm_schema_invalid",
+              "llm_plan_invalid",
+              "llm_validator_incompatible",
+              "llm_call_failed",
+              "no_text_extractable",
+              "no_candidate_extracted",
+              "field_normalization_failed",
+              "merge_conflict_unresolved",
+              "page_context_truncated",
+              "page_context_split",
+              "consistency_check_failed",
+              "parse_unreachable",
+              "parse_http_failed",
+              "parse_refused",
+              "office_convert_failed",
+              "category_item_not_in_summary",
+              "unexpected_error"
+            ],
+            "title": "Failure Code",
+            "type": "string"
+          },
+          "failure_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Failure Message"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Location"
+          }
+        },
+        "required": [
+          "failure_code"
+        ],
+        "title": "Failure",
+        "type": "object"
+      },
+      "FieldStat": {
+        "additionalProperties": true,
+        "properties": {
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "present": {
+            "title": "Present",
+            "type": "integer"
+          },
+          "points_to_attachment": {
+            "title": "Points To Attachment",
+            "type": "integer"
+          },
+          "missing": {
+            "title": "Missing",
+            "type": "integer"
+          },
+          "coverage": {
+            "title": "Coverage",
+            "type": "number"
+          }
+        },
+        "required": [
+          "total",
+          "present",
+          "points_to_attachment",
+          "missing",
+          "coverage"
+        ],
+        "title": "FieldStat",
+        "type": "object"
+      },
+      "ProjectPlan": {
+        "additionalProperties": true,
+        "properties": {
+          "project_id": {
+            "title": "Project Id",
+            "type": "string"
+          },
+          "package_no": {
+            "title": "Package No",
+            "type": "string"
+          },
+          "package_kind": {
+            "default": "unknown",
+            "enum": [
+              "lot",
+              "contract_package",
+              "unpartitioned",
+              "unknown"
+            ],
+            "title": "Package Kind",
+            "type": "string"
+          },
+          "package_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Package Name"
+          },
+          "source_package_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Source Package No"
+          },
+          "cob_candidate_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cob Candidate Ids",
+            "type": "array"
+          },
+          "sub_candidate_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sub Candidate Ids",
+            "type": "array"
+          },
+          "field_stats": {
+            "additionalProperties": {
+              "$ref": "#/$defs/FieldStat"
+            },
+            "title": "Field Stats",
+            "type": "object"
+          },
+          "missing_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing Fields",
+            "type": "array"
+          },
+          "needs": {
+            "items": {
+              "type": "object"
+            },
+            "title": "Needs",
+            "type": "array"
+          },
+          "suspects": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Suspects",
+            "type": "array"
+          },
+          "has_attachment": {
+            "title": "Has Attachment",
+            "type": "boolean"
+          },
+          "needs_attachment": {
+            "title": "Needs Attachment",
+            "type": "boolean"
+          },
+          "search_queries": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Search Queries",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "running",
+              "success",
+              "partial",
+              "failed",
+              "skipped"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project_id",
+          "package_no",
+          "has_attachment",
+          "needs_attachment",
+          "status"
+        ],
+        "title": "ProjectPlan",
+        "type": "object"
+      }
+    },
+    "additionalProperties": true,
+    "properties": {
+      "run_id": {
+        "title": "Run Id",
+        "type": "string"
+      },
+      "status": {
+        "enum": [
+          "pending",
+          "running",
+          "success",
+          "partial",
+          "failed",
+          "skipped"
+        ],
+        "title": "Status",
+        "type": "string"
+      },
+      "projects": {
+        "items": {
+          "$ref": "#/$defs/ProjectPlan"
+        },
+        "title": "Projects",
+        "type": "array"
+      },
+      "failures": {
+        "items": {
+          "$ref": "#/$defs/Failure"
+        },
+        "title": "Failures",
+        "type": "array"
+      }
+    },
+    "required": [
+      "run_id",
+      "status"
+    ],
+    "title": "ProjectPlans",
+    "type": "object"
+  },
+  "IndexedFile": {
+    "additionalProperties": true,
+    "properties": {
+      "file_id": {
+        "title": "File Id",
+        "type": "string"
+      },
+      "display_name": {
+        "title": "Display Name",
+        "type": "string"
+      },
+      "relative_path": {
+        "title": "Relative Path",
+        "type": "string"
+      },
+      "mime_type": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Mime Type"
+      },
+      "extension": {
+        "title": "Extension",
+        "type": "string"
+      },
+      "page_count": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Page Count"
+      },
+      "text_density": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Text Density"
+      },
+      "readability": {
+        "enum": [
+          "unknown",
+          "text_extractable",
+          "low_text",
+          "parse_failed",
+          "unsupported",
+          "needs_normalisation",
+          "ocr_needed"
+        ],
+        "title": "Readability",
+        "type": "string"
+      },
+      "fmt": {
+        "default": "unknown",
+        "title": "Fmt",
+        "type": "string"
+      },
+      "note": {
+        "default": "",
+        "title": "Note",
+        "type": "string"
+      },
+      "digest": {
+        "default": "",
+        "title": "Digest",
+        "type": "string"
+      },
+      "size_bytes": {
+        "default": 0,
+        "title": "Size Bytes",
+        "type": "integer"
+      },
+      "native_readable": {
+        "default": false,
+        "title": "Native Readable",
+        "type": "boolean"
+      },
+      "needs_normalisation": {
+        "default": false,
+        "title": "Needs Normalisation",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "file_id",
+      "display_name",
+      "relative_path",
+      "extension",
+      "readability"
+    ],
+    "title": "IndexedFile",
+    "type": "object"
+  },
+  "AttachmentIndex": {
+    "$defs": {
+      "IndexedFile": {
+        "additionalProperties": true,
+        "properties": {
+          "file_id": {
+            "title": "File Id",
+            "type": "string"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "relative_path": {
+            "title": "Relative Path",
+            "type": "string"
+          },
+          "mime_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Mime Type"
+          },
+          "extension": {
+            "title": "Extension",
+            "type": "string"
+          },
+          "page_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Page Count"
+          },
+          "text_density": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Text Density"
+          },
+          "readability": {
+            "enum": [
+              "unknown",
+              "text_extractable",
+              "low_text",
+              "parse_failed",
+              "unsupported",
+              "needs_normalisation",
+              "ocr_needed"
+            ],
+            "title": "Readability",
+            "type": "string"
+          },
+          "fmt": {
+            "default": "unknown",
+            "title": "Fmt",
+            "type": "string"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          },
+          "digest": {
+            "default": "",
+            "title": "Digest",
+            "type": "string"
+          },
+          "size_bytes": {
+            "default": 0,
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "native_readable": {
+            "default": false,
+            "title": "Native Readable",
+            "type": "boolean"
+          },
+          "needs_normalisation": {
+            "default": false,
+            "title": "Needs Normalisation",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "file_id",
+          "display_name",
+          "relative_path",
+          "extension",
+          "readability"
+        ],
+        "title": "IndexedFile",
+        "type": "object"
+      }
+    },
+    "additionalProperties": true,
+    "properties": {
+      "announcement_id": {
+        "title": "Announcement Id",
+        "type": "string"
+      },
+      "attachment_directory": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Attachment Directory"
+      },
+      "files": {
+        "items": {
+          "$ref": "#/$defs/IndexedFile"
+        },
+        "title": "Files",
+        "type": "array"
+      },
+      "extraction": {
+        "title": "Extraction",
+        "type": "object"
+      }
+    },
+    "required": [
+      "announcement_id"
+    ],
+    "title": "AttachmentIndex",
+    "type": "object"
+  },
+  "FileDecision": {
+    "additionalProperties": true,
+    "properties": {
+      "file_id": {
+        "title": "File Id",
+        "type": "string"
+      },
+      "file_class": {
+        "enum": [
+          "award_detail",
+          "bid_quote",
+          "winner_detail",
+          "tender_requirement",
+          "qualification",
+          "contract",
+          "evaluation",
+          "unrelated",
+          "unknown"
+        ],
+        "title": "File Class",
+        "type": "string"
+      },
+      "expected_fields": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Expected Fields",
+        "type": "array"
+      },
+      "possible_packages": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Possible Packages",
+        "type": "array"
+      },
+      "priority": {
+        "title": "Priority",
+        "type": "number"
+      },
+      "read_strategy": {
+        "enum": [
+          "skip",
+          "target_pages",
+          "unsupported"
+        ],
+        "title": "Read Strategy",
+        "type": "string"
+      },
+      "reason": {
+        "title": "Reason",
+        "type": "string"
+      },
+      "failure_code": {
+        "anyOf": [
+          {
+            "enum": [
+              "no_attachment",
+              "attachment_index_miss",
+              "unsupported_image",
+              "scanned_or_low_text_pdf",
+              "encrypted_pdf",
+              "watermark_interference",
+              "document_parse_failed",
+              "package_structure_unclear",
+              "llm_schema_invalid",
+              "llm_plan_invalid",
+              "llm_validator_incompatible",
+              "llm_call_failed",
+              "no_text_extractable",
+              "no_candidate_extracted",
+              "field_normalization_failed",
+              "merge_conflict_unresolved",
+              "page_context_truncated",
+              "page_context_split",
+              "consistency_check_failed",
+              "parse_unreachable",
+              "parse_http_failed",
+              "parse_refused",
+              "office_convert_failed",
+              "category_item_not_in_summary",
+              "unexpected_error"
+            ],
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Failure Code"
+      },
+      "failure_message": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Failure Message"
+      },
+      "quote_supplier": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Quote Supplier"
+      },
+      "is_award_notice": {
+        "anyOf": [
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Is Award Notice"
+      },
+      "native_segments": {
+        "items": {
+          "type": "object"
+        },
+        "title": "Native Segments",
+        "type": "array"
+      },
+      "evidence_refs": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Evidence Refs",
+        "type": "array"
+      },
+      "reuse_status": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Reuse Status"
+      },
+      "needs_hit_ids": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Needs Hit Ids",
+        "type": "array"
+      },
+      "continuation_audit": {
+        "title": "Continuation Audit",
+        "type": "object"
+      }
+    },
+    "required": [
+      "file_id",
+      "file_class",
+      "priority",
+      "read_strategy",
+      "reason"
+    ],
+    "title": "FileDecision",
+    "type": "object"
+  },
+  "FileDecisions": {
+    "$defs": {
+      "Failure": {
+        "additionalProperties": true,
+        "properties": {
+          "failure_code": {
+            "enum": [
+              "no_attachment",
+              "attachment_index_miss",
+              "unsupported_image",
+              "scanned_or_low_text_pdf",
+              "encrypted_pdf",
+              "watermark_interference",
+              "document_parse_failed",
+              "package_structure_unclear",
+              "llm_schema_invalid",
+              "llm_plan_invalid",
+              "llm_validator_incompatible",
+              "llm_call_failed",
+              "no_text_extractable",
+              "no_candidate_extracted",
+              "field_normalization_failed",
+              "merge_conflict_unresolved",
+              "page_context_truncated",
+              "page_context_split",
+              "consistency_check_failed",
+              "parse_unreachable",
+              "parse_http_failed",
+              "parse_refused",
+              "office_convert_failed",
+              "category_item_not_in_summary",
+              "unexpected_error"
+            ],
+            "title": "Failure Code",
+            "type": "string"
+          },
+          "failure_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Failure Message"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Location"
+          }
+        },
+        "required": [
+          "failure_code"
+        ],
+        "title": "Failure",
+        "type": "object"
+      },
+      "FileDecision": {
+        "additionalProperties": true,
+        "properties": {
+          "file_id": {
+            "title": "File Id",
+            "type": "string"
+          },
+          "file_class": {
+            "enum": [
+              "award_detail",
+              "bid_quote",
+              "winner_detail",
+              "tender_requirement",
+              "qualification",
+              "contract",
+              "evaluation",
+              "unrelated",
+              "unknown"
+            ],
+            "title": "File Class",
+            "type": "string"
+          },
+          "expected_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Expected Fields",
+            "type": "array"
+          },
+          "possible_packages": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Possible Packages",
+            "type": "array"
+          },
+          "priority": {
+            "title": "Priority",
+            "type": "number"
+          },
+          "read_strategy": {
+            "enum": [
+              "skip",
+              "target_pages",
+              "unsupported"
+            ],
+            "title": "Read Strategy",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "failure_code": {
+            "anyOf": [
+              {
+                "enum": [
+                  "no_attachment",
+                  "attachment_index_miss",
+                  "unsupported_image",
+                  "scanned_or_low_text_pdf",
+                  "encrypted_pdf",
+                  "watermark_interference",
+                  "document_parse_failed",
+                  "package_structure_unclear",
+                  "llm_schema_invalid",
+                  "llm_plan_invalid",
+                  "llm_validator_incompatible",
+                  "llm_call_failed",
+                  "no_text_extractable",
+                  "no_candidate_extracted",
+                  "field_normalization_failed",
+                  "merge_conflict_unresolved",
+                  "page_context_truncated",
+                  "page_context_split",
+                  "consistency_check_failed",
+                  "parse_unreachable",
+                  "parse_http_failed",
+                  "parse_refused",
+                  "office_convert_failed",
+                  "category_item_not_in_summary",
+                  "unexpected_error"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Failure Code"
+          },
+          "failure_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Failure Message"
+          },
+          "quote_supplier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Quote Supplier"
+          },
+          "is_award_notice": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Is Award Notice"
+          },
+          "native_segments": {
+            "items": {
+              "type": "object"
+            },
+            "title": "Native Segments",
+            "type": "array"
+          },
+          "evidence_refs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidence Refs",
+            "type": "array"
+          },
+          "reuse_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reuse Status"
+          },
+          "needs_hit_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Needs Hit Ids",
+            "type": "array"
+          },
+          "continuation_audit": {
+            "title": "Continuation Audit",
+            "type": "object"
+          }
+        },
+        "required": [
+          "file_id",
+          "file_class",
+          "priority",
+          "read_strategy",
+          "reason"
+        ],
+        "title": "FileDecision",
+        "type": "object"
+      }
+    },
+    "additionalProperties": true,
+    "properties": {
+      "run_id": {
+        "title": "Run Id",
+        "type": "string"
+      },
+      "status": {
+        "enum": [
+          "pending",
+          "running",
+          "success",
+          "partial",
+          "failed",
+          "skipped"
+        ],
+        "title": "Status",
+        "type": "string"
+      },
+      "file_decisions": {
+        "items": {
+          "$ref": "#/$defs/FileDecision"
+        },
+        "title": "File Decisions",
+        "type": "array"
+      },
+      "failures": {
+        "items": {
+          "$ref": "#/$defs/Failure"
+        },
+        "title": "Failures",
+        "type": "array"
+      }
+    },
+    "required": [
+      "run_id",
+      "status"
+    ],
+    "title": "FileDecisions",
+    "type": "object"
+  },
+  "PageDecision": {
+    "additionalProperties": true,
+    "properties": {
+      "file_id": {
+        "title": "File Id",
+        "type": "string"
+      },
+      "page_no": {
+        "title": "Page No",
+        "type": "integer"
+      },
+      "relevance": {
+        "title": "Relevance",
+        "type": "number"
+      },
+      "expected_fields": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Expected Fields",
+        "type": "array"
+      },
+      "package_scope": {
+        "title": "Package Scope",
+        "type": "string"
+      },
+      "extraction_mode": {
+        "enum": [
+          "text",
+          "table",
+          "text_and_table",
+          "unsupported"
+        ],
+        "title": "Extraction Mode",
+        "type": "string"
+      },
+      "reason": {
+        "title": "Reason",
+        "type": "string"
+      },
+      "failure_code": {
+        "anyOf": [
+          {
+            "enum": [
+              "no_attachment",
+              "attachment_index_miss",
+              "unsupported_image",
+              "scanned_or_low_text_pdf",
+              "encrypted_pdf",
+              "watermark_interference",
+              "document_parse_failed",
+              "package_structure_unclear",
+              "llm_schema_invalid",
+              "llm_plan_invalid",
+              "llm_validator_incompatible",
+              "llm_call_failed",
+              "no_text_extractable",
+              "no_candidate_extracted",
+              "field_normalization_failed",
+              "merge_conflict_unresolved",
+              "page_context_truncated",
+              "page_context_split",
+              "consistency_check_failed",
+              "parse_unreachable",
+              "parse_http_failed",
+              "parse_refused",
+              "office_convert_failed",
+              "category_item_not_in_summary",
+              "unexpected_error"
+            ],
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Failure Code"
+      },
+      "failure_message": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Failure Message"
+      }
+    },
+    "required": [
+      "file_id",
+      "page_no",
+      "relevance",
+      "package_scope",
+      "extraction_mode",
+      "reason"
+    ],
+    "title": "PageDecision",
+    "type": "object"
+  },
+  "PageDecisions": {
+    "$defs": {
+      "Failure": {
+        "additionalProperties": true,
+        "properties": {
+          "failure_code": {
+            "enum": [
+              "no_attachment",
+              "attachment_index_miss",
+              "unsupported_image",
+              "scanned_or_low_text_pdf",
+              "encrypted_pdf",
+              "watermark_interference",
+              "document_parse_failed",
+              "package_structure_unclear",
+              "llm_schema_invalid",
+              "llm_plan_invalid",
+              "llm_validator_incompatible",
+              "llm_call_failed",
+              "no_text_extractable",
+              "no_candidate_extracted",
+              "field_normalization_failed",
+              "merge_conflict_unresolved",
+              "page_context_truncated",
+              "page_context_split",
+              "consistency_check_failed",
+              "parse_unreachable",
+              "parse_http_failed",
+              "parse_refused",
+              "office_convert_failed",
+              "category_item_not_in_summary",
+              "unexpected_error"
+            ],
+            "title": "Failure Code",
+            "type": "string"
+          },
+          "failure_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Failure Message"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Location"
+          }
+        },
+        "required": [
+          "failure_code"
+        ],
+        "title": "Failure",
+        "type": "object"
+      },
+      "PageDecision": {
+        "additionalProperties": true,
+        "properties": {
+          "file_id": {
+            "title": "File Id",
+            "type": "string"
+          },
+          "page_no": {
+            "title": "Page No",
+            "type": "integer"
+          },
+          "relevance": {
+            "title": "Relevance",
+            "type": "number"
+          },
+          "expected_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Expected Fields",
+            "type": "array"
+          },
+          "package_scope": {
+            "title": "Package Scope",
+            "type": "string"
+          },
+          "extraction_mode": {
+            "enum": [
+              "text",
+              "table",
+              "text_and_table",
+              "unsupported"
+            ],
+            "title": "Extraction Mode",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "failure_code": {
+            "anyOf": [
+              {
+                "enum": [
+                  "no_attachment",
+                  "attachment_index_miss",
+                  "unsupported_image",
+                  "scanned_or_low_text_pdf",
+                  "encrypted_pdf",
+                  "watermark_interference",
+                  "document_parse_failed",
+                  "package_structure_unclear",
+                  "llm_schema_invalid",
+                  "llm_plan_invalid",
+                  "llm_validator_incompatible",
+                  "llm_call_failed",
+                  "no_text_extractable",
+                  "no_candidate_extracted",
+                  "field_normalization_failed",
+                  "merge_conflict_unresolved",
+                  "page_context_truncated",
+                  "page_context_split",
+                  "consistency_check_failed",
+                  "parse_unreachable",
+                  "parse_http_failed",
+                  "parse_refused",
+                  "office_convert_failed",
+                  "category_item_not_in_summary",
+                  "unexpected_error"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Failure Code"
+          },
+          "failure_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Failure Message"
+          }
+        },
+        "required": [
+          "file_id",
+          "page_no",
+          "relevance",
+          "package_scope",
+          "extraction_mode",
+          "reason"
+        ],
+        "title": "PageDecision",
+        "type": "object"
+      }
+    },
+    "additionalProperties": true,
+    "properties": {
+      "run_id": {
+        "title": "Run Id",
+        "type": "string"
+      },
+      "status": {
+        "enum": [
+          "pending",
+          "running",
+          "success",
+          "partial",
+          "failed",
+          "skipped"
+        ],
+        "title": "Status",
+        "type": "string"
+      },
+      "page_decisions": {
+        "items": {
+          "$ref": "#/$defs/PageDecision"
+        },
+        "title": "Page Decisions",
+        "type": "array"
+      },
+      "failures": {
+        "items": {
+          "$ref": "#/$defs/Failure"
+        },
+        "title": "Failures",
+        "type": "array"
+      }
+    },
+    "required": [
+      "run_id",
+      "status"
+    ],
+    "title": "PageDecisions",
+    "type": "object"
+  },
+  "Cob": {
+    "additionalProperties": true,
+    "properties": {
+      "object_name": {
+        "title": "Object Name",
+        "type": "string"
+      },
+      "category_code": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Category Code"
+      },
+      "category_name": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Category Name"
+      },
+      "category_type": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Category Type"
+      },
+      "brand": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Brand"
+      },
+      "product_supplier": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Product Supplier"
+      },
+      "spec_model": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Spec Model"
+      },
+      "unit_price": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Unit Price"
+      },
+      "quantity": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Quantity"
+      },
+      "unit": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Unit"
+      },
+      "total_price": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Total Price"
+      }
+    },
+    "required": [
+      "object_name"
+    ],
+    "title": "Cob",
+    "type": "object"
+  },
+  "Sub": {
+    "additionalProperties": true,
+    "properties": {
+      "supplier_name": {
+        "title": "Supplier Name",
+        "type": "string"
+      },
+      "score": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Score"
+      },
+      "is_winner": {
+        "title": "Is Winner",
+        "type": "boolean"
+      },
+      "supplier_award_amount": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Supplier Award Amount"
+      },
+      "bid_amount": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Bid Amount"
+      },
+      "review_status": {
+        "default": "unknown",
+        "enum": [
+          "passed",
+          "failed",
+          "unknown"
+        ],
+        "title": "Review Status",
+        "type": "string"
+      },
+      "review_failure_reason": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Review Failure Reason"
+      },
+      "cooperative_product_suppliers": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Cooperative Product Suppliers",
+        "type": "array"
+      }
+    },
+    "required": [
+      "supplier_name",
+      "is_winner"
+    ],
+    "title": "Sub",
+    "type": "object"
+  },
+  "Project": {
+    "$defs": {
+      "Cob": {
+        "additionalProperties": true,
+        "properties": {
+          "object_name": {
+            "title": "Object Name",
+            "type": "string"
+          },
+          "category_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Category Code"
+          },
+          "category_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Category Name"
+          },
+          "category_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Category Type"
+          },
+          "brand": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Brand"
+          },
+          "product_supplier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Product Supplier"
+          },
+          "spec_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Spec Model"
+          },
+          "unit_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Unit Price"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Quantity"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Unit"
+          },
+          "total_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Total Price"
+          }
+        },
+        "required": [
+          "object_name"
+        ],
+        "title": "Cob",
+        "type": "object"
+      },
+      "Sub": {
+        "additionalProperties": true,
+        "properties": {
+          "supplier_name": {
+            "title": "Supplier Name",
+            "type": "string"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Score"
+          },
+          "is_winner": {
+            "title": "Is Winner",
+            "type": "boolean"
+          },
+          "supplier_award_amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Supplier Award Amount"
+          },
+          "bid_amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Bid Amount"
+          },
+          "review_status": {
+            "default": "unknown",
+            "enum": [
+              "passed",
+              "failed",
+              "unknown"
+            ],
+            "title": "Review Status",
+            "type": "string"
+          },
+          "review_failure_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Review Failure Reason"
+          },
+          "cooperative_product_suppliers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cooperative Product Suppliers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "supplier_name",
+          "is_winner"
+        ],
+        "title": "Sub",
+        "type": "object"
+      }
+    },
+    "additionalProperties": true,
+    "properties": {
+      "project_id": {
+        "title": "Project Id",
+        "type": "string"
+      },
+      "source_project_no": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Source Project No"
+      },
+      "project_name": {
+        "title": "Project Name",
+        "type": "string"
+      },
+      "package_no": {
+        "title": "Package No",
+        "type": "string"
+      },
+      "package_kind": {
+        "default": "unknown",
+        "enum": [
+          "lot",
+          "contract_package",
+          "unpartitioned",
+          "unknown"
+        ],
+        "title": "Package Kind",
+        "type": "string"
+      },
+      "package_name": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Package Name"
+      },
+      "source_package_no": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Source Package No"
+      },
+      "purchaser": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Purchaser"
+      },
+      "package_total_amount": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Package Total Amount"
+      },
+      "cobs": {
+        "items": {
+          "$ref": "#/$defs/Cob"
+        },
+        "title": "Cobs",
+        "type": "array"
+      },
+      "subs": {
+        "items": {
+          "$ref": "#/$defs/Sub"
+        },
+        "title": "Subs",
+        "type": "array"
+      },
+      "provenance": {
+        "anyOf": [
+          {
+            "additionalProperties": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "type": "object"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Provenance"
+      }
+    },
+    "required": [
+      "project_id",
+      "project_name",
+      "package_no"
+    ],
+    "title": "Project",
+    "type": "object"
+  },
+  "MergedProjects": {
+    "$defs": {
+      "Cob": {
+        "additionalProperties": true,
+        "properties": {
+          "object_name": {
+            "title": "Object Name",
+            "type": "string"
+          },
+          "category_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Category Code"
+          },
+          "category_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Category Name"
+          },
+          "category_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Category Type"
+          },
+          "brand": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Brand"
+          },
+          "product_supplier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Product Supplier"
+          },
+          "spec_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Spec Model"
+          },
+          "unit_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Unit Price"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Quantity"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Unit"
+          },
+          "total_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Total Price"
+          }
+        },
+        "required": [
+          "object_name"
+        ],
+        "title": "Cob",
+        "type": "object"
+      },
+      "Failure": {
+        "additionalProperties": true,
+        "properties": {
+          "failure_code": {
+            "enum": [
+              "no_attachment",
+              "attachment_index_miss",
+              "unsupported_image",
+              "scanned_or_low_text_pdf",
+              "encrypted_pdf",
+              "watermark_interference",
+              "document_parse_failed",
+              "package_structure_unclear",
+              "llm_schema_invalid",
+              "llm_plan_invalid",
+              "llm_validator_incompatible",
+              "llm_call_failed",
+              "no_text_extractable",
+              "no_candidate_extracted",
+              "field_normalization_failed",
+              "merge_conflict_unresolved",
+              "page_context_truncated",
+              "page_context_split",
+              "consistency_check_failed",
+              "parse_unreachable",
+              "parse_http_failed",
+              "parse_refused",
+              "office_convert_failed",
+              "category_item_not_in_summary",
+              "unexpected_error"
+            ],
+            "title": "Failure Code",
+            "type": "string"
+          },
+          "failure_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Failure Message"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Location"
+          }
+        },
+        "required": [
+          "failure_code"
+        ],
+        "title": "Failure",
+        "type": "object"
+      },
+      "Project": {
+        "additionalProperties": true,
+        "properties": {
+          "project_id": {
+            "title": "Project Id",
+            "type": "string"
+          },
+          "source_project_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Source Project No"
+          },
+          "project_name": {
+            "title": "Project Name",
+            "type": "string"
+          },
+          "package_no": {
+            "title": "Package No",
+            "type": "string"
+          },
+          "package_kind": {
+            "default": "unknown",
+            "enum": [
+              "lot",
+              "contract_package",
+              "unpartitioned",
+              "unknown"
+            ],
+            "title": "Package Kind",
+            "type": "string"
+          },
+          "package_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Package Name"
+          },
+          "source_package_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Source Package No"
+          },
+          "purchaser": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Purchaser"
+          },
+          "package_total_amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Package Total Amount"
+          },
+          "cobs": {
+            "items": {
+              "$ref": "#/$defs/Cob"
+            },
+            "title": "Cobs",
+            "type": "array"
+          },
+          "subs": {
+            "items": {
+              "$ref": "#/$defs/Sub"
+            },
+            "title": "Subs",
+            "type": "array"
+          },
+          "provenance": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "type": "array"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Provenance"
+          }
+        },
+        "required": [
+          "project_id",
+          "project_name",
+          "package_no"
+        ],
+        "title": "Project",
+        "type": "object"
+      },
+      "Sub": {
+        "additionalProperties": true,
+        "properties": {
+          "supplier_name": {
+            "title": "Supplier Name",
+            "type": "string"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Score"
+          },
+          "is_winner": {
+            "title": "Is Winner",
+            "type": "boolean"
+          },
+          "supplier_award_amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Supplier Award Amount"
+          },
+          "bid_amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Bid Amount"
+          },
+          "review_status": {
+            "default": "unknown",
+            "enum": [
+              "passed",
+              "failed",
+              "unknown"
+            ],
+            "title": "Review Status",
+            "type": "string"
+          },
+          "review_failure_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Review Failure Reason"
+          },
+          "cooperative_product_suppliers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cooperative Product Suppliers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "supplier_name",
+          "is_winner"
+        ],
+        "title": "Sub",
+        "type": "object"
+      }
+    },
+    "additionalProperties": true,
+    "properties": {
+      "run_id": {
+        "title": "Run Id",
+        "type": "string"
+      },
+      "status": {
+        "enum": [
+          "pending",
+          "running",
+          "success",
+          "partial",
+          "failed",
+          "skipped"
+        ],
+        "title": "Status",
+        "type": "string"
+      },
+      "projects": {
+        "items": {
+          "$ref": "#/$defs/Project"
+        },
+        "title": "Projects",
+        "type": "array"
+      },
+      "conflicts": {
+        "items": {
+          "type": "object"
+        },
+        "title": "Conflicts",
+        "type": "array"
+      },
+      "unmatched_summary_rows": {
+        "items": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "title": "Unmatched Summary Rows",
+        "type": "array"
+      },
+      "unassigned_candidates": {
+        "items": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "title": "Unassigned Candidates",
+        "type": "array"
+      },
+      "list_sources": {
+        "additionalProperties": {
+          "type": "string"
+        },
+        "title": "List Sources",
+        "type": "object"
+      },
+      "amount_origins": {
+        "additionalProperties": {
+          "type": "string"
+        },
+        "title": "Amount Origins",
+        "type": "object"
+      },
+      "alternatives": {
+        "additionalProperties": {
+          "items": {
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "title": "Alternatives",
+        "type": "object"
+      },
+      "repairs": {
+        "items": {
+          "type": "object"
+        },
+        "title": "Repairs",
+        "type": "array"
+      },
+      "checks": {
+        "items": {
+          "type": "object"
+        },
+        "title": "Checks",
+        "type": "array"
+      },
+      "failures": {
+        "items": {
+          "$ref": "#/$defs/Failure"
+        },
+        "title": "Failures",
+        "type": "array"
+      },
+      "merge_decisions": {
+        "items": {
+          "type": "object"
+        },
+        "title": "Merge Decisions",
+        "type": "array"
+      },
+      "amount_audit": {
+        "additionalProperties": {
+          "type": "object"
+        },
+        "title": "Amount Audit",
+        "type": "object"
+      },
+      "merge_notes": {
+        "additionalProperties": {
+          "type": "string"
+        },
+        "title": "Merge Notes",
+        "type": "object"
+      },
+      "merge_attempts": {
+        "additionalProperties": {
+          "items": {
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "title": "Merge Attempts",
+        "type": "object"
+      },
+      "protocol_version": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Protocol Version"
+      },
+      "field_bindings": {
+        "items": {
+          "type": "object"
+        },
+        "title": "Field Bindings",
+        "type": "array"
+      },
+      "unresolved": {
+        "items": {
+          "type": "object"
+        },
+        "title": "Unresolved",
+        "type": "array"
+      },
+      "supplier_inferences": {
+        "items": {
+          "type": "object"
+        },
+        "title": "Supplier Inferences",
+        "type": "array"
+      },
+      "sub_merge_decisions": {
+        "items": {
+          "type": "object"
+        },
+        "title": "Sub Merge Decisions",
+        "type": "array"
+      }
+    },
+    "required": [
+      "run_id",
+      "status"
+    ],
+    "title": "MergedProjects",
+    "type": "object"
+  },
+  "MergeEvidence": {
+    "additionalProperties": true,
+    "description": "Read-only context assembled in the pipeline for step 8.\n\nEverything here already exists inside `run_announcement`'s scope; step 8 simply could not\nsee it. Keys are strings so the structure survives a round trip through JSON.",
+    "properties": {
+      "file_names": {
+        "additionalProperties": {
+          "type": "string"
+        },
+        "title": "File Names",
+        "type": "object"
+      },
+      "file_classes": {
+        "additionalProperties": {
+          "type": "string"
+        },
+        "title": "File Classes",
+        "type": "object"
+      },
+      "file_quote_suppliers": {
+        "additionalProperties": {
+          "type": "string"
+        },
+        "title": "File Quote Suppliers",
+        "type": "object"
+      },
+      "file_award_notices": {
+        "additionalProperties": {
+          "type": "boolean"
+        },
+        "title": "File Award Notices",
+        "type": "object"
+      },
+      "html_tables": {
+        "additionalProperties": {
+          "type": "object"
+        },
+        "title": "Html Tables",
+        "type": "object"
+      },
+      "attachment_pages": {
+        "additionalProperties": {
+          "type": "object"
+        },
+        "title": "Attachment Pages",
+        "type": "object"
+      },
+      "winner_hints": {
+        "additionalProperties": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "title": "Winner Hints",
+        "type": "object"
+      },
+      "amount_observations": {
+        "additionalProperties": {
+          "items": {
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "title": "Amount Observations",
+        "type": "object"
+      },
+      "native_extraction": {
+        "title": "Native Extraction",
+        "type": "object"
+      },
+      "package_registry": {
+        "items": {
+          "type": "object"
+        },
+        "title": "Package Registry",
+        "type": "array"
+      },
+      "source_contexts": {
+        "additionalProperties": {
+          "type": "object"
+        },
+        "title": "Source Contexts",
+        "type": "object"
+      }
+    },
+    "title": "MergeEvidence",
+    "type": "object"
+  },
+  "RunStep": {
+    "additionalProperties": true,
+    "properties": {
+      "step": {
+        "title": "Step",
+        "type": "string"
+      },
+      "status": {
+        "enum": [
+          "pending",
+          "running",
+          "success",
+          "partial",
+          "failed",
+          "skipped"
+        ],
+        "title": "Status",
+        "type": "string"
+      },
+      "output_file": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Output File"
+      },
+      "started_at": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Started At"
+      },
+      "ended_at": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Ended At"
+      },
+      "failure_code": {
+        "anyOf": [
+          {
+            "enum": [
+              "no_attachment",
+              "attachment_index_miss",
+              "unsupported_image",
+              "scanned_or_low_text_pdf",
+              "encrypted_pdf",
+              "watermark_interference",
+              "document_parse_failed",
+              "package_structure_unclear",
+              "llm_schema_invalid",
+              "llm_plan_invalid",
+              "llm_validator_incompatible",
+              "llm_call_failed",
+              "no_text_extractable",
+              "no_candidate_extracted",
+              "field_normalization_failed",
+              "merge_conflict_unresolved",
+              "page_context_truncated",
+              "page_context_split",
+              "consistency_check_failed",
+              "parse_unreachable",
+              "parse_http_failed",
+              "parse_refused",
+              "office_convert_failed",
+              "category_item_not_in_summary",
+              "unexpected_error"
+            ],
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Failure Code"
+      },
+      "failure_message": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Failure Message"
+      }
+    },
+    "required": [
+      "step",
+      "status"
+    ],
+    "title": "RunStep",
+    "type": "object"
+  },
+  "RunState": {
+    "$defs": {
+      "RunStep": {
+        "additionalProperties": true,
+        "properties": {
+          "step": {
+            "title": "Step",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "running",
+              "success",
+              "partial",
+              "failed",
+              "skipped"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "output_file": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Output File"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Started At"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Ended At"
+          },
+          "failure_code": {
+            "anyOf": [
+              {
+                "enum": [
+                  "no_attachment",
+                  "attachment_index_miss",
+                  "unsupported_image",
+                  "scanned_or_low_text_pdf",
+                  "encrypted_pdf",
+                  "watermark_interference",
+                  "document_parse_failed",
+                  "package_structure_unclear",
+                  "llm_schema_invalid",
+                  "llm_plan_invalid",
+                  "llm_validator_incompatible",
+                  "llm_call_failed",
+                  "no_text_extractable",
+                  "no_candidate_extracted",
+                  "field_normalization_failed",
+                  "merge_conflict_unresolved",
+                  "page_context_truncated",
+                  "page_context_split",
+                  "consistency_check_failed",
+                  "parse_unreachable",
+                  "parse_http_failed",
+                  "parse_refused",
+                  "office_convert_failed",
+                  "category_item_not_in_summary",
+                  "unexpected_error"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Failure Code"
+          },
+          "failure_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Failure Message"
+          }
+        },
+        "required": [
+          "step",
+          "status"
+        ],
+        "title": "RunStep",
+        "type": "object"
+      }
+    },
+    "additionalProperties": true,
+    "properties": {
+      "run_id": {
+        "title": "Run Id",
+        "type": "string"
+      },
+      "announcement_id": {
+        "title": "Announcement Id",
+        "type": "string"
+      },
+      "created_at": {
+        "title": "Created At",
+        "type": "string"
+      },
+      "updated_at": {
+        "title": "Updated At",
+        "type": "string"
+      },
+      "status": {
+        "enum": [
+          "pending",
+          "running",
+          "success",
+          "partial",
+          "failed"
+        ],
+        "title": "Status",
+        "type": "string"
+      },
+      "current_step": {
+        "title": "Current Step",
+        "type": "string"
+      },
+      "steps": {
+        "items": {
+          "$ref": "#/$defs/RunStep"
+        },
+        "title": "Steps",
+        "type": "array"
+      },
+      "counts": {
+        "additionalProperties": {
+          "type": "integer"
+        },
+        "title": "Counts",
+        "type": "object"
+      },
+      "review_required": {
+        "default": false,
+        "title": "Review Required",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "run_id",
+      "announcement_id",
+      "created_at",
+      "updated_at",
+      "status",
+      "current_step"
+    ],
+    "title": "RunState",
+    "type": "object"
+  },
+  "RunReport": {
+    "additionalProperties": true,
+    "properties": {
+      "run_id": {
+        "title": "Run Id",
+        "type": "string"
+      },
+      "announcement_id": {
+        "title": "Announcement Id",
+        "type": "string"
+      },
+      "status": {
+        "enum": [
+          "pending",
+          "running",
+          "success",
+          "partial",
+          "failed"
+        ],
+        "title": "Status",
+        "type": "string"
+      },
+      "duration_ms": {
+        "title": "Duration Ms",
+        "type": "integer"
+      },
+      "counts": {
+        "additionalProperties": {
+          "type": "integer"
+        },
+        "title": "Counts",
+        "type": "object"
+      },
+      "llm_calls": {
+        "additionalProperties": {
+          "type": "integer"
+        },
+        "title": "Llm Calls",
+        "type": "object"
+      },
+      "failure_summary": {
+        "items": {
+          "type": "object"
+        },
+        "title": "Failure Summary",
+        "type": "array"
+      },
+      "review_required": {
+        "title": "Review Required",
+        "type": "boolean"
+      },
+      "projects": {
+        "anyOf": [
+          {
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Projects"
+      },
+      "result": {
+        "anyOf": [
+          {
+            "type": "object"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Result"
+      }
+    },
+    "required": [
+      "run_id",
+      "announcement_id",
+      "status",
+      "duration_ms",
+      "counts",
+      "llm_calls",
+      "failure_summary",
+      "review_required"
+    ],
+    "title": "RunReport",
+    "type": "object"
+  }
+}

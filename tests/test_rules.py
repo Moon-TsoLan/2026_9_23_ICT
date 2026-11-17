@@ -320,7 +320,7 @@ def test_service_gap_ignores_missing_brand():
         packages=[PackageUnderstanding(package_no="1", title=None, project_id="项目|1", package_evidence_text="单包")],
     )
     plans = plan_projects("run_x", understanding, [candidate], True)
-    assert plans.projects[0].needs_attachment is True  # 新供应商信息/名单发现任务需要目检附件
+    assert plans.projects[0].needs  # 新供应商信息/名单发现任务需要目检附件
 
 
 def test_plan_needs_attachment_when_brand_missing():
@@ -345,8 +345,8 @@ def test_plan_needs_attachment_when_brand_missing():
         ],
     )
     plans = plan_projects("run_x", understanding, [candidate], True)
-    assert plans.projects[0].needs_attachment is True
-    assert json.loads(plans.model_dump_json())["projects"][0]["has_attachment"] is True
+    assert plans.projects[0].needs
+    assert "has_attachment" not in json.loads(plans.model_dump_json())["projects"][0]
 
 
 def _cob(cid, source, priority, fields, package="1", source_class=None, issues=None, **evidence):
@@ -679,43 +679,6 @@ def test_unpriced_rows_are_reported_instead_of_passing_silently():
     assert failures
 
 
-def test_winner_table_marks_is_winner():
-    from ict.html_context import ParsedNotice, ParsedTable
-    from ict.llm import FakeLLMClient
-    from ict.schemas import HtmlTable, HtmlTables
-    from ict.steps.s02_html import extract_html_candidates
-
-    notice = ParsedNotice(
-        announcement_id="demo",
-        title="示例",
-        summary={},
-        headings=[],
-        tables=[
-            ParsedTable(
-                0,
-                "采购包1:",
-                ["供应商名称", "供应商地址", "中标（成交）金额"],
-                [["甲公司", "地址", "100"], ["评审总得分及排名情况", "乙公司56.29分排名第二"]],
-                "三、中标信息",
-            )
-        ],
-        package_hints=[],
-    )
-    tables = HtmlTables(
-        run_id="run",
-        status="success",
-        tables=[HtmlTable(table_index=0, table_role="winner", package_scope="1", row_grain="supplier", status="success")],
-    )
-    rows = [
-        {"entity_type": "sub", "fields": {"supplier_name": "甲公司"}},
-        {"entity_type": "sub", "fields": {"supplier_name": "乙公司", "is_winner": False}},
-    ]
-    llm = FakeLLMClient({"extract_html_candidates": json.dumps({"candidates": rows})})
-    candidates, _, _ = extract_html_candidates("run", notice, tables, "项目", llm, known_packages=["1"])
-    assert candidates[0].fields["is_winner"].raw_value is True
-    assert candidates[1].fields["is_winner"].raw_value is False
-
-
 def test_promotion_needs_structure_and_respects_vetoes():
     from ict.html_context import ParsedNotice, ParsedTable
     from ict.package_resolve import promote_object_tables
@@ -818,33 +781,6 @@ def test_repair_adds_missing_winner_from_award_text():
     assert merged.repairs[-1]["action"] == "winner_added_from_award_text"
     assert not failures
 
-
-def test_bidder_column_is_not_product_supplier():
-    from ict.html_context import ParsedNotice, ParsedTable
-    from ict.llm import FakeLLMClient
-    from ict.schemas import HtmlTable, HtmlTables
-    from ict.steps.s02_html import extract_html_candidates
-
-    headers = ["序号", "供应商名称", "货物名称", "货物品牌"]
-    notice = ParsedNotice(
-        announcement_id="demo",
-        title="示例",
-        summary={},
-        headings=[],
-        tables=[ParsedTable(0, "", headers, [["1", "第4包 LCD显示大屏：北京智为视媒科技有限公司", "LCD显示大屏", "创维"]], "三、中标信息")],
-        package_hints=[],
-    )
-    mapping = {"supplier_name": "供应商名称", "object_name": "货物名称", "brand": "货物品牌"}
-    tables = HtmlTables(
-        run_id="run",
-        status="success",
-        tables=[HtmlTable(table_index=0, table_role="cob_detail", package_scope="1", row_grain="cob", column_mapping=mapping, status="success")],
-    )
-    row = {"entity_type": "cob", "fields": {"object_name": "LCD显示大屏", "brand": "创维", "product_supplier": "北京智为视媒科技有限公司"}}
-    llm = FakeLLMClient({"extract_html_candidates": json.dumps({"candidates": [row]})})
-    candidates, _, _ = extract_html_candidates("run", notice, tables, "项目", llm, known_packages=["1"])
-    assert candidates[0].fields["product_supplier"].raw_value is None
-    assert "product_supplier_from_bidder_column" in candidates[0].issues
 
 # --------------------------------------------------------------------------------------
 # Step 8: the model proposes deltas, rules own the arithmetic and the veto.

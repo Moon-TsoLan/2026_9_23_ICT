@@ -78,6 +78,9 @@ class ParsedNotice:
     source_project_no: str | None = None
     body_packages: list[str] = field(default_factory=list)
     package_anchors: list[dict] = field(default_factory=list)
+    summary_html: str = ""
+    body_html: str = ""
+    source_contexts: dict[str, dict] = field(default_factory=dict)
 
 
 def _summary(soup: BeautifulSoup) -> dict[str, str]:
@@ -219,6 +222,7 @@ def parse_notice(path: Path) -> ParsedNotice:
         if hint["package_no"] not in seen:
             seen.append(hint["package_no"])
     anchors = _package_anchors(sections)
+    summary_html, body_html, source_contexts = announcement_parts(soup)
     return ParsedNotice(
         announcement_id=announcement_id,
         title=title,
@@ -230,7 +234,39 @@ def parse_notice(path: Path) -> ParsedNotice:
         source_project_no=source_project_no,
         body_packages=seen,
         package_anchors=anchors,
+        summary_html=summary_html,
+        body_html=body_html,
+        source_contexts=source_contexts,
     )
+
+
+def announcement_parts(soup):
+    """Disjoint, complete HTML branches with mechanically assigned source addresses."""
+    title = soup.select_one("h2.tc")
+    meta = soup.find("meta", attrs={"name": "ArticleTitle"})
+    box = soup.select_one("div.table")
+    summary = box.find("table") if box else None
+    content = soup.select_one("div.vF_detail_content") or soup
+    for index, table in enumerate(table for table in content.find_all("table")
+                                  if not table.find_parent("div", class_="table")):
+        table["data-table-index"] = str(index)
+    sources = {}
+    for index, node in enumerate(soup.find_all(["p", "h1", "h2", "h3", "h4", "h5", "h6", "tr"])):
+        ref = "html:n%d" % index
+        node["data-source-ref"] = ref
+        table = node.find_parent("table")
+        sources[ref] = {"source_ref": ref, "text": node.get_text(" ", strip=True),
+                        "table_index": int(table["data-table-index"]) if table and table.has_attr("data-table-index") else None,
+                        "row_index": list(table.find_all("tr")).index(node) if table and node.name == "tr" else None,
+                        "headers": _headers_and_rows(table)[0] if table else []}
+    summary_html = "\n".join(str(node) for node in (title, meta, summary) if node is not None)
+    sources["html:summary"] = {"source_ref": "html:summary", "text": BeautifulSoup(summary_html, "lxml").get_text(" ", strip=True)}
+    for node in (title, meta, summary):
+        if node is not None:
+            node.extract()
+    body_html = str(soup)
+    sources["html:body"] = {"source_ref": "html:body", "text": soup.get_text(" ", strip=True)}
+    return summary_html, body_html, sources
 
 
 def _collect_package_hints(hints: list[dict], text: str, location: str) -> None:
@@ -256,36 +292,6 @@ def _hint(package_no: str, text: str, location: str) -> dict:
         "package_amount": _nearby_amount(text),
     }
 
-
-def _table_preview(table: ParsedTable) -> dict:
-    limit = 20 if table.key_value else 8
-    return {
-        "table_index": table.table_index,
-        "before_text": table.before_text,
-        "section": table.section,
-        "key_value": table.key_value,
-        "headers": table.headers,
-        "rows": table.rows[:limit],
-    }
-
-
-def step1_payload(notice: ParsedNotice) -> dict:
-    summary_keys = ("采购项目名称", "品目", "采购单位", "总中标金额", "总成交金额", "评审专家名单")
-    summary = {key: notice.summary[key] for key in summary_keys if key in notice.summary}
-    useful_sections = [
-        section
-        for section in notice.sections
-        if re.search(r"中标|成交|主要标的|分包", section["title"])
-    ]
-    return {
-        "announcement_title": notice.title,
-        "summary_table": summary,
-        "html_headings": notice.headings[:40],
-        "body_sections": useful_sections[:8],
-        "tables": [_table_preview(table) for table in notice.tables[:12]],
-        "package_hints": notice.package_hints[:40],
-        "source_project_no_hint": notice.source_project_no,
-    }
 
 
 def _package_anchors(sections: list[dict]) -> list[dict]:

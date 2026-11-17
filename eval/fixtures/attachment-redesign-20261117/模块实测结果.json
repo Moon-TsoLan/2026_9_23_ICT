@@ -1,0 +1,614 @@
+{
+  "classifier": {
+    "development": [
+      {
+        "case": "t20260612_26745069",
+        "file": "附件.pdf",
+        "expected": "needs_ocr",
+        "route": "needs_ocr",
+        "reason": "unread_image_content",
+        "part": null,
+        "errors": []
+      },
+      {
+        "case": "t20260807_27093354",
+        "file": "合同包1：中小企业或残疾人福利单位声明函（联通数字科技有限公司广东省分公司）.pdf",
+        "expected": "needs_ocr",
+        "route": "needs_ocr",
+        "reason": "unread_image_content",
+        "part": null,
+        "errors": []
+      },
+      {
+        "case": "t20260703_26870660",
+        "file": "包(1)_报价表.pdf",
+        "expected": "reference",
+        "route": "reference",
+        "reason": "procurement_document_or_form",
+        "part": 1,
+        "errors": []
+      },
+      {
+        "case": "t20260703_26870660",
+        "file": "包1供应商评审情况表.pdf",
+        "expected": "direct",
+        "route": "direct",
+        "reason": "filled_award_or_review",
+        "part": 1,
+        "errors": []
+      },
+      {
+        "case": "t20260403_26361883",
+        "file": "中小企业声明函.pdf",
+        "expected": "direct",
+        "route": "direct",
+        "reason": "named_provider",
+        "part": 1,
+        "errors": []
+      },
+      {
+        "case": "t20260305_26231838",
+        "file": "合同包1：中小企业或残疾人福利单位声明函（广州市城市规划勘测设计研究院有限公司）.pdf",
+        "expected": "direct",
+        "route": "direct",
+        "reason": "named_provider",
+        "part": 1,
+        "errors": []
+      },
+      {
+        "case": "t20260602_26667599",
+        "file": "包1供应商评审情况表.pdf",
+        "expected": "direct",
+        "route": "direct",
+        "reason": "filled_award_or_review",
+        "part": 1,
+        "errors": []
+      },
+      {
+        "case": "t20260812_27123683",
+        "file": "报价明细表.pdf",
+        "expected": "direct",
+        "route": "direct",
+        "reason": "filled_quotation",
+        "part": 1,
+        "errors": []
+      },
+      {
+        "case": "t20260812_27123683",
+        "file": "开标一览表.pdf",
+        "expected": "direct",
+        "route": "direct",
+        "reason": "filled_quotation",
+        "part": 1,
+        "errors": []
+      },
+      {
+        "case": "t20260812_27123683",
+        "file": "淄博市周村华洋交通器材有限公司第2轮报价.pdf",
+        "expected": "direct",
+        "route": "direct",
+        "reason": "filled_quotation",
+        "part": 1,
+        "errors": []
+      },
+      {
+        "case": "t20260511_26545535",
+        "file": "招标文件正文.pdf",
+        "expected": "reference",
+        "route": "reference",
+        "reason": "procurement_document_or_form",
+        "part": 124,
+        "errors": []
+      },
+      {
+        "case": "t20260401_26347563",
+        "file": "G26041招标文件.pdf",
+        "expected": "reference",
+        "route": "reference",
+        "reason": "procurement_document_or_form",
+        "part": null,
+        "errors": []
+      },
+      {
+        "case": "t20260608_26707010",
+        "file": "1包其他厨卫用具-招标文件.pdf",
+        "expected": "reference",
+        "route": "reference",
+        "reason": "procurement_document_or_form",
+        "part": null,
+        "errors": []
+      },
+      {
+        "case": "t20260810_27107304",
+        "file": "报价明细表及分项报价表.pdf",
+        "expected": "direct",
+        "route": "direct",
+        "reason": "filled_quotation",
+        "part": 1,
+        "errors": []
+      },
+      {
+        "case": "t20260807_27091873",
+        "file": "合同包1：报价明细附件（中移建设有限公司）.pdf",
+        "expected": "direct",
+        "route": "direct",
+        "reason": "filled_quotation",
+        "part": 7,
+        "errors": []
+      },
+      {
+        "case": "t20260601_26666947",
+        "file": "分项报价表.pdf",
+        "expected": "direct",
+        "route": "direct",
+        "reason": "filled_quotation",
+        "part": 1,
+        "errors": []
+      },
+      {
+        "case": "t20260804_27071642",
+        "file": "滨州市教育局办公楼顶面墙面及院内地面维修项目(3).xlsx",
+        "expected": "reference",
+        "route": "reference",
+        "reason": "procurement_document_or_form",
+        "part": 2,
+        "errors": []
+      },
+      {
+        "case": "t20260212_26174259",
+        "file": "合同包1：报价明细附件（中国电信股份有限公司广东分公司）.pdf",
+        "expected": "unavailable",
+        "route": "unavailable",
+        "reason": "source_unreadable",
+        "part": null,
+        "errors": [
+          "ValueError: download_error_page"
+        ]
+      },
+      {
+        "case": "t20260609_26719458",
+        "file": "专家费支付表.png",
+        "expected": "needs_ocr",
+        "route": "needs_ocr",
+        "reason": "unread_image_content",
+        "part": null,
+        "errors": []
+      }
+    ],
+    "additional": [
+      {
+        "case": "t20260303_26213769",
+        "file": "声明函.docx",
+        "expected": "irrelevant",
+        "route": "irrelevant",
+        "reason": "ancillary_document",
+        "part": null,
+        "errors": []
+      },
+      {
+        "case": "t20260303_26213769",
+        "file": "残疾人福利性单位声明函.pdf",
+        "expected": "irrelevant",
+        "route": "irrelevant",
+        "reason": "ancillary_document",
+        "part": null,
+        "errors": []
+      },
+      {
+        "case": "t20260303_26213769",
+        "file": "法定代表人或主要负责人身份证明书.docx",
+        "expected": "irrelevant",
+        "route": "undetermined",
+        "reason": "insufficient_evidence",
+        "part": null,
+        "errors": []
+      },
+      {
+        "case": "t20260303_26213769",
+        "file": "监狱企业的证明文件.docx",
+        "expected": "irrelevant",
+        "route": "undetermined",
+        "reason": "insufficient_evidence",
+        "part": null,
+        "errors": []
+      },
+      {
+        "case": "t20260812_27123683",
+        "file": "专家报酬支付表.pdf",
+        "expected": "needs_ocr",
+        "route": "needs_ocr",
+        "reason": "unread_image_content",
+        "part": null,
+        "errors": []
+      },
+      {
+        "case": "t20260812_27123683",
+        "file": "中小企业声明函.pdf",
+        "expected": "direct",
+        "route": "direct",
+        "reason": "named_provider",
+        "part": 1,
+        "errors": []
+      },
+      {
+        "case": "t20260602_26667599",
+        "file": "合同包1：中小企业声明函（四川均盛达商贸有限公司）.pdf",
+        "expected": "direct",
+        "route": "direct",
+        "reason": "named_provider",
+        "part": 1,
+        "errors": []
+      },
+      {
+        "case": "t20260806_27082104",
+        "file": "合同包2：中小企业或残疾人福利单位声明函（公诚管理咨询有限公司）.pdf",
+        "expected": "direct",
+        "route": "direct",
+        "reason": "named_provider",
+        "part": 9,
+        "errors": []
+      }
+    ]
+  },
+  "unit_merge": {
+    "t20260309_26250037": [
+      [
+        {
+          "reason": "该分支是采购需求中明确列出的独立采购包，名称为“设备采购（第一包）”，采购范围为交换机、光端机、视频云存储、警戒枪机、变焦球机、周界雷达、智能防水音柱、联动报警服务模块、视频数据中心主机、智能分析板卡等设备及平台兼容接入；合同履行期限也按第一包单列，故保留为真实单元。",
+          "source_refs": [
+            "html:n54",
+            "html:n57",
+            "html:n67"
+          ],
+          "source": "unit:1",
+          "target": "unit:1"
+        },
+        {
+          "reason": "该分支是采购需求中明确列出的独立采购包，名称为“配套安装工程（第二包）”，采购范围为现场电力、网络、监控杆、挖沟铺设管线及配套工程安装服务、整体设备集成软件调试与平台对接服务；合同履行期限也按第二包单列，故保留为真实单元。",
+          "source_refs": [
+            "html:n55",
+            "html:n58",
+            "html:n67"
+          ],
+          "source": "unit:2",
+          "target": "unit:2"
+        },
+        {
+          "reason": "分项报价表落款为“北京凤舞星河科技发展有限公司”，日期为2026年03月06日，合计总价为1100000元；结果公告及主要标的信息中北京凤舞星河科技发展有限公司的中标金额为110万元，二者一致。该报价明细中的区镇接入交换机、室外光汇聚交换机、周界光端机、视频云存储相关设备、警戒枪机、变焦球机、周界雷达、智能防水音柱、联动报警服务模块、视频数据中心主机、智能分析板卡等，逐项对应第一包“设备采购”的采购范围；总价和落款确认报价主体，明细内容确认所报包为第一包。",
+          "source_refs": [
+            "分项报价表.pdf#1",
+            "分项报价表.pdf#2",
+            "分项报价表.pdf#3",
+            "分项报价表.pdf#4",
+            "分项报价表.pdf#5",
+            "分项报价表.pdf#6",
+            "html:n50",
+            "html:n54"
+          ],
+          "source": "virtual:cand_000002",
+          "target": "unit:1"
+        },
+        {
+          "reason": "结果公告列出两名中标成交供应商：北京凤舞星河科技发展有限公司中标金额110万元，北京中电华安科技股份有限公司中标金额81.0151万元，总中标金额191.0151万元为二者合计。北京凤舞星河的分项报价表已通过落款、合计及设备明细明确对应第一包设备采购；本项目采购单元仅有第一包设备采购和第二包配套安装工程，结果公告的中标人金额覆盖两包，排除已确认对应第一包的凤舞星河后，唯一剩余的北京中电华安81.0151万元对应第二包配套安装工程。另公告按包列示代理费，第二包代理费0.81万元与81.0151万元的工程类费率关系相符，进一步支持该归属。",
+          "source_refs": [
+            "html:n33",
+            "html:n35",
+            "html:n43",
+            "html:n49",
+            "html:n13",
+            "html:n30",
+            "html:n50",
+            "html:n54",
+            "html:n55",
+            "html:n67",
+            "分项报价表.pdf#6"
+          ],
+          "source": "virtual:cand_000001",
+          "target": "unit:2"
+        }
+      ],
+      [
+        {
+          "reason": "分项报价表落款投标人名称（加盖公章）为北京凤舞星河科技发展有限公司，表内总价为1100000元，对应公告中凤舞星河中标金额110万元。更关键的是，明细行逐一落在第一包设备采购范围：区镇接入交换机、室外光汇聚交换机对应交换机；周界光端机对应光端机；48盘位云存储节点及电源、电池、硬盘对应视频云存储；400万智能双光警戒枪机及支架、电源对应警戒枪机；400万40倍变焦球机及吊装盘、支架对应变焦球机；周界雷达及抱杆支架对应周界雷达；智能防水音柱（内置功放）对应智能防水音柱；雷达周界视频联动报警服务模块对应联动报警服务模块；视频数据中心主机及电源对应视频数据中心主机；智能分析板卡、全结构化分析授权对应智能分析板卡。第一包采购范围见公告，故该虚分支应归入第一包设备采购，而非第二包配套安装工程。",
+          "source_refs": [
+            "分项报价表.pdf#6",
+            "分项报价表.pdf#5",
+            "分项报价表.pdf#1",
+            "分项报价表.pdf#2",
+            "分项报价表.pdf#3",
+            "分项报价表.pdf#4",
+            "html:n54",
+            "html:n39",
+            "html:n44"
+          ],
+          "source": "virtual:cand_000002",
+          "target": "unit:1"
+        },
+        {
+          "reason": "公告结果列明中电华安中标金额81.0151万元，凤舞星河中标金额110万元，总中标金额191.0151万元，正好等于两笔中标金额之和；项目采购需求仅第一包设备采购、第二包配套安装工程两个包。凤舞星河的分项报价表已凭设备明细、落款和总价确认归第一包，因此中电华安是唯一剩余的中标人，对应第二包配套安装工程（电力、网络、监控杆、挖沟铺设管线及配套安装、集成软件调试与平台对接）。不是按金额接近单独归位，而是按结果公告的包与中标人覆盖关系及唯一剩余项归位。",
+          "source_refs": [
+            "html:n33",
+            "html:n35",
+            "html:n37",
+            "html:n39",
+            "html:n30",
+            "html:n54",
+            "html:n55",
+            "html:n43",
+            "html:n49",
+            "html:n67"
+          ],
+          "source": "virtual:cand_000001",
+          "target": "unit:2"
+        },
+        {
+          "reason": "该分支是公告采购需求中明确列出的第一包设备采购单元，名称和采购范围与原文一致，属于独立真实采购包，应保留。",
+          "source_refs": [
+            "html:n54",
+            "中标结果公告.pdf#1",
+            "html:n57"
+          ],
+          "source": "unit:1",
+          "target": "unit:1"
+        },
+        {
+          "reason": "该分支是公告采购需求中明确列出的第二包配套安装工程单元，名称和采购范围与原文一致，属于独立真实采购包，应保留。",
+          "source_refs": [
+            "html:n55",
+            "中标结果公告.pdf#1",
+            "html:n58"
+          ],
+          "source": "unit:2",
+          "target": "unit:2"
+        }
+      ],
+      [
+        {
+          "reason": "该分支是公告原文明确列出的独立采购包“第一包”，采购范围为设备采购及兼容接入平台，合同履行期限为签订合同之日起10日内；与第二包的配套安装工程范围不同，故保留原文完整名称，target 指向自身。",
+          "source_refs": [
+            "html:n54",
+            "html:n57"
+          ],
+          "source": "unit:1",
+          "target": "unit:1"
+        },
+        {
+          "reason": "该分支是公告原文明确列出的独立采购包“第二包”，采购范围为现场电力、网络、监控杆、挖沟铺设管线及配套工程安装服务与平台对接调试，合同履行期限为签订合同之日起60日内；与第一包设备供货范围不同，故保留原文完整名称，target 指向自身。",
+          "source_refs": [
+            "html:n55",
+            "html:n58"
+          ],
+          "source": "unit:2",
+          "target": "unit:2"
+        },
+        {
+          "reason": "分项报价表落款投标人名称为北京凤舞星河科技发展有限公司，日期为2026年03月06日，总价为1100000元；表内第1至27项实际交付物为交换机、光端机、云存储、警戒枪机、变焦球机、周界雷达、智能防水音柱、联动报警服务模块、视频接入引擎、视频数据中心主机、智能分析板卡等，逐一落入第一包采购范围（如第1至2项交换机、第3至4项光端机、第5至8项云存储、第9项警戒枪机、第16项变焦球机、第19项周界雷达、第21项智能防水音柱、第22项联动报警服务模块、第24项视频数据中心主机、第26项智能分析板卡），而第二包是配套安装工程服务，不含上述设备供货。公告同时列明凤舞星河中标金额110万元，与分项报价表总价一致。故该供应商及其报价明细归属第一包设备采购。",
+          "source_refs": [
+            "html:n44",
+            "html:n49",
+            "html:n54",
+            "html:n55",
+            "分项报价表.pdf#1",
+            "分项报价表.pdf#2",
+            "分项报价表.pdf#3",
+            "分项报价表.pdf#4",
+            "分项报价表.pdf#5",
+            "分项报价表.pdf#6"
+          ],
+          "source": "virtual:cand_000002",
+          "target": "unit:1"
+        },
+        {
+          "reason": "结果公告载明项目总中标成交金额191.0151万元，且仅列两名中标供应商：北京中电华安科技股份有限公司81.0151万元、北京凤舞星河科技发展有限公司110万元；项目采购需求明确为第一包设备采购、第二包配套安装工程两包。第一包已由分项报价表落款凤舞星河及设备明细逐项对应而确认；在结果公告的两包与两名中标人覆盖关系下，唯一剩余的中标供应商北京中电华安科技股份有限公司（81.0151万元）即对应未占用的第二包配套安装工程。包段代理费也列明第一包1.61万元、第二包0.81万元，支持两包分别成交。故该分支归属第二包。",
+          "source_refs": [
+            "html:n30",
+            "html:n33",
+            "html:n35",
+            "html:n37",
+            "html:n39",
+            "html:n49",
+            "html:n50",
+            "html:n54",
+            "html:n55",
+            "html:n67"
+          ],
+          "source": "virtual:cand_000001",
+          "target": "unit:2"
+        }
+      ]
+    ],
+    "t20260511_26545535": [
+      {
+        "reason": "成交结果表中“豫政采(2)20260445-1”行明确列示采购内容为河南工学院教师业绩数据治理与智能服务平台项目，供应商为联奕科技股份有限公司，中标金额696,000.00元，评审总得分95.94分；该包行之后的服务明细表序号1名称及服务范围均为同一项目，说明该明细行对应-1包。包号、供应商及金额与分支观测一致，且与-2、-3包的中标人不同，故-1包为独立真实单元，保留原分支。",
+        "source_refs": [
+          "html:n36",
+          "html:n38",
+          "html:n41"
+        ],
+        "source": "豫政采(2)20260445-1",
+        "target": "豫政采(2)20260445-1"
+      },
+      {
+        "reason": "成交结果表中“豫政采(2)20260445-2”行明确列示供应商为河南铂恩智能科技有限公司，中标金额558,000.00元，评审总得分89.57分；该包行之后的服务明细表序号1名称及服务范围均为同一项目，说明该明细行对应-2包。包号、供应商及金额与分支观测一致，且与-1、-3包的中标人不同，故-2包为独立真实单元，保留原分支。",
+        "source_refs": [
+          "html:n36",
+          "html:n42",
+          "html:n45"
+        ],
+        "source": "豫政采(2)20260445-2",
+        "target": "豫政采(2)20260445-2"
+      },
+      {
+        "reason": "成交结果表中“豫政采(2)20260445-3”行明确列示供应商为正方软件股份有限公司，中标金额270,000.00元，评审总得分95.6分；该包行之后的服务明细表序号1名称及服务范围均为同一项目，说明该明细行对应-3包。包号、供应商及金额与分支观测一致，且与-1、-2包的中标人不同，故-3包为独立真实单元，保留原分支。",
+        "source_refs": [
+          "html:n36",
+          "html:n46",
+          "html:n49"
+        ],
+        "source": "豫政采(2)20260445-3",
+        "target": "豫政采(2)20260445-3"
+      }
+    ],
+    "t20260206_26154828": [
+      {
+        "source": "第1包",
+        "target": "第1包",
+        "source_refs": [
+          "html:n28",
+          "html:n30",
+          "html:n41",
+          "html:n58",
+          "html:n59"
+        ],
+        "reason": "原文中标信息明确写为“供应商名称：第1包-中国软件与技术服务股份有限公司”，对应金额603.3200000万元；主要标的信息第1行再次以“第1包-中国软件与技术服务股份有限公司”列示服务“基础硬件设备运维服务，操作系统、中间件、数据库、云平台等基础软件运维服务”；补充事宜亦写“第1包中标人：中国软件与技术服务股份有限公司”及综合得分95.29分。上述包号、供应商、服务内容和金额均指向同一第1包采购单元，且与其他包相互独立，故保留第1包。"
+      },
+      {
+        "source": "第2包",
+        "target": "第2包",
+        "source_refs": [
+          "html:n32",
+          "html:n34",
+          "html:n44",
+          "html:n60",
+          "html:n61"
+        ],
+        "reason": "原文中标信息明确写为“供应商名称：第2包-中软信息技术创新有限公司”，对应金额1233.3900000万元；主要标的信息第2行再次以“第2包-中软信息技术创新有限公司”列示服务“应用及数据运行运维服务”；补充事宜亦写“第2包中标人：中软信息技术创新有限公司”及综合得分92.56分。包号、供应商、服务内容和金额均指向同一第2包采购单元，且与第1包、第3包分别独立，故保留第2包。"
+      },
+      {
+        "source": "第3包",
+        "target": "第3包",
+        "source_refs": [
+          "html:n36",
+          "html:n38",
+          "html:n47",
+          "html:n62",
+          "html:n63"
+        ],
+        "reason": "原文中标信息明确写为“供应商名称：第3包-北京安华金和科技有限公司”，对应金额150.0000000万元；主要标的信息第3行再次以“第3包-北京安华金和科技有限公司”列示货物“数据库审计工具”，品牌安华金和、型号DAS12100A-G、数量3、单价250,000.00；补充事宜亦写“第3包中标人：北京安华金和科技有限公司”及综合得分96.37分。包号、供应商、货物内容和金额均指向同一第3包采购单元，且与第1包、第2包分别独立，故保留第3包。"
+      }
+    ]
+  },
+  "package_delta": {
+    "status": "partial",
+    "projects": [
+      {
+        "package_no": "unit:1",
+        "subs": [
+          {
+            "supplier_name": "北京凤舞星河科技发展有限公司",
+            "score": 93.63,
+            "is_winner": true,
+            "supplier_award_amount": 1100000.0,
+            "bid_amount": null,
+            "review_status": "unknown",
+            "review_failure_reason": null,
+            "cooperative_product_suppliers": []
+          }
+        ],
+        "cobs": []
+      },
+      {
+        "package_no": "unit:2",
+        "subs": [
+          {
+            "supplier_name": "北京中电华安科技股份有限公司",
+            "score": 92.4,
+            "is_winner": true,
+            "supplier_award_amount": 810151.0,
+            "bid_amount": null,
+            "review_status": "unknown",
+            "review_failure_reason": null,
+            "cooperative_product_suppliers": []
+          }
+        ],
+        "cobs": []
+      }
+    ],
+    "unresolved": [
+      {
+        "package_no": "unit:1",
+        "group_id": "g:0",
+        "candidate_id": "cand_000004",
+        "reason": "missing_object_name"
+      },
+      {
+        "package_no": "unit:2",
+        "group_id": "g:0",
+        "candidate_id": "cand_000003",
+        "keys": [
+          "unit_price",
+          "quantity"
+        ],
+        "reason": "accounting_conflicts_with_binding"
+      },
+      {
+        "package_no": "unit:2",
+        "group_id": "g:0",
+        "candidate_id": "cand_000003",
+        "reason": "missing_object_name"
+      }
+    ]
+  },
+  "reference_fill": {
+    "t20260511_26545535": {
+      "before": [
+        "豫政采(2)20260445-1",
+        "豫政采(2)20260445-2",
+        "豫政采(2)20260445-3"
+      ],
+      "after": [
+        "A 包：教师业绩智能服务平台",
+        "B 包：人事管理系统",
+        "C 包：科研管理服务平台"
+      ],
+      "changes": [
+        {
+          "stage": "reference_fill",
+          "package_no": "豫政采(2)20260445-1",
+          "cob_index": null,
+          "field": "package_name",
+          "value": "A 包：教师业绩智能服务平台",
+          "sources": [
+            "招标文件正文.pdf#4:T1R1:包名称",
+            "招标文件正文_2.pdf#4:T1R1:包名称"
+          ]
+        },
+        {
+          "stage": "reference_fill",
+          "package_no": "豫政采(2)20260445-2",
+          "cob_index": null,
+          "field": "package_name",
+          "value": "B 包：人事管理系统",
+          "sources": [
+            "招标文件正文.pdf#4:T1R2:包名称",
+            "招标文件正文_2.pdf#4:T1R2:包名称"
+          ]
+        },
+        {
+          "stage": "reference_fill",
+          "package_no": "豫政采(2)20260445-3",
+          "cob_index": null,
+          "field": "package_name",
+          "value": "C 包：科研管理服务平台",
+          "sources": [
+            "招标文件正文.pdf#4:T1R3:包名称",
+            "招标文件正文_2.pdf#4:T1R3:包名称"
+          ]
+        }
+      ]
+    },
+    "t20260206_26154828": {
+      "before": [
+        "第1包",
+        "第2包",
+        "第3包"
+      ],
+      "after": [
+        "第1包",
+        "第2包",
+        "第3包"
+      ],
+      "changes": []
+    }
+  }
+}

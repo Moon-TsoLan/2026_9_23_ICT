@@ -14,6 +14,26 @@ export interface AnnouncementItem {
 
 export type RunStatus = 'pending' | 'running' | 'success' | 'partial' | 'failed'
 export type StepStatus = 'pending' | 'running' | 'success' | 'partial' | 'failed' | 'skipped'
+export type MergeWait = 'queued' | 'running' | 'resuming'
+
+export interface MergeTiming {
+  queued_at: string | null
+  started_at: string | null
+  returned_at: string | null
+  resumed_at: string | null
+}
+
+export function mergeWaitText(phase: MergeWait, timing?: MergeTiming | null): string {
+  if (phase !== 'resuming' || !timing?.returned_at) return MERGE_WAIT_LABEL[phase]
+  const seconds = Math.max(0, ((timing.resumed_at ? Date.parse(timing.resumed_at) : Date.now()) - Date.parse(timing.returned_at)) / 1000)
+  return `${MERGE_WAIT_LABEL[phase]} · ${seconds.toFixed(1)}秒`
+}
+
+export const MERGE_WAIT_LABEL: Record<MergeWait, string> = {
+  queued: '等待合并名额',
+  running: '合并处理中',
+  resuming: '等待接续处理',
+}
 
 /** ---- 上传 → 建任务：与 server/ingest.py 的接口对齐 ---- */
 
@@ -42,7 +62,7 @@ export interface JobItem {
   current_step: string | null
   error: string | null
   /** 提取进度（读自 run_state.json；只在跑过之后有） */
-  progress?: { done: number; total: number; current_step: string | null; status: string } | null
+  progress?: { done: number; total: number; current_step: string | null; status: string; merge_wait?: MergeWait | null; merge_timing?: MergeTiming | null } | null
 }
 
 export interface IngestJob {
@@ -77,7 +97,7 @@ export interface IngestRecord {
   error: string | null
   /** 磁盘上那份 run_state 是否属于本次尝试（重新上传后，旧记录还在，不能拿来展示） */
   run_started: boolean
-  progress: { done: number; total: number; current_step: string | null } | null
+  progress: { done: number; total: number; current_step: string | null; merge_wait?: MergeWait | null; merge_timing?: MergeTiming | null } | null
   projects: number | null
   cobs: number | null
   updated_at: string | null
@@ -115,6 +135,8 @@ export interface RunState {
   updated_at: string
   status: RunStatus
   current_step: string
+  merge_wait?: MergeWait | null
+  merge_timing?: MergeTiming | null
   steps: RunStep[]
   counts: {
     projects: number
@@ -132,7 +154,8 @@ export interface RunState {
 
 /** 步骤中文名（与后端 steps[].step 对齐） */
 export const STEP_LABEL: Record<string, string> = {
-  understand_announcement: '读入公告',
+  understand_announcement: '并行理解概要与正文',
+  process_attachment_pages: '逐页读取与抽取附件',
   understand_html_tables: '理解表格',
   extract_html_candidates: '抽候选',
   bind_packages: '采购单元归属',

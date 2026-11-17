@@ -161,14 +161,18 @@ def parse_settings() -> dict:
 def concurrency_settings() -> dict:
     """Concurrency knobs, defaulted for the 2-core / 4 GB deployment box.
 
-    These bound how many calls may be in flight at once; no judgement reads them. Every one of
-    them has the same effect when set to 1 as the serial pipeline had before them.
+    These bound resource use; no business judgement reads them. Merge waiting uses a separate
+    pool so even one normal case slot can advance the next case while a merge is in flight.
     """
     load_local_env()
     return {
-        # Announcements processed at the same time. Memory, not CPU, is what limits this: each one
-        # in flight holds its own parsed pages.
+        # Case slots outside merge. Suspended merges do not occupy these slots.
         "announcement_workers": int(os.environ.get("ICT_ANNOUNCEMENT_WORKERS", "4")),
+        # Merge coordinators (each still shares the global per-request API gate).
+        # Total live cases are bounded by announcement_workers + merge_workers.
+        "merge_workers": int(os.environ.get("ICT_MERGE_WORKERS", "4")),
+        # Dedicated post-merge continuations; does not increase the live-case bound.
+        "resume_workers": int(os.environ.get("ICT_RESUME_WORKERS", "1")),
         # Chat calls in flight across every step and every announcement.
         "llm_max_concurrency": int(os.environ.get("ICT_LLM_MAX_CONCURRENCY", "8")),
         "llm_retry_attempts": int(os.environ.get("ICT_LLM_RETRY_ATTEMPTS", "3")),
